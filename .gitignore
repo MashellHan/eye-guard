@@ -1,0 +1,32 @@
+# Swift / Xcode
+.build/
+.swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
+.swiftpm/xcode/xcshareddata/
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+DerivedData/
+*.playground
+
+# macOS
+.DS_Store
+*.dSYM
+*.dSYM.zip
+
+# Build artifacts
+Build/
+build/
+*.o
+*.d
+*.swp
+*~
+
+# IDE
+.idea/
+*.sublime-project
+*.sublime-workspace
+.vscode/
+
+# Package manager
+Packages/
+Package.resolved
