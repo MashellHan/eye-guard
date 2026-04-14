@@ -171,6 +171,10 @@ final class NotificationManager: NotificationSending {
     // MARK: - Private: Notification Permission
 
     private func requestNotificationPermission() {
+        guard Bundle.main.bundleIdentifier != nil else {
+            Log.notification.warning("Not running in an app bundle. Notifications disabled.")
+            return
+        }
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
             if let error {
                 Log.notification.error("Permission error: \(error.localizedDescription)")
@@ -185,6 +189,11 @@ final class NotificationManager: NotificationSending {
     // MARK: - Private: Tier 1 — System Notification
 
     private func sendTier1Notification(breakType: BreakType) {
+        guard Bundle.main.bundleIdentifier != nil else {
+            Log.notification.warning("No bundle identifier — skipping Tier 1 notification.")
+            return
+        }
+
         let content = UNMutableNotificationContent()
         content.title = "Time for a \(breakType.displayName)"
         content.body = breakType.ruleDescription
@@ -235,9 +244,11 @@ final class NotificationManager: NotificationSending {
     }
 
     private func dismissAllOverlays() {
-        UNUserNotificationCenter.current().removeDeliveredNotifications(
-            withIdentifiers: BreakType.allCases.map { "eyeguard.break.\($0.rawValue)" }
-        )
+        if Bundle.main.bundleIdentifier != nil {
+            UNUserNotificationCenter.current().removeDeliveredNotifications(
+                withIdentifiers: BreakType.allCases.map { "eyeguard.break.\($0.rawValue)" }
+            )
+        }
         // TODO: Close Tier 2/3 overlay windows
     }
 }

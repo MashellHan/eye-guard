@@ -48,7 +48,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Requests notification permissions via explicit setup() call
     /// (moved out of NotificationManager.init).
+    /// Guarded: only runs inside a proper .app bundle with a bundle identifier.
     private func setupNotifications() {
+        guard Bundle.main.bundleIdentifier != nil else {
+            Log.app.warning("Not running in an app bundle. Notifications disabled.")
+            return
+        }
         Task { @MainActor in
             NotificationManager.shared.setup()
         }

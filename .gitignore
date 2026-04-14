@@ -16,6 +16,7 @@ DerivedData/
 # Build artifacts
 Build/
 build/
+*.app
 *.o
 *.d
 *.swp
