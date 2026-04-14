@@ -1,0 +1,259 @@
+import Foundation
+import Testing
+
+@testable import EyeGuard
+
+// MARK: - Mock ActivityMonitor
+
+/// Mock activity monitor for testing BreakScheduler in isolation.
+actor MockActivityMonitor: ActivityMonitoring {
+    private(set) var isIdle: Bool = false
+    private(set) var startMonitoringCalled = false
+    private(set) var stopMonitoringCalled = false
+    private(set) var resetStateCalled = false
+
+    func setIdle(_ idle: Bool) {
+        isIdle = idle
+    }
+
+    func startMonitoring() {
+        startMonitoringCalled = true
+    }
+
+    func stopMonitoring() {
+        stopMonitoringCalled = true
+    }
+
+    func resetState() {
+        resetStateCalled = true
+        isIdle = false
+    }
+}
+
+// MARK: - Mock NotificationSender
+
+/// Mock notification sender for testing BreakScheduler in isolation.
+@MainActor
+final class MockNotificationSender: NotificationSending {
+    private(set) var notifyCalls: [(BreakType, @Sendable () -> Void, @Sendable () -> Void)] = []
+    private(set) var acknowledgeCalls = 0
+    private(set) var snoozeCalls: [(BreakType, @Sendable () -> Void)] = []
+    private(set) var setupCalled = false
+
+    var lastNotifiedBreakType: BreakType? {
+        notifyCalls.last?.0
+    }
+
+    func notify(
+        breakType: BreakType,
+        onTaken: @escaping @Sendable () -> Void,
+        onSkipped: @escaping @Sendable () -> Void
+    ) {
+        notifyCalls.append((breakType, onTaken, onSkipped))
+    }
+
+    func acknowledgeBreak() {
+        acknowledgeCalls += 1
+    }
+
+    func snooze(breakType: BreakType, onDue: @escaping @Sendable () -> Void) {
+        snoozeCalls.append((breakType, onDue))
+    }
+
+    func setup() {
+        setupCalled = true
+    }
+}
+
+// MARK: - BreakScheduler Tests
+
+@Suite("BreakScheduler")
+struct BreakSchedulerTests {
+
+    @Test("Initial state is correct")
+    @MainActor
+    func initialState() {
+        let mockActivity = MockActivityMonitor()
+        let mockNotification = MockNotificationSender()
+        let scheduler = BreakScheduler(
+            activityMonitor: mockActivity,
+            notificationSender: mockNotification
+        )
+
+        #expect(scheduler.isPaused == false)
+        #expect(scheduler.currentSessionDuration == 0)
+        #expect(scheduler.nextScheduledBreak == .micro)
+        #expect(scheduler.breaksTakenToday == 0)
+        #expect(scheduler.breaksSkippedToday == 0)
+        #expect(scheduler.currentHealthScore == 100)
+        #expect(scheduler.todayBreakEvents.isEmpty)
+        #expect(scheduler.totalScreenTimeToday == 0)
+    }
+
+    @Test("Toggle pause works correctly")
+    @MainActor
+    func togglePause() {
+        let scheduler = BreakScheduler(
+            activityMonitor: MockActivityMonitor(),
+            notificationSender: MockNotificationSender()
+        )
+
+        #expect(scheduler.isPaused == false)
+        scheduler.togglePause()
+        #expect(scheduler.isPaused == true)
+        scheduler.togglePause()
+        #expect(scheduler.isPaused == false)
+    }
+
+    @Test("Take break records event and increments counter")
+    @MainActor
+    func takeBreak() {
+        let scheduler = BreakScheduler(
+            activityMonitor: MockActivityMonitor(),
+            notificationSender: MockNotificationSender()
+        )
+
+        scheduler.takeBreakNow(.micro)
+        #expect(scheduler.breaksTakenToday == 1)
+        #expect(scheduler.breaksSkippedToday == 0)
+        #expect(scheduler.todayBreakEvents.count == 1)
+        #expect(scheduler.todayBreakEvents[0].wasTaken == true)
+        #expect(scheduler.todayBreakEvents[0].type == .micro)
+    }
+
+    @Test("Skip break records event and increments counter")
+    @MainActor
+    func skipBreak() {
+        let scheduler = BreakScheduler(
+            activityMonitor: MockActivityMonitor(),
+            notificationSender: MockNotificationSender()
+        )
+
+        scheduler.skipBreak(.macro)
+        #expect(scheduler.breaksTakenToday == 0)
+        #expect(scheduler.breaksSkippedToday == 1)
+        #expect(scheduler.todayBreakEvents.count == 1)
+        #expect(scheduler.todayBreakEvents[0].wasTaken == false)
+    }
+
+    @Test("Reset session clears duration and timers")
+    @MainActor
+    func resetSession() {
+        let scheduler = BreakScheduler(
+            activityMonitor: MockActivityMonitor(),
+            notificationSender: MockNotificationSender()
+        )
+
+        scheduler.takeBreakNow(.micro)
+        scheduler.resetSession()
+
+        #expect(scheduler.currentSessionDuration == 0)
+        #expect(scheduler.nextScheduledBreak == .micro)
+    }
+
+    @Test("Reset daily clears all counters")
+    @MainActor
+    func resetDaily() {
+        let scheduler = BreakScheduler(
+            activityMonitor: MockActivityMonitor(),
+            notificationSender: MockNotificationSender()
+        )
+
+        scheduler.takeBreakNow(.micro)
+        scheduler.skipBreak(.macro)
+        scheduler.resetDaily()
+
+        #expect(scheduler.breaksTakenToday == 0)
+        #expect(scheduler.breaksSkippedToday == 0)
+        #expect(scheduler.todayBreakEvents.isEmpty)
+        #expect(scheduler.totalScreenTimeToday == 0)
+        #expect(scheduler.currentHealthScore == 100)
+    }
+
+    @Test("Micro break reset only resets micro timer")
+    @MainActor
+    func microBreakResetBehavior() {
+        let scheduler = BreakScheduler(
+            activityMonitor: MockActivityMonitor(),
+            notificationSender: MockNotificationSender()
+        )
+
+        scheduler.takeBreakNow(.micro)
+        #expect(scheduler.breaksTakenToday == 1)
+        #expect(scheduler.currentSessionDuration == 0)
+    }
+
+    @Test("Mandatory break reset resets all timers")
+    @MainActor
+    func mandatoryBreakResetBehavior() {
+        let scheduler = BreakScheduler(
+            activityMonitor: MockActivityMonitor(),
+            notificationSender: MockNotificationSender()
+        )
+
+        scheduler.takeBreakNow(.mandatory)
+        #expect(scheduler.breaksTakenToday == 1)
+        #expect(scheduler.currentSessionDuration == 0)
+    }
+
+    @Test("Handle idle detected resets micro timer")
+    @MainActor
+    func handleIdleDetected() {
+        let scheduler = BreakScheduler(
+            activityMonitor: MockActivityMonitor(),
+            notificationSender: MockNotificationSender()
+        )
+
+        scheduler.handleIdleDetected()
+        #expect(scheduler.currentSessionDuration == 0)
+    }
+
+    @Test("Handle idle detected does nothing when paused")
+    @MainActor
+    func handleIdleDetectedWhenPaused() {
+        let scheduler = BreakScheduler(
+            activityMonitor: MockActivityMonitor(),
+            notificationSender: MockNotificationSender()
+        )
+
+        scheduler.togglePause()
+        scheduler.handleIdleDetected()
+        #expect(scheduler.isPaused == true)
+    }
+
+    @Test("Health score decreases when breaks are skipped")
+    @MainActor
+    func healthScoreDecreasesOnSkip() {
+        let scheduler = BreakScheduler(
+            activityMonitor: MockActivityMonitor(),
+            notificationSender: MockNotificationSender()
+        )
+
+        scheduler.skipBreak(.micro)
+        scheduler.skipBreak(.micro)
+        scheduler.skipBreak(.macro)
+
+        #expect(scheduler.currentHealthScore < 100)
+    }
+
+    @Test("Multiple break types can be taken independently")
+    @MainActor
+    func multipleBreakTypes() {
+        let scheduler = BreakScheduler(
+            activityMonitor: MockActivityMonitor(),
+            notificationSender: MockNotificationSender()
+        )
+
+        scheduler.takeBreakNow(.micro)
+        scheduler.takeBreakNow(.macro)
+        scheduler.takeBreakNow(.mandatory)
+
+        #expect(scheduler.breaksTakenToday == 3)
+        #expect(scheduler.todayBreakEvents.count == 3)
+
+        let types = Set(scheduler.todayBreakEvents.map(\.type))
+        #expect(types.contains(.micro))
+        #expect(types.contains(.macro))
+        #expect(types.contains(.mandatory))
+    }
+}

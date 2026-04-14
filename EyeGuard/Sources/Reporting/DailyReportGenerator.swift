@@ -1,13 +1,17 @@
 import Foundation
+import os
 
 /// Generates daily Markdown reports summarizing eye health metrics.
 ///
 /// Reports are saved to `~/EyeGuard/reports/YYYY-MM-DD.md`.
-struct DailyReportGenerator {
+/// All file I/O is performed asynchronously.
+struct DailyReportGenerator: Sendable {
 
     private let calculator = HealthScoreCalculator()
 
     /// Generates and saves a daily report for the given data.
+    ///
+    /// File I/O is performed on a background thread via async (v0.2).
     ///
     /// - Parameters:
     ///   - date: The date of the report.
@@ -22,7 +26,7 @@ struct DailyReportGenerator {
         breakEvents: [BreakEvent],
         totalScreenTime: TimeInterval,
         longestContinuousSession: TimeInterval
-    ) -> DailyReport {
+    ) async -> DailyReport {
         let healthScore = calculator.calculate(
             breakEvents: breakEvents,
             totalScreenTime: totalScreenTime,
@@ -39,14 +43,14 @@ struct DailyReportGenerator {
             totalBreaksScheduled: breakEvents.count
         )
 
-        saveMarkdownReport(report, date: date)
+        await saveMarkdownReport(report, date: date)
         return report
     }
 
     // MARK: - Markdown Generation
 
-    /// Saves the report as a Markdown file.
-    private func saveMarkdownReport(_ report: DailyReport, date: Date) {
+    /// Saves the report as a Markdown file on a background thread.
+    private func saveMarkdownReport(_ report: DailyReport, date: Date) async {
         let markdown = renderMarkdown(report, date: date)
         let fileName = "\(report.dateString).md"
         let fileURL = EyeGuardConstants.reportsDirectory.appendingPathComponent(fileName)
@@ -58,9 +62,9 @@ struct DailyReportGenerator {
                 withIntermediateDirectories: true
             )
             try markdown.write(to: fileURL, atomically: true, encoding: .utf8)
-            print("[DailyReportGenerator] Report saved: \(fileURL.path)")
+            Log.report.info("Report saved: \(fileURL.path)")
         } catch {
-            print("[DailyReportGenerator] Failed to save report: \(error.localizedDescription)")
+            Log.report.error("Failed to save report: \(error.localizedDescription)")
         }
     }
 
@@ -68,9 +72,10 @@ struct DailyReportGenerator {
     private func renderMarkdown(_ report: DailyReport, date: Date) -> String {
         let dateFormatter = DateFormatter()
         dateFormatter.dateStyle = .long
+        dateFormatter.timeZone = .current  // BUG-007: explicit timezone
 
         let score = report.healthScore
-        let screenTimeStr = formatDuration(report.totalScreenTime)
+        let screenTimeStr = TimeFormatting.formatDuration(report.totalScreenTime)
 
         return """
         # EyeGuard Daily Report — \(dateFormatter.string(from: date))
@@ -113,11 +118,12 @@ struct DailyReportGenerator {
 
         let timeFormatter = DateFormatter()
         timeFormatter.timeStyle = .short
+        timeFormatter.timeZone = .current  // BUG-007: explicit timezone
 
         return allBreaks.map { event in
             let time = timeFormatter.string(from: event.timestamp)
             let taken = event.wasTaken ? "Yes" : "No"
-            let duration = event.wasTaken ? formatDuration(event.actualDuration) : "—"
+            let duration = event.wasTaken ? TimeFormatting.formatDuration(event.actualDuration) : "—"
             return "| \(time) | \(event.type.displayName) | \(taken) | \(duration) |"
         }.joined(separator: "\n")
     }
@@ -154,17 +160,6 @@ struct DailyReportGenerator {
     }
 
     // MARK: - Helpers
-
-    private func formatDuration(_ interval: TimeInterval) -> String {
-        let totalSeconds = Int(interval)
-        let hours = totalSeconds / 3600
-        let minutes = (totalSeconds % 3600) / 60
-
-        if hours > 0 {
-            return "\(hours)h \(minutes)m"
-        }
-        return "\(minutes)m"
-    }
 
     private func healthEmoji(_ score: Int) -> String {
         switch score {

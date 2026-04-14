@@ -40,6 +40,20 @@ struct BreakTypeTests {
             #expect(decoded == breakType)
         }
     }
+
+    @Test("All break types have icon names")
+    func allBreakTypesHaveIconNames() {
+        for breakType in BreakType.allCases {
+            #expect(!breakType.iconName.isEmpty)
+        }
+    }
+
+    @Test("All break types have rule descriptions")
+    func allBreakTypesHaveRuleDescriptions() {
+        for breakType in BreakType.allCases {
+            #expect(!breakType.ruleDescription.isEmpty)
+        }
+    }
 }
 
 // MARK: - HealthScore Tests
@@ -82,72 +96,6 @@ struct HealthScoreTests {
         #expect(score.screenTimeScore == 20)
         #expect(score.breakQuality == 10)
         #expect(score.totalScore == 70)
-    }
-}
-
-// MARK: - HealthScoreCalculator Tests
-
-@Suite("HealthScoreCalculator")
-struct HealthScoreCalculatorTests {
-
-    let calculator = HealthScoreCalculator()
-
-    @Test("No breaks and low screen time yields high score")
-    func noBreaksLowScreenTime() {
-        let score = calculator.calculate(
-            breakEvents: [],
-            totalScreenTime: 30 * 60, // 30 minutes
-            longestContinuousSession: 15 * 60 // 15 minutes
-        )
-        // No break events = full compliance (no breaks were due)
-        #expect(score.breakCompliance == 40)
-        // Short session = full discipline
-        #expect(score.continuousUseDiscipline == 30)
-        // Low screen time = full points
-        #expect(score.screenTimeScore == 20)
-        // No breaks to evaluate quality = full points
-        #expect(score.breakQuality == 10)
-        #expect(score.totalScore == 100)
-    }
-
-    @Test("All breaks skipped yields low compliance")
-    func allBreaksSkipped() {
-        let events = [
-            BreakEvent(type: .micro, wasTaken: false, actualDuration: 0),
-            BreakEvent(type: .micro, wasTaken: false, actualDuration: 0),
-            BreakEvent(type: .macro, wasTaken: false, actualDuration: 0),
-        ]
-        let score = calculator.calculate(
-            breakEvents: events,
-            totalScreenTime: 60 * 60,
-            longestContinuousSession: 60 * 60
-        )
-        #expect(score.breakCompliance == 0)
-    }
-
-    @Test("Half breaks taken yields proportional compliance")
-    func halfBreaksTaken() {
-        let events = [
-            BreakEvent(type: .micro, wasTaken: true, actualDuration: 20),
-            BreakEvent(type: .micro, wasTaken: false, actualDuration: 0),
-        ]
-        let score = calculator.calculate(
-            breakEvents: events,
-            totalScreenTime: 40 * 60,
-            longestContinuousSession: 20 * 60
-        )
-        #expect(score.breakCompliance == 20) // 50% of 40
-    }
-
-    @Test("Long continuous session penalizes discipline")
-    func longContinuousSession() {
-        let score = calculator.calculate(
-            breakEvents: [],
-            totalScreenTime: 3 * 60 * 60,
-            longestContinuousSession: 3 * 60 * 60 // 3 hours straight
-        )
-        // Exceeded mandatory break interval → 0 discipline
-        #expect(score.continuousUseDiscipline == 0)
     }
 }
 

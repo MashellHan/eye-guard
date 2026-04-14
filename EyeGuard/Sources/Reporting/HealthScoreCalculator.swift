@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Calculates a daily health score (0-100) based on user break behavior.
 ///
@@ -7,7 +8,7 @@ import Foundation
 /// - Continuous use discipline: 30 pts — how well user avoids long stretches
 /// - Total screen time: 20 pts — total hours vs recommended max
 /// - Break quality: 10 pts — actual break duration vs recommended
-struct HealthScoreCalculator {
+struct HealthScoreCalculator: Sendable {
 
     /// Calculates the health score from today's activity data.
     ///
@@ -70,23 +71,31 @@ struct HealthScoreCalculator {
         }
     }
 
-    /// Screen time score: penalizes exceeding recommended daily max.
+    /// Screen time score: penalizes exceeding recommended daily max (BUG-004 fix).
     /// Full score = under recommended max (8 hours).
+    ///
+    /// Fixed boundary arithmetic: at exactly the recommended max, score is correctly
+    /// calculated without discontinuity.
     private func calculateScreenTimeScore(_ totalTime: TimeInterval) -> Int {
         let recommended = EyeGuardConstants.recommendedMaxScreenTime
         let maxPoints = Double(EyeGuardConstants.screenTimeMaxPoints)
 
-        if totalTime <= recommended * 0.5 {
-            // Under half the recommended max
+        if totalTime <= 0 {
             return EyeGuardConstants.screenTimeMaxPoints
-        } else if totalTime <= recommended {
-            // Proportional between 50% and 100%
-            let ratio = 1.0 - (totalTime - recommended * 0.5) / (recommended * 0.5)
-            return Int(ratio * maxPoints * 0.5) + Int(maxPoints * 0.5)
+        } else if totalTime <= recommended * 0.5 {
+            // Under half the recommended max — full score
+            return EyeGuardConstants.screenTimeMaxPoints
+        } else if totalTime < recommended {
+            // Between 50% and 100%: linear interpolation from maxPoints down to maxPoints * 0.5
+            let fraction = (totalTime - recommended * 0.5) / (recommended * 0.5)
+            let score = maxPoints * (1.0 - fraction * 0.5)
+            return Int(score)
         } else {
-            // Over recommended max — steep penalty
-            let overRatio = min(totalTime / recommended, 2.0)
-            let score = maxPoints * max(0, 1.0 - (overRatio - 1.0) * 2.0)
+            // At or over recommended max — steep penalty, min 0
+            // At exactly recommended: score = maxPoints * 0.5 = 10
+            // At 2x recommended: score = 0
+            let overFraction = min((totalTime - recommended) / recommended, 1.0)
+            let score = maxPoints * 0.5 * (1.0 - overFraction)
             return Int(max(0, score))
         }
     }

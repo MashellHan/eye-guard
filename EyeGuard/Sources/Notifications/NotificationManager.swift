@@ -1,14 +1,17 @@
 import AppKit
 import Foundation
 import UserNotifications
+import os
 
 /// Manages break notifications with a three-tier escalation system.
 ///
 /// Tier 1 (Gentle): macOS UserNotification banner — dismissible.
 /// Tier 2 (Firm): Custom semi-transparent overlay window — 30-sec countdown.
 /// Tier 3 (Mandatory): Full-screen overlay — requires acknowledgment.
+///
+/// Conforms to `NotificationSending` for testability.
 @MainActor
-final class NotificationManager {
+final class NotificationManager: NotificationSending {
 
     // MARK: - Notification Tier
 
@@ -22,19 +25,31 @@ final class NotificationManager {
 
     private var currentTier: Tier = .gentle
     private var escalationTask: Task<Void, Never>?
-    private var isNotificationActive: Bool = false
+    private var snoozeTask: Task<Void, Never>?
+    private(set) var isNotificationActive: Bool = false
+
+    /// Stored callbacks for the current notification cycle (H4).
+    private var onTakenCallback: (@Sendable () -> Void)?
+    private var onSkippedCallback: (@Sendable () -> Void)?
 
     // MARK: - Singleton
 
     static let shared = NotificationManager()
 
-    private init() {
-        requestNotificationPermission()
-    }
+    /// Use `setup()` to request notification permissions instead of doing it in init.
+    private init() {}
 
     // MARK: - Public API
 
+    /// Requests notification permission from the user.
+    /// Called explicitly during app setup, not in init.
+    func setup() {
+        requestNotificationPermission()
+    }
+
     /// Sends a break notification starting at Tier 1, escalating if ignored.
+    ///
+    /// Stores `onTaken` and `onSkipped` callbacks for later invocation (H4).
     ///
     /// - Parameters:
     ///   - breakType: The type of break to notify about.
@@ -48,6 +63,10 @@ final class NotificationManager {
         guard !isNotificationActive else { return }
         isNotificationActive = true
         currentTier = .gentle
+
+        // Store callbacks (H4)
+        self.onTakenCallback = onTaken
+        self.onSkippedCallback = onSkipped
 
         sendTier1Notification(breakType: breakType)
 
@@ -71,23 +90,82 @@ final class NotificationManager {
                     self.currentTier = .mandatory
                     self.showTier3Fullscreen(breakType: breakType)
                 }
+
+                // After Tier 3 timeout, invoke onSkipped if still not acknowledged (H4)
+                try? await Task.sleep(for: .seconds(EyeGuardConstants.tier2EscalationDelay))
+                guard !Task.isCancelled else { return }
+
+                await MainActor.run {
+                    self.handleEscalationTimeout()
+                }
+            } else {
+                // Non-mandatory: after Tier 2 timeout, invoke onSkipped (H4)
+                try? await Task.sleep(for: .seconds(EyeGuardConstants.tier2EscalationDelay))
+                guard !Task.isCancelled else { return }
+
+                await MainActor.run {
+                    self.handleEscalationTimeout()
+                }
             }
         }
     }
 
     /// Dismisses the current notification (user took the break).
+    /// Invokes the stored `onTaken` callback (H4).
     func acknowledgeBreak() {
+        let callback = onTakenCallback
         cancelEscalation()
         dismissAllOverlays()
         isNotificationActive = false
+        clearCallbacks()
+
+        callback?()
     }
 
-    /// Snoozes the current notification for a short period.
-    func snooze() {
+    /// Snoozes the current notification and reschedules after snooze duration (BUG-006).
+    ///
+    /// - Parameters:
+    ///   - breakType: The break type being snoozed.
+    ///   - onDue: Callback when snooze expires and break is due again.
+    func snooze(breakType: BreakType, onDue: @escaping @Sendable () -> Void) {
         cancelEscalation()
         dismissAllOverlays()
         isNotificationActive = false
-        // TODO: Re-schedule notification after snooze duration
+        clearCallbacks()
+
+        Log.notification.info("Snoozed \(breakType.displayName) for \(Int(EyeGuardConstants.maxSnoozeDuration))s.")
+
+        // Reschedule after snooze duration (BUG-006)
+        snoozeTask?.cancel()
+        snoozeTask = Task {
+            try? await Task.sleep(for: .seconds(EyeGuardConstants.maxSnoozeDuration))
+            guard !Task.isCancelled else { return }
+
+            await MainActor.run {
+                Log.notification.info("Snooze expired for \(breakType.displayName), re-notifying.")
+                onDue()
+            }
+        }
+    }
+
+    // MARK: - Private: Escalation Timeout (H4)
+
+    /// Called when escalation chain times out without user acknowledgment.
+    /// Invokes the stored `onSkipped` callback.
+    private func handleEscalationTimeout() {
+        let callback = onSkippedCallback
+        dismissAllOverlays()
+        isNotificationActive = false
+        clearCallbacks()
+
+        Log.notification.info("Escalation timed out, break skipped.")
+        callback?()
+    }
+
+    /// Clears stored callbacks after they've been invoked or are no longer needed.
+    private func clearCallbacks() {
+        onTakenCallback = nil
+        onSkippedCallback = nil
     }
 
     // MARK: - Private: Notification Permission
@@ -95,11 +173,11 @@ final class NotificationManager {
     private func requestNotificationPermission() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
             if let error {
-                print("[NotificationManager] Permission error: \(error.localizedDescription)")
+                Log.notification.error("Permission error: \(error.localizedDescription)")
             } else if granted {
-                print("[NotificationManager] Notification permission granted.")
+                Log.notification.info("Notification permission granted.")
             } else {
-                print("[NotificationManager] Notification permission denied.")
+                Log.notification.warning("Notification permission denied.")
             }
         }
     }
@@ -120,11 +198,11 @@ final class NotificationManager {
 
         UNUserNotificationCenter.current().add(request) { error in
             if let error {
-                print("[NotificationManager] Tier 1 error: \(error.localizedDescription)")
+                Log.notification.error("Tier 1 error: \(error.localizedDescription)")
             }
         }
 
-        print("[NotificationManager] Tier 1 notification sent: \(breakType.displayName)")
+        Log.notification.info("Tier 1 notification sent: \(breakType.displayName)")
     }
 
     // MARK: - Private: Tier 2 — Overlay Window
@@ -135,7 +213,7 @@ final class NotificationManager {
         // - 30-second countdown timer
         // - "Take Break" and "Snooze" buttons
         // - Floats above all windows
-        print("[NotificationManager] Tier 2 overlay shown: \(breakType.displayName)")
+        Log.notification.info("Tier 2 overlay shown: \(breakType.displayName)")
     }
 
     // MARK: - Private: Tier 3 — Full-Screen
@@ -146,7 +224,7 @@ final class NotificationManager {
         // - Large countdown timer
         // - "I took my break" acknowledgment button
         // - Cannot be dismissed without acknowledgment
-        print("[NotificationManager] Tier 3 fullscreen shown: \(breakType.displayName)")
+        Log.notification.info("Tier 3 fullscreen shown: \(breakType.displayName)")
     }
 
     // MARK: - Private: Cleanup

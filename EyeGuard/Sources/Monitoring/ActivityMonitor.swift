@@ -1,12 +1,15 @@
 import AppKit
 import Foundation
+import os
 
 /// Actor responsible for monitoring user activity via CGEventTap.
 ///
 /// Tracks the last activity timestamp and determines idle state.
 /// Uses an actor to ensure thread safety since CGEventTap callbacks
 /// arrive on arbitrary threads.
-actor ActivityMonitor {
+///
+/// Conforms to `ActivityMonitoring` for testability.
+actor ActivityMonitor: ActivityMonitoring {
 
     // MARK: - Singleton
 
@@ -17,6 +20,9 @@ actor ActivityMonitor {
     private(set) var lastActivityTimestamp: Date = .now
     private(set) var isIdle: Bool = false
     private(set) var isMonitoring: Bool = false
+
+    /// Tracks the date of the last daily rollover for midnight reset.
+    private var lastRolloverDate: Date = .now
 
     private var idleCheckTask: Task<Void, Never>?
 
@@ -32,11 +38,12 @@ actor ActivityMonitor {
         isMonitoring = true
         lastActivityTimestamp = .now
         isIdle = false
+        lastRolloverDate = .now
 
         startIdleCheckLoop()
         startEventTap()
 
-        print("[ActivityMonitor] Monitoring started.")
+        Log.activity.info("Monitoring started.")
     }
 
     /// Stops monitoring and cleans up resources.
@@ -44,7 +51,7 @@ actor ActivityMonitor {
         isMonitoring = false
         idleCheckTask?.cancel()
         idleCheckTask = nil
-        print("[ActivityMonitor] Monitoring stopped.")
+        Log.activity.info("Monitoring stopped.")
     }
 
     /// Called when a user input event is detected.
@@ -52,8 +59,16 @@ actor ActivityMonitor {
         lastActivityTimestamp = .now
         if isIdle {
             isIdle = false
-            print("[ActivityMonitor] User returned from idle.")
+            Log.activity.info("User returned from idle.")
         }
+    }
+
+    /// Resets internal state for testing and daily rollover (BUG-005).
+    func resetState() {
+        lastActivityTimestamp = .now
+        isIdle = false
+        lastRolloverDate = .now
+        Log.activity.info("State reset.")
     }
 
     /// Returns the duration since the last detected user activity.
@@ -63,13 +78,14 @@ actor ActivityMonitor {
 
     // MARK: - Private
 
-    /// Periodically checks if the user has gone idle.
+    /// Periodically checks if the user has gone idle and handles daily rollover.
     private func startIdleCheckLoop() {
-        idleCheckTask = Task { [weak self] in
+        idleCheckTask = Task {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(5))
-                guard let self else { return }
-                await self.checkIdleState()
+                guard !Task.isCancelled else { return }
+                checkIdleState()
+                checkDailyRollover()
             }
         }
     }
@@ -80,7 +96,19 @@ actor ActivityMonitor {
         isIdle = elapsed >= EyeGuardConstants.idleThreshold
 
         if isIdle && !wasIdle {
-            print("[ActivityMonitor] User is now idle (inactive for \(Int(elapsed))s).")
+            Log.activity.info("User is now idle (inactive for \(Int(elapsed))s).")
+        }
+    }
+
+    /// Resets state at midnight for a new day (daily rollover).
+    private func checkDailyRollover() {
+        let calendar = Calendar.current
+        let now = Date.now
+        if !calendar.isDate(now, inSameDayAs: lastRolloverDate) {
+            lastRolloverDate = now
+            lastActivityTimestamp = now
+            isIdle = false
+            Log.activity.info("Daily rollover: state reset for new day.")
         }
     }
 
@@ -108,6 +136,6 @@ actor ActivityMonitor {
         // For now, the idle check loop runs independently
         // and activity is recorded only when explicitly called.
 
-        print("[ActivityMonitor] CGEventTap setup skipped (placeholder). Idle detection runs via polling.")
+        Log.activity.info("CGEventTap setup skipped (placeholder). Idle detection runs via polling.")
     }
 }

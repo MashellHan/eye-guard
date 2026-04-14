@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import os
 
 /// Application delegate handling system-level setup.
 ///
@@ -7,12 +8,14 @@ import Foundation
 /// - Check/request accessibility permissions (needed for CGEventTap)
 /// - Initialize monitoring services
 /// - Ensure data directories exist
+/// - Set up notification permissions
 final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         ensureDataDirectories()
         checkAccessibilityPermissions()
         startMonitoring()
+        setupNotifications()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -30,9 +33,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // Use string literal to avoid Swift 6 concurrency warning on the C global.
             let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
             AXIsProcessTrustedWithOptions(options)
-            print("[EyeGuard] Accessibility permission not yet granted. Some features will be limited.")
+            Log.app.warning("Accessibility permission not yet granted. Some features will be limited.")
         } else {
-            print("[EyeGuard] Accessibility permission granted.")
+            Log.app.info("Accessibility permission granted.")
         }
     }
 
@@ -40,6 +43,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func startMonitoring() {
         Task {
             await ActivityMonitor.shared.startMonitoring()
+        }
+    }
+
+    /// Requests notification permissions via explicit setup() call
+    /// (moved out of NotificationManager.init).
+    private func setupNotifications() {
+        Task { @MainActor in
+            NotificationManager.shared.setup()
         }
     }
 

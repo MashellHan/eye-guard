@@ -42,7 +42,7 @@ struct MenuBarView: View {
 
             HStack {
                 Image(systemName: "clock")
-                Text(formatDuration(scheduler.currentSessionDuration))
+                Text(TimeFormatting.formatTimerDisplay(scheduler.currentSessionDuration))
                     .font(.system(.title3, design: .monospaced))
                 Spacer()
             }
@@ -53,7 +53,7 @@ struct MenuBarView: View {
                     Text("Next: \(nextBreak.displayName)")
                         .font(.caption)
                     Spacer()
-                    Text(formatDuration(scheduler.timeUntilNextBreak))
+                    Text(TimeFormatting.formatTimerDisplay(scheduler.timeUntilNextBreak))
                         .font(.caption)
                         .foregroundStyle(.orange)
                 }
@@ -141,20 +141,6 @@ struct MenuBarView: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
-    }
-
-    // MARK: - Formatting
-
-    private func formatDuration(_ interval: TimeInterval) -> String {
-        let totalSeconds = Int(interval)
-        let hours = totalSeconds / 3600
-        let minutes = (totalSeconds % 3600) / 60
-        let seconds = totalSeconds % 60
-
-        if hours > 0 {
-            return String(format: "%d:%02d:%02d", hours, minutes, seconds)
-        }
-        return String(format: "%02d:%02d", minutes, seconds)
     }
 }
 

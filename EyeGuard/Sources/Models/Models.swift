@@ -31,9 +31,9 @@ struct BreakEvent: Codable, Sendable, Identifiable {
 struct UsageSession: Codable, Sendable, Identifiable {
     let id: UUID
     let startTime: Date
-    var endTime: Date?
-    var activeTime: TimeInterval
-    var breaks: [BreakEvent]
+    let endTime: Date?
+    let activeTime: TimeInterval
+    let breaks: [BreakEvent]
 
     init(
         id: UUID = UUID(),
@@ -159,6 +159,7 @@ struct DailyReport: Codable, Sendable, Identifiable {
     ) {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = .current  // BUG-007: explicit timezone
         self.dateString = formatter.string(from: date)
         self.sessions = sessions
         self.healthScore = healthScore

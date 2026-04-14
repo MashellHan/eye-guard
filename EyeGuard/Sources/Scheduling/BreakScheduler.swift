@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import os
 
 /// Manages break scheduling based on medical guidelines.
 ///
@@ -10,6 +11,9 @@ import Observation
 /// - Micro-break: every 20 min → 20 sec (20-20-20 rule)
 /// - Macro-break: every 60 min → 5 min
 /// - Mandatory break: every 120 min → 15 min
+///
+/// Accepts `ActivityMonitoring` and `NotificationSending` protocols via init
+/// for testability (H6).
 @Observable
 @MainActor
 final class BreakScheduler {
@@ -40,21 +44,59 @@ final class BreakScheduler {
     /// All break events recorded today.
     private(set) var todayBreakEvents: [BreakEvent] = []
 
+    /// Total screen time accumulated across all sessions today (BUG-002).
+    private(set) var totalScreenTimeToday: TimeInterval = 0
+
     // MARK: - Internal State
 
     private var sessionStartTime: Date = .now
     private var timerTask: Task<Void, Never>?
-    private var preferences: UserPreferences = .default
+    private let preferences: UserPreferences
+
+    /// Tracks whether the user was idle on the previous tick (H1).
+    private var wasIdle: Bool = false
+
+    /// Per-break-type elapsed time for independent tracking (H5/BUG-001).
+    private var elapsedPerType: [BreakType: TimeInterval] = [
+        .micro: 0,
+        .macro: 0,
+        .mandatory: 0,
+    ]
+
+    /// Tracks the last notified cycle per break type to prevent double-fire (BUG-003).
+    private var lastNotifiedCycle: [BreakType: Int] = [
+        .micro: -1,
+        .macro: -1,
+        .mandatory: -1,
+    ]
+
+    /// Date of the last daily rollover check.
+    private var lastRolloverDate: Date = .now
+
+    /// The activity monitor dependency (H6).
+    private let activityMonitor: any ActivityMonitoring
+
+    /// The notification manager dependency (H6).
+    private let notificationSender: any NotificationSending
 
     // MARK: - Initialization
 
-    init() {
+    /// Creates a new BreakScheduler with injectable dependencies (H6).
+    ///
+    /// - Parameters:
+    ///   - activityMonitor: Activity monitoring service (defaults to shared singleton).
+    ///   - notificationSender: Notification delivery service (defaults to shared singleton).
+    ///   - preferences: User preferences for break intervals.
+    init(
+        activityMonitor: any ActivityMonitoring = ActivityMonitor.shared,
+        notificationSender: any NotificationSending = NotificationManager.shared,
+        preferences: UserPreferences = .default
+    ) {
+        self.activityMonitor = activityMonitor
+        self.notificationSender = notificationSender
+        self.preferences = preferences
         startTimerLoop()
     }
-
-    // Note: timerTask is cancelled when the scheduler is no longer referenced.
-    // In a @MainActor class, deinit cannot access actor-isolated properties,
-    // so cleanup is handled by the Task's weak self reference going nil.
 
     // MARK: - Public Controls
 
@@ -73,6 +115,22 @@ final class BreakScheduler {
         currentSessionDuration = 0
         timeUntilNextBreak = preferences.microBreakInterval
         nextScheduledBreak = .micro
+
+        for type in BreakType.allCases {
+            elapsedPerType[type] = 0
+            lastNotifiedCycle[type] = -1
+        }
+    }
+
+    /// Resets all daily counters (daily rollover).
+    func resetDaily() {
+        breaksTakenToday = 0
+        breaksSkippedToday = 0
+        currentHealthScore = 100
+        todayBreakEvents = []
+        totalScreenTimeToday = 0
+        resetSession()
+        Log.scheduler.info("Daily counters reset for new day.")
     }
 
     /// Immediately triggers a break of the given type.
@@ -86,62 +144,83 @@ final class BreakScheduler {
         recordBreak(type: type, wasTaken: false)
     }
 
-    /// Called when idle is detected — resets timers since user is resting.
+    /// Called when idle is detected — resets timers since user is resting (H1).
     func handleIdleDetected() {
         guard !isPaused else { return }
         // User is already resting, reset micro-break timer
         resetTimersAfterBreak(.micro)
+        Log.scheduler.info("Idle detected, micro timer reset.")
     }
 
-    /// Called when user returns from idle.
+    /// Called when user returns from idle (H1).
     func handleActivityResumed() {
         guard !isPaused else { return }
         sessionStartTime = .now
         currentSessionDuration = 0
+        Log.scheduler.info("Activity resumed, session restarted.")
     }
 
-    // MARK: - Private
+    // MARK: - Private: Timer Loop
 
     /// Main timer loop — ticks every second to update UI state.
+    /// Fixed concurrency: no [weak self] or MainActor.run needed since
+    /// BreakScheduler is @MainActor (C1).
     private func startTimerLoop() {
-        timerTask = Task { [weak self] in
+        timerTask = Task {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(1))
-                guard let self else { return }
-                await MainActor.run {
-                    self.tick()
-                }
+                tick()
             }
         }
     }
 
     /// Called every second to update session duration and check for due breaks.
+    /// Also polls ActivityMonitor for idle state (H1).
     private func tick() {
         guard !isPaused else { return }
 
+        let previousDuration = currentSessionDuration
         currentSessionDuration = Date.now.timeIntervalSince(sessionStartTime)
+
+        // Accumulate daily screen time (BUG-002)
+        let delta = currentSessionDuration - previousDuration
+        if delta > 0 {
+            totalScreenTimeToday += delta
+        }
+
+        // Update per-type elapsed times (H5)
+        for type in BreakType.allCases {
+            guard isBreakTypeEnabled(type) else { continue }
+            elapsedPerType[type, default: 0] += max(delta, 0)
+        }
+
         updateNextBreak()
         checkForDueBreaks()
+        checkDailyRollover()
+
+        // Poll activity monitor for idle state (H1)
+        Task {
+            let idle = await activityMonitor.isIdle
+            if idle && !wasIdle {
+                handleIdleDetected()
+                wasIdle = true
+            } else if !idle && wasIdle {
+                handleActivityResumed()
+                wasIdle = false
+            }
+        }
     }
 
     /// Determines which break is next and how long until it triggers.
     private func updateNextBreak() {
-        let elapsed = currentSessionDuration
-
-        // Check breaks in order of urgency (shortest interval first)
-        let candidates: [(BreakType, TimeInterval)] = [
-            (.micro, preferences.microBreakInterval),
-            (.macro, preferences.macroBreakInterval),
-            (.mandatory, preferences.mandatoryBreakInterval),
-        ]
-
         var soonest: (BreakType, TimeInterval)? = nil
 
-        for (type, interval) in candidates {
+        for type in BreakType.allCases {
             guard isBreakTypeEnabled(type) else { continue }
 
-            let timeInCurrentCycle = elapsed.truncatingRemainder(dividingBy: interval)
-            let remaining = interval - timeInCurrentCycle
+            let elapsed = elapsedPerType[type, default: 0]
+            let interval = intervalForType(type)
+            let remaining = interval - elapsed
 
             if remaining > 0 {
                 if soonest == nil || remaining < soonest!.1 {
@@ -157,27 +236,39 @@ final class BreakScheduler {
     }
 
     /// Checks if any break is due and triggers notification.
+    /// Uses `lastNotifiedCycle` per break type to prevent double-fire (BUG-003).
     private func checkForDueBreaks() {
-        let elapsed = currentSessionDuration
-
-        // Check each break type
         for type in BreakType.allCases {
             guard isBreakTypeEnabled(type) else { continue }
 
-            let interval = type.interval
-            let timeInCycle = elapsed.truncatingRemainder(dividingBy: interval)
+            let elapsed = elapsedPerType[type, default: 0]
+            let interval = intervalForType(type)
 
-            // Break is due when we cross the interval boundary (within 1-sec tolerance)
-            if timeInCycle < 1.0 && elapsed >= interval {
+            guard interval > 0 else { continue }
+
+            let currentCycle = Int(elapsed / interval)
+
+            // Only fire if we crossed into a new cycle and haven't notified for it (BUG-003)
+            if currentCycle > 0 && currentCycle != lastNotifiedCycle[type] {
+                lastNotifiedCycle[type] = currentCycle
                 triggerBreakNotification(type)
             }
         }
     }
 
-    /// Sends a break notification to the user.
-    private func triggerBreakNotification(_ type: BreakType) {
-        // TODO: Integrate with NotificationManager for escalation tiers
-        print("[BreakScheduler] Break due: \(type.displayName)")
+    /// Sends a break notification wired to NotificationManager (H2).
+    private func triggerBreakNotification(_ breakType: BreakType) {
+        Log.scheduler.info("Break due: \(breakType.displayName)")
+
+        notificationSender.notify(breakType: breakType) { [weak self] in
+            Task { @MainActor in
+                self?.takeBreakNow(breakType)
+            }
+        } onSkipped: { [weak self] in
+            Task { @MainActor in
+                self?.skipBreak(breakType)
+            }
+        }
     }
 
     /// Records a break event in today's history.
@@ -198,20 +289,31 @@ final class BreakScheduler {
         recalculateHealthScore()
     }
 
-    /// Resets timers after a break is taken.
+    /// Resets timers after a break is taken (H5/BUG-001).
+    /// Per-type reset logic:
+    /// - Micro break: only reset micro timer
+    /// - Macro break: reset macro + micro timers
+    /// - Mandatory break: reset all three timers
     private func resetTimersAfterBreak(_ type: BreakType) {
-        // For micro-breaks, just reset the micro timer
-        // For macro/mandatory, reset all shorter timers too
         switch type {
         case .micro:
-            break
+            elapsedPerType[.micro] = 0
+            lastNotifiedCycle[.micro] = -1
+
         case .macro:
-            break
+            elapsedPerType[.macro] = 0
+            elapsedPerType[.micro] = 0
+            lastNotifiedCycle[.macro] = -1
+            lastNotifiedCycle[.micro] = -1
+
         case .mandatory:
-            break
+            for t in BreakType.allCases {
+                elapsedPerType[t] = 0
+                lastNotifiedCycle[t] = -1
+            }
         }
 
-        // Simplified: reset session start to now
+        // Reset session tracking
         sessionStartTime = .now
         currentSessionDuration = 0
     }
@@ -225,7 +327,17 @@ final class BreakScheduler {
         }
     }
 
+    /// Returns the configured interval for a break type.
+    private func intervalForType(_ type: BreakType) -> TimeInterval {
+        switch type {
+        case .micro:     return preferences.microBreakInterval
+        case .macro:     return preferences.macroBreakInterval
+        case .mandatory: return preferences.mandatoryBreakInterval
+        }
+    }
+
     /// Recalculates the current health score based on today's breaks.
+    /// Uses `totalScreenTimeToday` for daily accumulation (BUG-002).
     private func recalculateHealthScore() {
         let totalScheduled = breaksTakenToday + breaksSkippedToday
         guard totalScheduled > 0 else {
@@ -236,9 +348,19 @@ final class BreakScheduler {
         let calculator = HealthScoreCalculator()
         let score = calculator.calculate(
             breakEvents: todayBreakEvents,
-            totalScreenTime: currentSessionDuration,
+            totalScreenTime: totalScreenTimeToday,
             longestContinuousSession: currentSessionDuration
         )
         currentHealthScore = score.totalScore
+    }
+
+    /// Checks for daily rollover at midnight and resets counters.
+    private func checkDailyRollover() {
+        let calendar = Calendar.current
+        let now = Date.now
+        if !calendar.isDate(now, inSameDayAs: lastRolloverDate) {
+            lastRolloverDate = now
+            resetDaily()
+        }
     }
 }
