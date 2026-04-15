@@ -11,6 +11,7 @@ import os
 /// - Visible on all desktops/spaces
 /// - Positioned at the bottom-right corner by default
 /// - Wired to break events via the scheduler (v1.0)
+/// - Tracks mouse position for pupil follow (v1.1)
 @MainActor
 final class MascotWindowController {
 
@@ -25,12 +26,21 @@ final class MascotWindowController {
     /// Task for monitoring scheduler state changes.
     private var stateMonitorTask: Task<Void, Never>?
 
+    /// Mouse event monitor for hover tracking (v1.1).
+    private var mouseMonitor: Any?
+
+    /// Task for polling mouse position updates.
+    private var mouseTrackTask: Task<Void, Never>?
+
     /// Shows the mascot window on screen.
     ///
     /// - Parameter scheduler: The BreakScheduler to wire mascot state to.
     func show(scheduler: BreakScheduler) {
         guard window == nil else { return }
         self.scheduler = scheduler
+
+        let vm = MascotViewModel()
+        self.viewModel = vm
 
         let containerView = MascotContainerView(
             scheduler: scheduler,
@@ -39,6 +49,9 @@ final class MascotWindowController {
             },
             onSnooze: { [weak self] in
                 self?.handleSnooze()
+            },
+            onGenerateReport: { [weak self] in
+                self?.handleGenerateReport()
             }
         )
         let hostingView = NSHostingView(rootView: containerView)
@@ -66,6 +79,9 @@ final class MascotWindowController {
         mascotWindow.makeKeyAndOrderFront(nil)
         window = mascotWindow
 
+        // Start mouse tracking for pupil follow (v1.1)
+        startMouseTracking()
+
         Log.mascot.info("Mascot window shown at bottom-right corner.")
     }
 
@@ -73,6 +89,7 @@ final class MascotWindowController {
     func hide() {
         stateMonitorTask?.cancel()
         stateMonitorTask = nil
+        stopMouseTracking()
         window?.orderOut(nil)
         window = nil
         viewModel = nil
@@ -106,6 +123,56 @@ final class MascotWindowController {
             }
         }
         Log.mascot.info("Mascot: user snoozed via mascot menu.")
+    }
+
+    /// Handles "Generate Report" from mascot context menu.
+    private func handleGenerateReport() {
+        Task { @MainActor in
+            let data = ReportDataProvider.shared.currentData()
+            let generator = DailyReportGenerator()
+            _ = await generator.generate(
+                sessions: data.sessions,
+                breakEvents: data.breakEvents,
+                totalScreenTime: data.totalScreenTime,
+                longestContinuousSession: data.longestContinuousSession
+            )
+            NSWorkspace.shared.open(EyeGuardConstants.reportsDirectory)
+        }
+        Log.mascot.info("Mascot: user requested report via mascot menu.")
+    }
+
+    // MARK: - Mouse Tracking (v1.1)
+
+    /// Starts a polling task that reads the global mouse position and updates
+    /// the mascot pupil to follow the cursor.
+    private func startMouseTracking() {
+        mouseTrackTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(0.1)) // 10 fps polling
+                guard !Task.isCancelled else { return }
+
+                guard let window = self.window, let viewModel = self.viewModel else { continue }
+
+                let mouseLocation = NSEvent.mouseLocation
+                let windowFrame = window.frame
+                let mascotCenter = CGPoint(
+                    x: windowFrame.midX,
+                    y: windowFrame.midY
+                )
+
+                viewModel.updateHoverPupil(
+                    mousePosition: mouseLocation,
+                    mascotCenter: mascotCenter
+                )
+            }
+        }
+    }
+
+    /// Stops mouse tracking.
+    private func stopMouseTracking() {
+        mouseTrackTask?.cancel()
+        mouseTrackTask = nil
+        viewModel?.stopHoverTracking()
     }
 
     // MARK: - Private

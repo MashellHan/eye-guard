@@ -24,6 +24,12 @@ final class MascotViewModel {
     /// Rotation angle for celebrating state.
     var celebrateRotation: Double = 0
 
+    /// Whether mouse hover tracking is overriding pupil position.
+    var isHoverTracking: Bool = false
+
+    /// Pupil offset from hover tracking (overrides idle look-around).
+    var hoverPupilOffset: CGSize = .zero
+
     /// Internal animation tasks — cancelled on state change.
     private var blinkTask: Task<Void, Never>?
     private var breathTask: Task<Void, Never>?
@@ -112,6 +118,49 @@ final class MascotViewModel {
         } else if !bubbleText.isEmpty {
             showBubble = true
         }
+    }
+
+    /// Updates pupil position to look toward a mouse position relative to mascot center.
+    ///
+    /// - Parameters:
+    ///   - mousePosition: The mouse position in screen coordinates.
+    ///   - mascotCenter: The mascot center in screen coordinates.
+    func updateHoverPupil(mousePosition: CGPoint, mascotCenter: CGPoint) {
+        // Only track in states that allow it
+        guard mascotState == .idle || mascotState == .happy || mascotState == .concerned else {
+            return
+        }
+
+        let maxOffset: CGFloat = 4.0 // Max pupil displacement from hover
+        let dx = mousePosition.x - mascotCenter.x
+        let dy = mousePosition.y - mascotCenter.y
+        let distance = sqrt(dx * dx + dy * dy)
+
+        // Only track if mouse is within reasonable range (200pt)
+        guard distance < 200 else {
+            if isHoverTracking {
+                isHoverTracking = false
+            }
+            return
+        }
+
+        isHoverTracking = true
+
+        // Normalize and clamp to max offset
+        let scale = min(distance / 100, 1.0) * maxOffset
+        let angle = atan2(dy, dx)
+        let offsetX = cos(angle) * scale
+        // Invert Y because screen Y goes down but SwiftUI Y goes up
+        let offsetY = -sin(angle) * scale
+
+        withAnimation(.easeOut(duration: 0.15)) {
+            pupilOffset = CGSize(width: offsetX, height: offsetY)
+        }
+    }
+
+    /// Stops hover tracking and returns to idle pupil behavior.
+    func stopHoverTracking() {
+        isHoverTracking = false
     }
 
     // MARK: - Breathing
@@ -246,6 +295,9 @@ final class MascotViewModel {
                 try? await Task.sleep(for: .seconds(MascotAnimations.idleLookInterval))
                 guard !Task.isCancelled else { return }
 
+                // Skip random movement when hover tracking is active
+                guard !isHoverTracking else { continue }
+
                 let dx = CGFloat.random(in: -range...range)
                 let dy = CGFloat.random(in: -range...range)
 
@@ -315,6 +367,9 @@ struct MascotContainerView: View {
     /// Callback for "Snooze 5 min" from mascot menu.
     var onSnooze: (@MainActor () -> Void)?
 
+    /// Callback for "Generate Report" from mascot menu.
+    var onGenerateReport: (@MainActor () -> Void)?
+
     var body: some View {
         VStack(spacing: 4) {
             if viewModel.showBubble {
@@ -338,7 +393,11 @@ struct MascotContainerView: View {
             .offset(x: viewModel.swayOffset)
         }
         .frame(width: 120, height: 130)
-        .onTapGesture {
+        .onTapGesture(count: 2) {
+            // Double-click: toggle speech bubble
+            viewModel.toggleBubble()
+        }
+        .onTapGesture(count: 1) {
             handleSingleClick()
         }
         .onLongPressGesture(minimumDuration: 0.5) {
@@ -372,9 +431,23 @@ struct MascotContainerView: View {
         Divider()
 
         Button {
+            onGenerateReport?()
+        } label: {
+            Label("Generate Report", systemImage: "doc.text")
+        }
+
+        Button {
             PreferencesWindowController.shared.showPreferences()
         } label: {
             Label("Settings", systemImage: "gear")
+        }
+
+        Divider()
+
+        Button {
+            NSApplication.shared.terminate(nil)
+        } label: {
+            Label("Quit EyeGuard", systemImage: "power")
         }
     }
 
