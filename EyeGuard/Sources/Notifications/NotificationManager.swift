@@ -250,12 +250,29 @@ final class NotificationManager: NotificationSending {
     // MARK: - Private: Tier 3 — Full-Screen
 
     private func showTier3Fullscreen(breakType: BreakType) {
-        // TODO: Implement full-screen NSWindow
-        // - Full-screen opaque overlay
-        // - Large countdown timer
-        // - "I took my break" acknowledgment button
-        // - Cannot be dismissed without acknowledgment
+        guard onTakenCallback != nil else {
+            Log.notification.warning("Tier 3: no onTaken callback stored, skipping overlay.")
+            return
+        }
+
+        escalateToTier3(healthScore: 65) { [weak self] in
+            Task { @MainActor in
+                self?.acknowledgeBreak()
+            }
+        }
+
         Log.notification.info("Tier 3 fullscreen shown: \(breakType.displayName)")
+    }
+
+    /// Escalates to Tier 3 full-screen overlay for mandatory breaks.
+    ///
+    /// - Parameters:
+    ///   - healthScore: Current eye health score to display on the overlay.
+    ///   - onTaken: Called when the user completes the full break.
+    private func escalateToTier3(healthScore: Int, onTaken: @escaping @Sendable () -> Void) {
+        // Dismiss any Tier 2 overlay before showing Tier 3
+        overlayController.dismiss()
+        overlayController.showFullScreenOverlay(healthScore: healthScore, onTaken: onTaken)
     }
 
     // MARK: - Private: Cleanup
@@ -273,6 +290,7 @@ final class NotificationManager: NotificationSending {
         }
         // Dismiss Tier 2 overlay window
         overlayController.dismiss()
-        // TODO: Close Tier 3 overlay windows
+        // Dismiss Tier 3 full-screen overlay windows
+        overlayController.dismissFullScreen()
     }
 }

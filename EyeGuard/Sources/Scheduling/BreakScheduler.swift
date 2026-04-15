@@ -47,6 +47,12 @@ final class BreakScheduler {
     /// Total screen time accumulated across all sessions today (BUG-002).
     private(set) var totalScreenTimeToday: TimeInterval = 0
 
+    /// Longest continuous session without a mandatory break (updated each tick).
+    private(set) var longestContinuousSession: TimeInterval = 0
+
+    /// Number of continuous use warnings (Tier 3) issued today.
+    private(set) var continuousUseWarnings: Int = 0
+
     // MARK: - Internal State
 
     private var sessionStartTime: Date = .now
@@ -129,6 +135,8 @@ final class BreakScheduler {
         currentHealthScore = 100
         todayBreakEvents = []
         totalScreenTimeToday = 0
+        longestContinuousSession = 0
+        continuousUseWarnings = 0
         resetSession()
         Log.scheduler.info("Daily counters reset for new day.")
     }
@@ -175,7 +183,7 @@ final class BreakScheduler {
     }
 
     /// Called every second to update session duration and check for due breaks.
-    /// Also polls ActivityMonitor for idle state (H1).
+    /// Also polls ActivityMonitor for idle state (H1) and tracks continuous use.
     private func tick() {
         guard !isPaused else { return }
 
@@ -188,6 +196,11 @@ final class BreakScheduler {
             totalScreenTimeToday += delta
         }
 
+        // Track longest continuous session
+        if currentSessionDuration > longestContinuousSession {
+            longestContinuousSession = currentSessionDuration
+        }
+
         // Update per-type elapsed times (H5)
         for type in BreakType.allCases {
             guard isBreakTypeEnabled(type) else { continue }
@@ -196,6 +209,7 @@ final class BreakScheduler {
 
         updateNextBreak()
         checkForDueBreaks()
+        checkContinuousUse()
         checkDailyRollover()
 
         // Poll activity monitor for idle state (H1)
@@ -271,6 +285,23 @@ final class BreakScheduler {
         }
     }
 
+    /// Checks if continuous use has reached the mandatory break threshold (120 min).
+    /// Triggers Tier 3 full-screen overlay via NotificationManager when exceeded.
+    private func checkContinuousUse() {
+        let threshold = preferences.mandatoryBreakInterval
+        guard currentSessionDuration >= threshold else { return }
+
+        // Only warn once per session crossing the threshold
+        let warningCycle = Int(currentSessionDuration / threshold)
+        if warningCycle > continuousUseWarnings {
+            continuousUseWarnings = warningCycle
+            Log.scheduler.warning(
+                "Continuous use reached \(Int(self.currentSessionDuration / 60)) minutes — triggering Tier 3."
+            )
+            triggerBreakNotification(.mandatory)
+        }
+    }
+
     /// Records a break event in today's history.
     private func recordBreak(type: BreakType, wasTaken: Bool) {
         let event = BreakEvent(
@@ -338,6 +369,7 @@ final class BreakScheduler {
 
     /// Recalculates the current health score based on today's breaks.
     /// Uses `totalScreenTimeToday` for daily accumulation (BUG-002).
+    /// Uses `longestContinuousSession` for continuous use discipline scoring.
     private func recalculateHealthScore() {
         let totalScheduled = breaksTakenToday + breaksSkippedToday
         guard totalScheduled > 0 else {
@@ -349,7 +381,7 @@ final class BreakScheduler {
         let score = calculator.calculate(
             breakEvents: todayBreakEvents,
             totalScreenTime: totalScreenTimeToday,
-            longestContinuousSession: currentSessionDuration
+            longestContinuousSession: longestContinuousSession
         )
         currentHealthScore = score.totalScore
     }

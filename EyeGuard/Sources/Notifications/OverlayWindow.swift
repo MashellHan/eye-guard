@@ -2,16 +2,22 @@ import AppKit
 import SwiftUI
 import os
 
-/// Controls a floating overlay window for Tier 2 break notifications.
+/// Controls floating overlay windows for Tier 2 and Tier 3 break notifications.
 ///
-/// The overlay appears in the top-right corner of the screen with a semi-transparent
-/// blur background, smooth fade-in/out animations, and is visible on all desktops.
+/// Tier 2: appears in the top-right corner with semi-transparent blur background.
+/// Tier 3: covers ALL screens with a full-screen semi-transparent overlay.
 ///
-/// Window properties:
+/// Tier 2 window properties:
 /// - Level: `.floating` (above other windows but not fullscreen)
 /// - Borderless style with shadow
 /// - Movable by dragging background
 /// - Visible on all Spaces (desktops)
+///
+/// Tier 3 window properties:
+/// - Level: `.screenSaver` (above everything)
+/// - Covers entire screen frame per monitor
+/// - Cannot be easily dismissed (no close button)
+/// - Multi-monitor support
 @MainActor
 final class OverlayWindowController: NSObject {
 
@@ -19,8 +25,14 @@ final class OverlayWindowController: NSObject {
 
     private var window: NSWindow?
 
-    /// Whether an overlay is currently displayed.
+    /// Full-screen overlay windows (one per screen) for Tier 3.
+    private var fullScreenWindows: [NSWindow] = []
+
+    /// Whether a Tier 2 overlay is currently displayed.
     var isShowing: Bool { window != nil }
+
+    /// Whether a Tier 3 full-screen overlay is currently displayed.
+    var isFullScreenShowing: Bool { !fullScreenWindows.isEmpty }
 
     // MARK: - Public API
 
@@ -86,7 +98,77 @@ final class OverlayWindowController: NSObject {
         Log.notification.info("Overlay window shown for \(breakType.displayName)")
     }
 
-    /// Dismisses the overlay with a fade-out animation.
+    /// Shows a full-screen overlay on every connected monitor for Tier 3 mandatory breaks.
+    ///
+    /// - Parameters:
+    ///   - healthScore: Current eye health score (0-100) to display.
+    ///   - onTaken: Called when the user completes the full break countdown.
+    func showFullScreenOverlay(healthScore: Int, onTaken: @escaping @Sendable () -> Void) {
+        // Dismiss any existing overlays first
+        dismissFullScreen()
+        if isShowing {
+            dismissImmediate()
+        }
+
+        let screens = NSScreen.screens
+        guard !screens.isEmpty else {
+            Log.notification.warning("No screens available for full-screen overlay.")
+            return
+        }
+
+        for (index, screen) in screens.enumerated() {
+            let contentView = FullScreenOverlayView(
+                healthScore: healthScore,
+                onBreakTaken: { [weak self] in
+                    Task { @MainActor in
+                        self?.dismissFullScreen()
+                        onTaken()
+                    }
+                }
+            )
+
+            let hostingView = NSHostingView(rootView: contentView)
+
+            let fullScreenWindow = NSWindow(
+                contentRect: screen.frame,
+                styleMask: [.borderless],
+                backing: .buffered,
+                defer: false
+            )
+            fullScreenWindow.contentView = hostingView
+            fullScreenWindow.level = .screenSaver
+            fullScreenWindow.isOpaque = false
+            fullScreenWindow.backgroundColor = .clear
+            fullScreenWindow.hasShadow = false
+            fullScreenWindow.collectionBehavior = [.canJoinAllSpaces, .stationary]
+            fullScreenWindow.isReleasedWhenClosed = false
+
+            // Position to cover entire screen
+            fullScreenWindow.setFrame(screen.frame, display: true)
+
+            // Fade in
+            fullScreenWindow.alphaValue = 0
+            fullScreenWindow.makeKeyAndOrderFront(nil)
+
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.5
+                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                fullScreenWindow.animator().alphaValue = 1
+            }
+
+            fullScreenWindows.append(fullScreenWindow)
+
+            Log.notification.info(
+                "Full-screen overlay shown on screen \(index + 1) of \(screens.count)"
+            )
+        }
+
+        Log.notification.info(
+            "Tier 3 full-screen overlay active on \(screens.count) screen(s), health: \(healthScore)"
+        )
+    }
+
+    /// Dismisses the Tier 2 overlay with a fade-out animation.
     func dismiss() {
         guard let overlayWindow = window else { return }
 
@@ -101,6 +183,28 @@ final class OverlayWindowController: NSObject {
                 Log.notification.info("Overlay window dismissed.")
             }
         })
+    }
+
+    /// Dismisses all Tier 3 full-screen overlay windows with fade-out animation.
+    func dismissFullScreen() {
+        guard !fullScreenWindows.isEmpty else { return }
+
+        let windows = fullScreenWindows
+        fullScreenWindows = []
+
+        for fsWindow in windows {
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = 0.3
+                context.timingFunction = CAMediaTimingFunction(name: .easeIn)
+                fsWindow.animator().alphaValue = 0
+            }, completionHandler: {
+                Task { @MainActor in
+                    fsWindow.close()
+                }
+            })
+        }
+
+        Log.notification.info("Full-screen overlay windows dismissed.")
     }
 
     // MARK: - Private

@@ -256,4 +256,42 @@ struct BreakSchedulerTests {
         #expect(types.contains(.macro))
         #expect(types.contains(.mandatory))
     }
+
+    @Test("Initial longestContinuousSession is zero")
+    @MainActor
+    func initialLongestContinuousSession() {
+        let scheduler = BreakScheduler(
+            activityMonitor: MockActivityMonitor(),
+            notificationSender: MockNotificationSender()
+        )
+
+        #expect(scheduler.longestContinuousSession == 0)
+    }
+
+    @Test("Initial continuousUseWarnings is zero")
+    @MainActor
+    func initialContinuousUseWarnings() {
+        let scheduler = BreakScheduler(
+            activityMonitor: MockActivityMonitor(),
+            notificationSender: MockNotificationSender()
+        )
+
+        #expect(scheduler.continuousUseWarnings == 0)
+    }
+
+    @Test("Reset daily clears continuous use tracking")
+    @MainActor
+    func resetDailyClearsContinuousUseTracking() {
+        let scheduler = BreakScheduler(
+            activityMonitor: MockActivityMonitor(),
+            notificationSender: MockNotificationSender()
+        )
+
+        // Simulate some activity
+        scheduler.takeBreakNow(.micro)
+        scheduler.resetDaily()
+
+        #expect(scheduler.longestContinuousSession == 0)
+        #expect(scheduler.continuousUseWarnings == 0)
+    }
 }
