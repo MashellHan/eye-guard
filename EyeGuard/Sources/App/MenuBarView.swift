@@ -189,7 +189,7 @@ struct MenuBarView: View {
     private var footerSection: some View {
         HStack {
             Button("Preferences...") {
-                // TODO: Open preferences window
+                PreferencesWindowController.shared.showPreferences()
             }
             .font(.caption)
             Spacer()
