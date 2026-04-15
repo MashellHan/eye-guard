@@ -188,11 +188,20 @@ struct MenuBarView: View {
 
     private var footerSection: some View {
         HStack {
+            Button("Dashboard...") {
+                DashboardWindowController.shared.showDashboard(scheduler: scheduler)
+            }
+            .font(.caption)
+
+            Spacer()
+
             Button("Preferences...") {
                 PreferencesWindowController.shared.showPreferences()
             }
             .font(.caption)
+
             Spacer()
+
             Button("Quit") {
                 NSApplication.shared.terminate(nil)
             }

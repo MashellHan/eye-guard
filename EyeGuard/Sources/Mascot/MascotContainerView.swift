@@ -376,6 +376,9 @@ struct MascotContainerView: View {
     /// Callback for "Show Eye Tip" from mascot menu.
     var onShowTip: (@MainActor () -> Void)?
 
+    /// Callback for "Dashboard" from mascot menu.
+    var onDashboard: (@MainActor () -> Void)?
+
     var body: some View {
         VStack(spacing: 4) {
             if viewModel.showBubble {
@@ -450,6 +453,12 @@ struct MascotContainerView: View {
         }
 
         Divider()
+
+        Button {
+            onDashboard?()
+        } label: {
+            Label("Dashboard 数据面板", systemImage: "chart.bar")
+        }
 
         Button {
             onGenerateReport?()

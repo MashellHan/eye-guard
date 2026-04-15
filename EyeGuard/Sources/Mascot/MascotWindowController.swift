@@ -58,6 +58,9 @@ final class MascotWindowController {
             },
             onShowTip: { [weak self] in
                 self?.handleShowTip()
+            },
+            onDashboard: { [weak self] in
+                self?.handleDashboard()
             }
         )
         let hostingView = NSHostingView(rootView: containerView)
@@ -160,6 +163,14 @@ final class MascotWindowController {
         let tip = TipDatabase.randomTip()
         viewModel?.showMessage(tip.shortBubbleText, duration: 15)
         Log.mascot.info("Mascot: showing eye tip #\(tip.id): \(tip.title)")
+    }
+
+    /// Handles "Dashboard" from mascot context menu.
+    /// Opens the dashboard window with historical charts.
+    private func handleDashboard() {
+        guard let scheduler else { return }
+        DashboardWindowController.shared.showDashboard(scheduler: scheduler)
+        Log.mascot.info("Mascot: opened dashboard via mascot menu.")
     }
 
     /// The exercise session floating window.
