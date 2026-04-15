@@ -22,4 +22,7 @@ enum Log {
 
     /// Logger for data persistence operations.
     static let persistence = Logger(subsystem: "com.eyeguard", category: "DataPersistence")
+
+    /// Logger for the mascot subsystem.
+    static let mascot = Logger(subsystem: "com.eyeguard", category: "Mascot")
 }

@@ -5,6 +5,7 @@ import SwiftUI
 /// Uses `MenuBarExtra` to live exclusively in the menu bar (no dock icon).
 /// Wires up the core services and provides the menu bar UI.
 /// The menu bar title shows a countdown to the next 20-20-20 break.
+/// Launches the floating mascot character (护眼精灵) on screen (v0.9).
 @main
 struct EyeGuardApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
@@ -17,11 +18,24 @@ struct EyeGuardApp: App {
                 .onAppear {
                     // Register scheduler with ReportDataProvider for quit-time report generation
                     ReportDataProvider.shared.register(scheduler: scheduler)
+
+                    // Launch mascot character (v0.9)
+                    launchMascot()
                 }
         } label: {
             MenuBarLabel(scheduler: scheduler)
         }
         .menuBarExtraStyle(.window)
+    }
+
+    /// Creates and shows the mascot floating window, wired to the scheduler.
+    @MainActor
+    private func launchMascot() {
+        guard AppDelegate.mascotController == nil else { return }
+        let controller = MascotWindowController()
+        controller.show(scheduler: scheduler)
+        AppDelegate.mascotController = controller
+        Log.app.info("Mascot character (护眼精灵) launched.")
     }
 }
 

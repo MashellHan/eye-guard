@@ -11,10 +11,15 @@ import os
 /// - Set up notification permissions
 /// - Auto-generate daily report on app quit (v0.7)
 /// - Schedule midnight report generation (v0.7)
+/// - Show the mascot floating character (v0.9)
 final class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
 
     /// Timer for midnight report generation (daily rollover).
     private var midnightTimer: Timer?
+
+    /// The mascot floating window controller (v0.9).
+    @MainActor
+    static var mascotController: MascotWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         ensureDataDirectories()
@@ -30,6 +35,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
 
         // Generate daily report on app quit (v0.7)
         generateDailyReportSync()
+
+        // Clean up mascot window (v0.9)
+        Task { @MainActor in
+            AppDelegate.mascotController?.hide()
+        }
+
         Log.app.info("EyeGuard terminating. Daily report generated.")
     }
 
