@@ -157,10 +157,7 @@ struct DailyReport: Codable, Sendable, Identifiable {
         totalBreaksTaken: Int,
         totalBreaksScheduled: Int
     ) {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.timeZone = .current  // BUG-007: explicit timezone
-        self.dateString = formatter.string(from: date)
+        self.dateString = TimeFormatting.dateStringFormatter.string(from: date)
         self.sessions = sessions
         self.healthScore = healthScore
         self.totalScreenTime = totalScreenTime

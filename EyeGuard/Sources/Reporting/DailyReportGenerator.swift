@@ -138,9 +138,7 @@ struct DailyReportGenerator: Sendable {
         longestContinuousSession: TimeInterval,
         aiInsights: String = ""
     ) -> String {
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateStyle = .long
-        dateFormatter.timeZone = .current
+        let dateFormatter = TimeFormatting.longDateFormatter
 
         let score = report.healthScore
         let screenTimeStr = TimeFormatting.formatDuration(report.totalScreenTime)
@@ -374,9 +372,7 @@ struct DailyReportGenerator: Sendable {
             return "*No breaks recorded today.*"
         }
 
-        let timeFormatter = DateFormatter()
-        timeFormatter.timeStyle = .medium
-        timeFormatter.timeZone = .current
+        let timeFormatter = TimeFormatting.timeFormatter
 
         var lines: [String] = []
         lines.append("| # | Time | Type | Status | Duration |")

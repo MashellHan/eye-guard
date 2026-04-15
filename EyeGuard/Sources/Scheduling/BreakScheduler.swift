@@ -107,7 +107,12 @@ final class BreakScheduler {
     private var ticksSinceLastPersist: Int = 0
 
     /// Data persistence manager for JSON file I/O.
+    @ObservationIgnored
     private let persistenceManager = DataPersistenceManager()
+
+    /// Health score calculator (reusable instance instead of creating per-call, v1.9).
+    @ObservationIgnored
+    private let healthScoreCalculator = HealthScoreCalculator()
 
     // MARK: - Initialization
 
@@ -224,7 +229,8 @@ final class BreakScheduler {
 
     // MARK: - Private: Timer Loop
 
-    /// Main timer loop — ticks every second to update UI state.
+    /// Main timer loop — ticks every second for UI responsiveness.
+    /// Heavy work (health score, persistence, idle polling) runs on a slower cadence.
     /// Fixed concurrency: no [weak self] or MainActor.run needed since
     /// BreakScheduler is @MainActor (C1).
     private func startTimerLoop() {
@@ -237,6 +243,7 @@ final class BreakScheduler {
     }
 
     /// Called every second to update session duration and check for due breaks.
+    /// Lightweight operations run every tick; heavy operations run on slower cadence.
     /// Also polls ActivityMonitor for idle state (H1) and tracks continuous use.
     private func tick() {
         guard !isPaused else { return }
@@ -263,11 +270,15 @@ final class BreakScheduler {
 
         updateNextBreak()
         checkForDueBreaks()
-        checkContinuousUse()
-        checkDailyRollover()
+
+        // Heavy operations on slower cadence (every 5 seconds)
+        ticksSinceLastScoreUpdate += 1
+        if ticksSinceLastScoreUpdate >= 5 {
+            checkContinuousUse()
+            checkDailyRollover()
+        }
 
         // Periodic health score recalculation (every 60 seconds)
-        ticksSinceLastScoreUpdate += 1
         if ticksSinceLastScoreUpdate >= 60 {
             ticksSinceLastScoreUpdate = 0
             recalculateHealthScore()
@@ -280,15 +291,17 @@ final class BreakScheduler {
             persistData()
         }
 
-        // Poll activity monitor for idle state (H1)
-        Task {
-            let idle = await activityMonitor.isIdle
-            if idle && !wasIdle {
-                handleIdleDetected()
-                wasIdle = true
-            } else if !idle && wasIdle {
-                handleActivityResumed()
-                wasIdle = false
+        // Poll activity monitor every 5 seconds (not every tick)
+        if ticksSinceLastScoreUpdate % 5 == 0 {
+            Task {
+                let idle = await activityMonitor.isIdle
+                if idle && !wasIdle {
+                    handleIdleDetected()
+                    wasIdle = true
+                } else if !idle && wasIdle {
+                    handleActivityResumed()
+                    wasIdle = false
+                }
             }
         }
     }
@@ -447,7 +460,7 @@ final class BreakScheduler {
             return
         }
 
-        let calculator = HealthScoreCalculator()
+        let calculator = healthScoreCalculator
         let breakdown = calculator.calculateBreakdown(
             breakEvents: todayBreakEvents,
             totalScreenTime: totalScreenTimeToday,

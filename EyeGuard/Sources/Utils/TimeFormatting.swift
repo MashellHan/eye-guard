@@ -1,7 +1,37 @@
 import Foundation
 
 /// Shared time formatting utilities used across the app.
+///
+/// Static DateFormatter instances avoid repeated allocation overhead (v1.9).
 enum TimeFormatting {
+
+    // MARK: - Static DateFormatters (v1.9 optimization)
+
+    /// Shared date formatter for YYYY-MM-DD date strings.
+    static let dateStringFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = .current
+        return formatter
+    }()
+
+    /// Shared date formatter for long date display.
+    static let longDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .long
+        formatter.timeZone = .current
+        return formatter
+    }()
+
+    /// Shared date formatter for time display (HH:mm:ss).
+    static let timeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .medium
+        formatter.timeZone = .current
+        return formatter
+    }()
+
+    // MARK: - Duration Formatting
 
     /// Formats a duration in seconds to a human-readable string (e.g. "2h 15m", "5m").
     ///

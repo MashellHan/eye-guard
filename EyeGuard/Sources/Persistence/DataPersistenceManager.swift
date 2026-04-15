@@ -132,11 +132,8 @@ struct DataPersistenceManager: Sendable {
             .appendingPathComponent("\(dateString).json")
     }
 
-    /// Formats a date as YYYY-MM-DD.
+    /// Formats a date as YYYY-MM-DD using the shared static formatter (v1.9).
     private static func formatDateString(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.timeZone = .current
-        return formatter.string(from: date)
+        TimeFormatting.dateStringFormatter.string(from: date)
     }
 }

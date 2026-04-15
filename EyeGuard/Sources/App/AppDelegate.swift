@@ -12,6 +12,7 @@ import os
 /// - Auto-generate daily report on app quit (v0.7)
 /// - Schedule midnight report generation (v0.7)
 /// - Show the mascot floating character (v0.9)
+/// - Track app launch time (v1.9)
 final class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
 
     /// Timer for midnight report generation (daily rollover).
@@ -21,12 +22,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
     @MainActor
     static var mascotController: MascotWindowController?
 
+    /// App launch start time for performance tracking (v1.9).
+    private let launchStartTime = Date.now
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         ensureDataDirectories()
         checkAccessibilityPermissions()
         startMonitoring()
         setupNotifications()
         scheduleMidnightReport()
+
+        // Log launch time (v1.9)
+        let launchDuration = Date.now.timeIntervalSince(launchStartTime)
+        Log.app.info("App launch completed in \(String(format: "%.3f", launchDuration))s (target < 1s)")
+        if launchDuration > 1.0 {
+            Log.app.warning("Launch time exceeded 1s target: \(String(format: "%.3f", launchDuration))s")
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
