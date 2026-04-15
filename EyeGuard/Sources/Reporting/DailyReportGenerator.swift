@@ -19,6 +19,7 @@ struct DailyReportGenerator: Sendable {
     /// Generates and saves a daily report for the given data.
     ///
     /// File I/O is performed on a background thread via async (v0.2).
+    /// Includes AI-powered insights section (v1.8).
     ///
     /// - Parameters:
     ///   - date: The date of the report.
@@ -50,11 +51,16 @@ struct DailyReportGenerator: Sendable {
             totalBreaksScheduled: breakEvents.count
         )
 
+        // Generate AI insights for the report (v1.8)
+        let insightGenerator = InsightGenerator()
+        let aiInsights = await insightGenerator.generateReportInsights(report: report)
+
         await saveMarkdownReport(
             report,
             date: date,
             breakEvents: breakEvents,
-            longestContinuousSession: longestContinuousSession
+            longestContinuousSession: longestContinuousSession,
+            aiInsights: aiInsights
         )
         return report
     }
@@ -98,13 +104,15 @@ struct DailyReportGenerator: Sendable {
         _ report: DailyReport,
         date: Date,
         breakEvents: [BreakEvent],
-        longestContinuousSession: TimeInterval
+        longestContinuousSession: TimeInterval,
+        aiInsights: String = ""
     ) async {
         let markdown = renderMarkdown(
             report,
             date: date,
             breakEvents: breakEvents,
-            longestContinuousSession: longestContinuousSession
+            longestContinuousSession: longestContinuousSession,
+            aiInsights: aiInsights
         )
         let fileName = "\(report.dateString).md"
         let fileURL = EyeGuardConstants.reportsDirectory.appendingPathComponent(fileName)
@@ -122,12 +130,13 @@ struct DailyReportGenerator: Sendable {
         }
     }
 
-    /// Renders a `DailyReport` as a comprehensive Markdown string (v0.7).
+    /// Renders a `DailyReport` as a comprehensive Markdown string (v0.7, v1.8).
     private func renderMarkdown(
         _ report: DailyReport,
         date: Date,
         breakEvents: [BreakEvent],
-        longestContinuousSession: TimeInterval
+        longestContinuousSession: TimeInterval,
+        aiInsights: String = ""
     ) -> String {
         let dateFormatter = DateFormatter()
         dateFormatter.dateStyle = .long
@@ -207,6 +216,25 @@ struct DailyReportGenerator: Sendable {
         sections.append("## \u{1F4CB} Detailed Break Log")
         sections.append("")
         sections.append(renderDetailedBreakLog(breakEvents: breakEvents))
+
+        // --- AI Insights (v1.8) ---
+        if !aiInsights.isEmpty {
+            sections.append("")
+            sections.append("## \u{1F916} AI Insights")
+            sections.append("")
+            sections.append(aiInsights)
+        }
+
+        // --- Hourly Pattern Analysis (v1.8) ---
+        let insightGen = InsightGenerator()
+        let patterns = insightGen.analyzeHourlyPatterns(breakEvents: breakEvents)
+        sections.append("")
+        sections.append("## \u{1F50D} Pattern Analysis")
+        sections.append("")
+        sections.append("| Pattern | Detail |")
+        sections.append("|---------|--------|")
+        sections.append("| **Best Hour** | \(patterns.best) |")
+        sections.append("| **Worst Hour** | \(patterns.worst) |")
 
         // --- Tip of the Day (v1.3) ---
         sections.append("")

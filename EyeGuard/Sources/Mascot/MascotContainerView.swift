@@ -513,6 +513,11 @@ struct MascotContainerView: View {
             var ticksSinceLastNightMessage: Int = 0
             let nightMessageTicks: Int = 450  // 15 min × 60 sec / 2 sec per tick
 
+            // AI insight: show an AI insight every 2 hours (3600 ticks at 2-sec interval)
+            var ticksSinceLastInsight: Int = 0
+            let insightTicks: Int = 3600  // 2 hr × 60 min × 60 sec / 2 sec per tick
+            let insightGenerator = InsightGenerator()
+
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(2))
                 guard !Task.isCancelled else { return }
@@ -544,6 +549,23 @@ struct MascotContainerView: View {
                         viewModel.showMessage(tip.shortBubbleText, duration: 15)
                         // Play tip rotation bell (v1.6)
                         SoundManager.shared.onTipRotation()
+                    }
+                }
+
+                // AI insight rotation (v1.8) — every 2 hours
+                ticksSinceLastInsight += 1
+                if ticksSinceLastInsight >= insightTicks {
+                    ticksSinceLastInsight = 0
+                    if viewModel.mascotState == .idle || viewModel.mascotState == .happy {
+                        let hour = Calendar.current.component(.hour, from: .now)
+                        let insight = insightGenerator.generateMascotInsight(
+                            screenTime: scheduler.totalScreenTimeToday,
+                            breaksTaken: scheduler.breaksTakenToday,
+                            breaksScheduled: scheduler.breaksTakenToday + scheduler.breaksSkippedToday,
+                            healthScore: scheduler.currentHealthScore,
+                            hour: hour
+                        )
+                        viewModel.showMessage(insight, duration: 20)
                     }
                 }
 

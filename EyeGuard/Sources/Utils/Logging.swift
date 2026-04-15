@@ -43,4 +43,7 @@ enum Log {
 
     /// Logger for dashboard subsystem.
     static let dashboard = Logger(subsystem: "com.eyeguard", category: "Dashboard")
+
+    /// Logger for AI/LLM insight subsystem.
+    static let ai = Logger(subsystem: "com.eyeguard", category: "AI")
 }

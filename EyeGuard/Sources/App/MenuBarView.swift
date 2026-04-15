@@ -16,6 +16,8 @@ struct MenuBarView: View {
             Divider()
             statsSection
             Divider()
+            insightSection
+            Divider()
             reportSection
             Divider()
             footerSection
@@ -183,6 +185,34 @@ struct MenuBarView: View {
             }
             .font(.caption)
             Spacer()
+        }
+    }
+
+    /// AI-powered insight summary (v1.8).
+    private var insightSection: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 4) {
+                Image(systemName: "brain")
+                    .font(.caption2)
+                    .foregroundStyle(.purple)
+                Text("AI Insight")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
+            let compliance = (scheduler.breaksTakenToday + scheduler.breaksSkippedToday) > 0
+                ? Double(scheduler.breaksTakenToday)
+                    / Double(scheduler.breaksTakenToday + scheduler.breaksSkippedToday)
+                : 1.0
+            let insight = InsightGenerator().generateMenuBarInsight(
+                healthScore: scheduler.currentHealthScore,
+                screenTime: scheduler.totalScreenTimeToday,
+                breakCompliance: compliance
+            )
+            Text(insight)
+                .font(.caption2)
+                .foregroundStyle(.primary)
+                .lineLimit(2)
         }
     }
 
