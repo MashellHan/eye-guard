@@ -286,7 +286,7 @@ struct PreferencesView: View {
 
             Section {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("EyeGuard v0.8")
+                    Text("EyeGuard v2.1")
                         .font(.headline)
                     Text("Protect your eyes with science-based break reminders")
                         .font(.caption)

@@ -23,8 +23,9 @@ struct EyeGuardApp: App {
                     // Launch mascot character (v0.9)
                     launchMascot()
 
-                    // Start color analysis (v1.5)
-                    ColorAnalyzer.shared.startAnalysis()
+                    // Color analysis (v1.5) — deferred until user opens color suggestions
+                    // to avoid triggering Screen Recording permission prompt on launch.
+                    // ColorAnalyzer.shared.startAnalysis()
                 }
         } label: {
             MenuBarLabel(scheduler: scheduler)
