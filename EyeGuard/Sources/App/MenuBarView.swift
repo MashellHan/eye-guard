@@ -16,6 +16,8 @@ struct MenuBarView: View {
             Divider()
             statsSection
             Divider()
+            reportSection
+            Divider()
             footerSection
         }
         .padding()
@@ -172,6 +174,18 @@ struct MenuBarView: View {
         }
     }
 
+    private var reportSection: some View {
+        HStack {
+            Button {
+                generateReport()
+            } label: {
+                Label("Generate Report", systemImage: "doc.text")
+            }
+            .font(.caption)
+            Spacer()
+        }
+    }
+
     private var footerSection: some View {
         HStack {
             Button("Preferences...") {
@@ -183,6 +197,24 @@ struct MenuBarView: View {
                 NSApplication.shared.terminate(nil)
             }
             .font(.caption)
+        }
+    }
+
+    // MARK: - Report Generation
+
+    /// Generates a daily report with current session data and opens the reports folder.
+    private func generateReport() {
+        Task { @MainActor in
+            let data = ReportDataProvider.shared.currentData()
+            let generator = DailyReportGenerator()
+            _ = await generator.generate(
+                sessions: data.sessions,
+                breakEvents: data.breakEvents,
+                totalScreenTime: data.totalScreenTime,
+                longestContinuousSession: data.longestContinuousSession
+            )
+            // Open the reports directory in Finder
+            NSWorkspace.shared.open(EyeGuardConstants.reportsDirectory)
         }
     }
 

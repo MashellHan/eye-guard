@@ -9,19 +9,28 @@ import os
 /// - Initialize monitoring services
 /// - Ensure data directories exist
 /// - Set up notification permissions
-final class AppDelegate: NSObject, NSApplicationDelegate {
+/// - Auto-generate daily report on app quit (v0.7)
+/// - Schedule midnight report generation (v0.7)
+final class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
+
+    /// Timer for midnight report generation (daily rollover).
+    private var midnightTimer: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         ensureDataDirectories()
         checkAccessibilityPermissions()
         startMonitoring()
         setupNotifications()
+        scheduleMidnightReport()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        // Data persistence happens automatically via BreakScheduler's periodic persist.
-        // Final persist will occur on next app launch from loaded data.
-        Log.app.info("EyeGuard terminating. Data persisted via scheduler.")
+        midnightTimer?.invalidate()
+        midnightTimer = nil
+
+        // Generate daily report on app quit (v0.7)
+        generateDailyReportSync()
+        Log.app.info("EyeGuard terminating. Daily report generated.")
     }
 
     // MARK: - Private
@@ -75,5 +84,76 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 )
             }
         }
+    }
+
+    // MARK: - Daily Report Generation (v0.7)
+
+    /// Generates the daily report synchronously at app termination.
+    /// Uses a semaphore to block until the async generation completes,
+    /// because applicationWillTerminate does not support async.
+    private func generateDailyReportSync() {
+        let semaphore = DispatchSemaphore(value: 0)
+
+        Task { @MainActor in
+            let data = ReportDataProvider.shared.currentData()
+            let generator = DailyReportGenerator()
+            _ = await generator.generate(
+                sessions: data.sessions,
+                breakEvents: data.breakEvents,
+                totalScreenTime: data.totalScreenTime,
+                longestContinuousSession: data.longestContinuousSession
+            )
+            semaphore.signal()
+        }
+
+        // Wait up to 5 seconds for report generation
+        _ = semaphore.wait(timeout: .now() + 5)
+    }
+
+    /// Schedules a timer to fire at the next midnight for daily report rollover.
+    private func scheduleMidnightReport() {
+        let calendar = Calendar.current
+        guard let nextMidnight = calendar.nextDate(
+            after: .now,
+            matching: DateComponents(hour: 0, minute: 0, second: 0),
+            matchingPolicy: .nextTime
+        ) else {
+            Log.app.error("Failed to calculate next midnight for report scheduling.")
+            return
+        }
+
+        let interval = nextMidnight.timeIntervalSince(.now)
+        Log.app.info("Midnight report scheduled in \(Int(interval / 60)) minutes.")
+
+        midnightTimer = Timer.scheduledTimer(
+            withTimeInterval: interval,
+            repeats: false
+        ) { [weak self] _ in
+            self?.handleMidnightRollover()
+        }
+    }
+
+    /// Called at midnight — generates the previous day's report and reschedules.
+    private func handleMidnightRollover() {
+        Log.app.info("Midnight rollover: generating daily report.")
+
+        // Generate report for the day that just ended (yesterday)
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: .now) ?? .now
+
+        Task { @MainActor in
+            let data = ReportDataProvider.shared.currentData()
+            let generator = DailyReportGenerator()
+            _ = await generator.generate(
+                date: yesterday,
+                sessions: data.sessions,
+                breakEvents: data.breakEvents,
+                totalScreenTime: data.totalScreenTime,
+                longestContinuousSession: data.longestContinuousSession
+            )
+            Log.app.info("Midnight report generated for \(yesterday).")
+        }
+
+        // Reschedule for next midnight
+        scheduleMidnightReport()
     }
 }

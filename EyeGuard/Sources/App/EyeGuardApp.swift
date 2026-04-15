@@ -14,6 +14,10 @@ struct EyeGuardApp: App {
     var body: some Scene {
         MenuBarExtra {
             MenuBarView(scheduler: scheduler)
+                .onAppear {
+                    // Register scheduler with ReportDataProvider for quit-time report generation
+                    ReportDataProvider.shared.register(scheduler: scheduler)
+                }
         } label: {
             MenuBarLabel(scheduler: scheduler)
         }
