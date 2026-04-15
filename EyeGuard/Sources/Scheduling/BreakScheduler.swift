@@ -100,6 +100,9 @@ final class BreakScheduler {
     /// The notification manager dependency (H6).
     private let notificationSender: any NotificationSending
 
+    /// The sound manager dependency (v2.3 — protocol-based DI).
+    private let soundPlayer: any SoundPlaying
+
     /// Tick counter for periodic health score recalculation (every 60 ticks = 1 minute).
     private var ticksSinceLastScoreUpdate: Int = 0
 
@@ -116,19 +119,22 @@ final class BreakScheduler {
 
     // MARK: - Initialization
 
-    /// Creates a new BreakScheduler with injectable dependencies (H6).
+    /// Creates a new BreakScheduler with injectable dependencies (H6, v2.3).
     ///
     /// - Parameters:
     ///   - activityMonitor: Activity monitoring service (defaults to shared singleton).
     ///   - notificationSender: Notification delivery service (defaults to shared singleton).
+    ///   - soundPlayer: Sound playback service (defaults to shared singleton, v2.3).
     ///   - preferences: User preferences for break intervals.
     init(
         activityMonitor: any ActivityMonitoring = ActivityMonitor.shared,
         notificationSender: any NotificationSending = NotificationManager.shared,
+        soundPlayer: any SoundPlaying = SoundManager.shared,
         preferences: UserPreferences = .default
     ) {
         self.activityMonitor = activityMonitor
         self.notificationSender = notificationSender
+        self.soundPlayer = soundPlayer
         self.preferences = preferences
         startTimerLoop()
         loadPersistedData()
@@ -184,8 +190,8 @@ final class BreakScheduler {
         recordBreak(type: type, wasTaken: true)
         resetTimersAfterBreak(type)
 
-        // Start ambient sound during break (v1.6)
-        SoundManager.shared.startAmbient()
+        // Start ambient sound during break (v1.6, v2.3 — uses injected soundPlayer)
+        soundPlayer.startAmbient()
 
         // Auto-end break after the break duration
         Task {
@@ -202,8 +208,8 @@ final class BreakScheduler {
         isBreakInProgress = false
         activeBreakType = nil
 
-        // Stop ambient sound when break ends (v1.6)
-        SoundManager.shared.stopAmbient()
+        // Stop ambient sound when break ends (v1.6, v2.3 — uses injected soundPlayer)
+        soundPlayer.stopAmbient()
     }
 
     /// Records that the user skipped a scheduled break.

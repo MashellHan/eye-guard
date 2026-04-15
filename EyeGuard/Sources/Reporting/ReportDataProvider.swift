@@ -7,7 +7,7 @@ import os
 /// the DailyReportGenerator. Collects snapshot data that can be used
 /// by the AppDelegate at quit time or midnight rollover.
 @MainActor
-final class ReportDataProvider {
+final class ReportDataProvider: ReportDataProviding {
 
     /// Shared singleton instance.
     static let shared = ReportDataProvider()

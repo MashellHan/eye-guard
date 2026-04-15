@@ -13,7 +13,7 @@ import os
 /// Sampling frequency: Every 5 minutes.
 @Observable
 @MainActor
-final class ColorAnalyzer {
+final class ColorAnalyzer: ColorAnalyzing {
 
     /// Shared singleton instance.
     static let shared = ColorAnalyzer()

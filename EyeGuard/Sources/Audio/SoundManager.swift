@@ -15,7 +15,7 @@ import os
 /// Uses NSSound for system sound playback and AVAudioEngine for
 /// procedurally generated ambient tones (no external audio files needed).
 @MainActor
-final class SoundManager {
+final class SoundManager: SoundPlaying {
 
     // MARK: - Singleton
 
