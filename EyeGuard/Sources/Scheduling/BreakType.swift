@@ -62,4 +62,13 @@ enum BreakType: String, Codable, Sendable, CaseIterable {
         case .mandatory: return "figure.walk"
         }
     }
+
+    /// Priority for break absorption: higher absorbs lower when due simultaneously.
+    var priority: Int {
+        switch self {
+        case .micro:     return 0
+        case .macro:     return 1
+        case .mandatory: return 2
+        }
+    }
 }

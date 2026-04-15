@@ -47,14 +47,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         // Generate daily report on app quit (v0.7)
         generateDailyReportSync()
 
-        // Stop any ambient sound (v1.6)
-        Task { @MainActor in
+        // Stop any ambient sound (v1.6) — synchronous on main thread
+        if Thread.isMainThread {
             SoundManager.shared.stopAmbient()
-        }
-
-        // Clean up mascot window (v0.9)
-        Task { @MainActor in
             AppDelegate.mascotController?.hide()
+            AppDelegate.mascotController = nil
+        } else {
+            DispatchQueue.main.sync {
+                SoundManager.shared.stopAmbient()
+                AppDelegate.mascotController?.hide()
+                AppDelegate.mascotController = nil
+            }
         }
 
         Log.app.info("EyeGuard terminating. Daily report generated.")
@@ -63,13 +66,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
     // MARK: - Private
 
     /// Verifies accessibility permissions required for CGEventTap.
+    /// Only logs a warning if not trusted — does NOT prompt the user.
+    /// The system will prompt automatically when CGEventTap is first used.
     private func checkAccessibilityPermissions() {
         let trusted = AXIsProcessTrusted()
         if !trusted {
-            // Prompt the user to grant accessibility permissions.
-            // Use string literal to avoid Swift 6 concurrency warning on the C global.
-            let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
-            AXIsProcessTrustedWithOptions(options)
             Log.app.warning("Accessibility permission not yet granted. Some features will be limited.")
         } else {
             Log.app.info("Accessibility permission granted.")

@@ -3,27 +3,25 @@ import Foundation
 import UserNotifications
 import os
 
-/// Manages break notifications with a three-tier escalation system.
+/// Manages break notifications with mode-aware behavior (v2.4).
 ///
-/// Tier 1 (Gentle): macOS UserNotification banner — dismissible.
-/// Tier 2 (Firm): Custom semi-transparent overlay window — 30-sec countdown.
-/// Tier 3 (Mandatory): Full-screen overlay — requires acknowledgment.
+/// Notification delivery is driven by `BreakBehavior` and `EscalationStrategy`
+/// from the active `ReminderModeProfile`, rather than hardcoded tier logic.
+///
+/// - `.direct` escalation: jump straight to the `entryTier` (no waiting).
+/// - `.tiered` escalation: start at system notification, wait, then escalate.
+///
+/// `DismissPolicy` controls what buttons appear on overlays:
+/// - `.skippable`: Skip + Take Break
+/// - `.postponeOnly(maxCount:)`: Postpone (limited) + Take Break
+/// - `.mandatory`: Take Break only (countdown auto-starts)
 ///
 /// Conforms to `NotificationSending` for testability.
 @MainActor
 final class NotificationManager: NotificationSending {
 
-    // MARK: - Notification Tier
-
-    enum Tier: Int, Sendable {
-        case gentle = 1
-        case firm = 2
-        case mandatory = 3
-    }
-
     // MARK: - State
 
-    private var currentTier: Tier = .gentle
     private var escalationTask: Task<Void, Never>?
     private var snoozeTask: Task<Void, Never>?
     private(set) var isNotificationActive: Bool = false
@@ -31,9 +29,19 @@ final class NotificationManager: NotificationSending {
     /// Stored callbacks for the current notification cycle (H4).
     private var onTakenCallback: (@Sendable () -> Void)?
     private var onSkippedCallback: (@Sendable () -> Void)?
+    private var onPostponedCallback: (@Sendable (TimeInterval) -> Void)?
 
     /// Current health score for display in overlays.
     private var currentHealthScore: Int = 100
+
+    /// Active break behavior for the current notification.
+    private var activeBehavior: BreakBehavior?
+
+    /// Active break type for the current notification.
+    private var activeBreakType: BreakType?
+
+    /// Postpone count per break type (reset when break is taken or skipped).
+    private var postponeCountByBreakType: [BreakType: Int] = [:]
 
     /// Tier 2 floating overlay window controller.
     private let overlayController = OverlayWindowController()
@@ -53,70 +61,84 @@ final class NotificationManager: NotificationSending {
         requestNotificationPermission()
     }
 
-    /// Sends a break notification starting at Tier 1, escalating if ignored.
+    /// Sends a break notification using mode-aware behavior (v2.4).
     ///
-    /// Stores `onTaken` and `onSkipped` callbacks for later invocation (H4).
+    /// For `.direct` escalation: jumps straight to the configured `entryTier`.
+    /// For `.tiered` escalation: starts at Tier 1 (system), escalates after delays.
     ///
     /// - Parameters:
     ///   - breakType: The type of break to notify about.
+    ///   - behavior: Behavioral configuration from the active profile.
+    ///   - escalation: Escalation strategy from the active profile.
     ///   - healthScore: Current eye health score (0-100) for overlay display.
     ///   - onTaken: Callback when user acknowledges the break.
     ///   - onSkipped: Callback when user dismisses/skips the break.
+    ///   - onPostponed: Callback when user postpones the break.
     func notify(
         breakType: BreakType,
+        behavior: BreakBehavior,
+        escalation: EscalationStrategy,
         healthScore: Int,
         onTaken: @escaping @Sendable () -> Void,
-        onSkipped: @escaping @Sendable () -> Void
+        onSkipped: @escaping @Sendable () -> Void,
+        onPostponed: @escaping @Sendable (TimeInterval) -> Void
     ) {
         guard !isNotificationActive else { return }
         isNotificationActive = true
-        currentTier = .gentle
         currentHealthScore = healthScore
+        activeBehavior = behavior
+        activeBreakType = breakType
 
         // Store callbacks (H4)
         self.onTakenCallback = onTaken
         self.onSkippedCallback = onSkipped
-
-        sendTier1Notification(breakType: breakType)
+        self.onPostponedCallback = onPostponed
 
         // Play break start sound (v1.6)
         SoundManager.shared.onBreakStart()
 
-        // Start escalation chain
-        escalationTask = Task {
-            // Wait for Tier 1 → Tier 2 escalation
-            try? await Task.sleep(for: .seconds(EyeGuardConstants.tier1EscalationDelay))
-            guard !Task.isCancelled else { return }
+        switch escalation {
+        case .direct:
+            // Jump straight to the configured entry tier
+            showTier(behavior.entryTier, breakType: breakType, behavior: behavior)
 
-            await MainActor.run {
-                self.currentTier = .firm
-                self.showTier2Overlay(breakType: breakType)
-            }
+        case .tiered(let tier1Delay, let tier2Delay):
+            // Start at system notification, then escalate
+            sendTier1Notification(breakType: breakType)
 
-            // Wait for Tier 2 → Tier 3 escalation (only for mandatory breaks)
-            if breakType == .mandatory {
-                try? await Task.sleep(for: .seconds(EyeGuardConstants.tier2EscalationDelay))
+            escalationTask = Task {
+                // Wait for Tier 1 → Tier 2
+                try? await Task.sleep(for: .seconds(tier1Delay))
                 guard !Task.isCancelled else { return }
 
                 await MainActor.run {
-                    self.currentTier = .mandatory
-                    self.showTier3Fullscreen(breakType: breakType)
+                    self.showTier(.floating, breakType: breakType, behavior: behavior)
                 }
 
-                // After Tier 3 timeout, invoke onSkipped if still not acknowledged (H4)
-                try? await Task.sleep(for: .seconds(EyeGuardConstants.tier2EscalationDelay))
-                guard !Task.isCancelled else { return }
+                // Tier 2 → Tier 3 (only for mandatory breaks)
+                if breakType == .mandatory {
+                    try? await Task.sleep(for: .seconds(tier2Delay))
+                    guard !Task.isCancelled else { return }
 
-                await MainActor.run {
-                    self.handleEscalationTimeout()
-                }
-            } else {
-                // Non-mandatory: after Tier 2 timeout, invoke onSkipped (H4)
-                try? await Task.sleep(for: .seconds(EyeGuardConstants.tier2EscalationDelay))
-                guard !Task.isCancelled else { return }
+                    await MainActor.run {
+                        self.showTier(.fullScreen, breakType: breakType, behavior: behavior)
+                    }
 
-                await MainActor.run {
-                    self.handleEscalationTimeout()
+                    // After Tier 3 timeout, invoke onSkipped if still active (H4)
+                    try? await Task.sleep(for: .seconds(tier2Delay))
+                    guard !Task.isCancelled else { return }
+
+                    await MainActor.run {
+                        self.handleEscalationTimeout()
+                    }
+                } else {
+                    // Non-mandatory: after Tier 2 timeout, invoke onSkipped (H4)
+                    try? await Task.sleep(for: .seconds(tier2Delay))
+                    guard !Task.isCancelled else { return }
+
+                    await MainActor.run {
+                        self.handleEscalationTimeout()
+                    }
                 }
             }
         }
@@ -134,7 +156,37 @@ final class NotificationManager: NotificationSending {
         // Play break complete sound (v1.6)
         SoundManager.shared.onBreakComplete()
 
+        // Reset postpone count for this break type
+        if let breakType = activeBreakType {
+            postponeCountByBreakType[breakType] = 0
+        }
+        activeBreakType = nil
+        activeBehavior = nil
+
         callback?()
+    }
+
+    /// Postpones the current break by the configured delay (v2.4).
+    ///
+    /// - Parameter breakType: The break type being postponed.
+    func postponeBreak(breakType: BreakType) {
+        let currentCount = postponeCountByBreakType[breakType, default: 0]
+        postponeCountByBreakType[breakType] = currentCount + 1
+
+        let callback = onPostponedCallback
+        cancelEscalation()
+        dismissAllOverlays()
+        isNotificationActive = false
+
+        Log.notification.info(
+            "Postponed \(breakType.displayName) (\(currentCount + 1) times)."
+        )
+
+        clearCallbacks()
+        activeBreakType = nil
+        activeBehavior = nil
+
+        callback?(EyeGuardConstants.postponeDelay)
     }
 
     /// Snoozes the current notification and reschedules after snooze duration (BUG-006).
@@ -148,7 +200,9 @@ final class NotificationManager: NotificationSending {
         isNotificationActive = false
         clearCallbacks()
 
-        Log.notification.info("Snoozed \(breakType.displayName) for \(Int(EyeGuardConstants.maxSnoozeDuration))s.")
+        Log.notification.info(
+            "Snoozed \(breakType.displayName) for \(Int(EyeGuardConstants.maxSnoozeDuration))s."
+        )
 
         // Reschedule after snooze duration (BUG-006)
         snoozeTask?.cancel()
@@ -157,9 +211,82 @@ final class NotificationManager: NotificationSending {
             guard !Task.isCancelled else { return }
 
             await MainActor.run {
-                Log.notification.info("Snooze expired for \(breakType.displayName), re-notifying.")
+                Log.notification.info(
+                    "Snooze expired for \(breakType.displayName), re-notifying."
+                )
                 onDue()
             }
+        }
+    }
+
+    // MARK: - Private: Tier Dispatch (v2.4)
+
+    /// Dispatches notification to the correct tier based on the configured entry tier.
+    private func showTier(
+        _ tier: NotificationTier,
+        breakType: BreakType,
+        behavior: BreakBehavior
+    ) {
+        let postponeCount = postponeCountByBreakType[breakType, default: 0]
+
+        switch tier {
+        case .system:
+            sendTier1Notification(breakType: breakType)
+
+        case .floating:
+            overlayController.showBreakOverlay(
+                breakType: breakType,
+                healthScore: currentHealthScore,
+                dismissPolicy: behavior.dismissPolicy,
+                postponeCount: postponeCount,
+                onTaken: { [weak self] in
+                    Task { @MainActor in
+                        self?.acknowledgeBreak()
+                    }
+                },
+                onSkipped: { [weak self] in
+                    Task { @MainActor in
+                        let callback = self?.onSkippedCallback
+                        self?.cancelEscalation()
+                        self?.dismissAllOverlays()
+                        self?.isNotificationActive = false
+                        self?.clearCallbacks()
+                        self?.activeBreakType = nil
+                        self?.activeBehavior = nil
+                        callback?()
+                    }
+                },
+                onPostponed: { [weak self] in
+                    Task { @MainActor in
+                        guard let self, let bt = self.activeBreakType else { return }
+                        self.postponeBreak(breakType: bt)
+                    }
+                }
+            )
+
+            Log.notification.info("Floating overlay shown: \(breakType.displayName)")
+
+        case .fullScreen:
+            overlayController.dismiss()
+            overlayController.showFullScreenOverlay(
+                breakType: breakType,
+                healthScore: currentHealthScore,
+                dismissPolicy: behavior.dismissPolicy,
+                postponeCount: postponeCount,
+                onTaken: { [weak self] in
+                    Task { @MainActor in
+                        self?.acknowledgeBreak()
+                    }
+                },
+                onPostponed: { [weak self] in
+                    Task { @MainActor in
+                        guard let self, let bt = self.activeBreakType else { return }
+                        self.postponeBreak(breakType: bt)
+                    }
+                }
+            )
+
+            Log.notification.info("Full-screen overlay shown: \(breakType.displayName)")
         }
     }
 
@@ -172,6 +299,8 @@ final class NotificationManager: NotificationSending {
         dismissAllOverlays()
         isNotificationActive = false
         clearCallbacks()
+        activeBreakType = nil
+        activeBehavior = nil
 
         Log.notification.info("Escalation timed out, break skipped.")
         callback?()
@@ -181,6 +310,7 @@ final class NotificationManager: NotificationSending {
     private func clearCallbacks() {
         onTakenCallback = nil
         onSkippedCallback = nil
+        onPostponedCallback = nil
     }
 
     // MARK: - Private: Notification Permission
@@ -190,7 +320,9 @@ final class NotificationManager: NotificationSending {
             Log.notification.warning("Not running in an app bundle. Notifications disabled.")
             return
         }
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
+        UNUserNotificationCenter.current().requestAuthorization(
+            options: [.alert, .sound]
+        ) { granted, error in
             if let error {
                 Log.notification.error("Permission error: \(error.localizedDescription)")
             } else if granted {
@@ -227,65 +359,6 @@ final class NotificationManager: NotificationSending {
         }
 
         Log.notification.info("Tier 1 notification sent: \(breakType.displayName)")
-    }
-
-    // MARK: - Private: Tier 2 — Overlay Window
-
-    private func showTier2Overlay(breakType: BreakType) {
-        guard onTakenCallback != nil, onSkippedCallback != nil else {
-            Log.notification.warning("Tier 2: no callbacks stored, skipping overlay.")
-            return
-        }
-
-        overlayController.showBreakOverlay(
-            breakType: breakType,
-            healthScore: currentHealthScore,
-            onTaken: { [weak self] in
-                Task { @MainActor in
-                    self?.acknowledgeBreak()
-                }
-            },
-            onSkipped: { [weak self] in
-                Task { @MainActor in
-                    let callback = self?.onSkippedCallback
-                    self?.cancelEscalation()
-                    self?.dismissAllOverlays()
-                    self?.isNotificationActive = false
-                    self?.clearCallbacks()
-                    callback?()
-                }
-            }
-        )
-
-        Log.notification.info("Tier 2 overlay shown: \(breakType.displayName)")
-    }
-
-    // MARK: - Private: Tier 3 — Full-Screen
-
-    private func showTier3Fullscreen(breakType: BreakType) {
-        guard onTakenCallback != nil else {
-            Log.notification.warning("Tier 3: no onTaken callback stored, skipping overlay.")
-            return
-        }
-
-        escalateToTier3(healthScore: currentHealthScore) { [weak self] in
-            Task { @MainActor in
-                self?.acknowledgeBreak()
-            }
-        }
-
-        Log.notification.info("Tier 3 fullscreen shown: \(breakType.displayName)")
-    }
-
-    /// Escalates to Tier 3 full-screen overlay for mandatory breaks.
-    ///
-    /// - Parameters:
-    ///   - healthScore: Current eye health score to display on the overlay.
-    ///   - onTaken: Called when the user completes the full break.
-    private func escalateToTier3(healthScore: Int, onTaken: @escaping @Sendable () -> Void) {
-        // Dismiss any Tier 2 overlay before showing Tier 3
-        overlayController.dismiss()
-        overlayController.showFullScreenOverlay(healthScore: healthScore, onTaken: onTaken)
     }
 
     // MARK: - Private: Cleanup

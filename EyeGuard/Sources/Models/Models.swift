@@ -120,6 +120,14 @@ struct UserPreferences: Codable, Sendable {
     var isSoundEnabled: Bool
     var isEscalationEnabled: Bool
 
+    /// Active reminder mode preset (v2.4).
+    var reminderMode: ReminderMode
+
+    /// Returns the behavioral profile for the active reminder mode (v2.4).
+    var activeProfile: ReminderModeProfile {
+        reminderMode.profile()
+    }
+
     /// Default preferences based on medical guidelines.
     static let `default` = UserPreferences(
         microBreakInterval: EyeGuardConstants.microBreakInterval,
@@ -132,7 +140,8 @@ struct UserPreferences: Codable, Sendable {
         isMacroBreakEnabled: true,
         isMandatoryBreakEnabled: true,
         isSoundEnabled: true,
-        isEscalationEnabled: true
+        isEscalationEnabled: true,
+        reminderMode: EyeGuardConstants.defaultReminderMode
     )
 }
 

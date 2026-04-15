@@ -47,16 +47,26 @@ struct MascotContainerView: View {
 
             MascotView(
                 state: viewModel.mascotState,
-                isBlinking: viewModel.isBlinking,
+                restingMode: viewModel.restingMode,
+                eyelidClosedness: viewModel.eyelidClosedness,
                 pupilOffset: viewModel.pupilOffset,
                 bounceOffset: viewModel.bounceOffset,
-                waveAngle: viewModel.waveAngle
+                eyeScale: viewModel.eyeScale,
+                isHighScore: viewModel.isHighScore,
+                alertGlowOpacity: viewModel.alertGlowOpacity,
+                handGesture: viewModel.handGesture,
+                gestureWiggle: viewModel.gestureWiggle
             )
             .scaleEffect(viewModel.breathScale * viewModel.celebrateScale)
             .rotationEffect(.degrees(viewModel.celebrateRotation))
             .offset(x: viewModel.swayOffset)
         }
         .frame(width: 120, height: 130)
+        .onHover { isHovering in
+            if isHovering && !viewModel.showBubble {
+                viewModel.toggleBubble()
+            }
+        }
         .onTapGesture(count: 2) {
             // Double-click: toggle speech bubble
             viewModel.toggleBubble()

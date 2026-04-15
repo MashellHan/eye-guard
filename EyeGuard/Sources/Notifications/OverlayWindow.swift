@@ -7,17 +7,8 @@ import os
 /// Tier 2: appears in the top-right corner with semi-transparent blur background.
 /// Tier 3: covers ALL screens with a full-screen semi-transparent overlay.
 ///
-/// Tier 2 window properties:
-/// - Level: `.floating` (above other windows but not fullscreen)
-/// - Borderless style with shadow
-/// - Movable by dragging background
-/// - Visible on all Spaces (desktops)
-///
-/// Tier 3 window properties:
-/// - Level: `.screenSaver` (above everything)
-/// - Covers entire screen frame per monitor
-/// - Cannot be easily dismissed (no close button)
-/// - Multi-monitor support
+/// v2.4: Now accepts `DismissPolicy`, `postponeCount`, and `onPostponed` to support
+/// mode-aware behavior.
 @MainActor
 final class OverlayWindowController: NSObject {
 
@@ -36,18 +27,24 @@ final class OverlayWindowController: NSObject {
 
     // MARK: - Public API
 
-    /// Shows a break overlay window with the given break type and callbacks.
+    /// Shows a break overlay window with mode-aware dismiss behavior (v2.4).
     ///
     /// - Parameters:
     ///   - breakType: The type of break being prompted.
     ///   - healthScore: Current eye health score (0-100) to display.
+    ///   - dismissPolicy: How the user can dismiss this notification.
+    ///   - postponeCount: Number of postpones already used.
     ///   - onTaken: Called when the user taps "Take Break" and the countdown completes.
     ///   - onSkipped: Called when the user taps "Skip".
+    ///   - onPostponed: Called when the user taps "Postpone".
     func showBreakOverlay(
         breakType: BreakType,
         healthScore: Int = 100,
+        dismissPolicy: DismissPolicy = .skippable,
+        postponeCount: Int = 0,
         onTaken: @escaping @Sendable () -> Void,
-        onSkipped: @escaping @Sendable () -> Void
+        onSkipped: @escaping @Sendable () -> Void,
+        onPostponed: @escaping @Sendable () -> Void = {}
     ) {
         // Dismiss any existing overlay first
         if isShowing {
@@ -61,15 +58,22 @@ final class OverlayWindowController: NSObject {
         let contentView = BreakOverlayView(
             breakType: breakType,
             healthScore: healthScore,
+            dismissPolicy: dismissPolicy,
+            postponeCount: postponeCount,
             onTaken: onTaken,
             onSkipped: onSkipped,
+            onPostponed: onPostponed,
             onDismiss: dismissAction
         )
 
         let hostingView = NSHostingView(rootView: contentView)
 
+        // Larger window for macro/mandatory breaks
+        let windowWidth: CGFloat = breakType == .macro ? 400 : 340
+        let windowHeight: CGFloat = breakType == .macro ? 340 : 300
+
         let overlayWindow = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 340, height: 300),
+            contentRect: NSRect(x: 0, y: 0, width: windowWidth, height: windowHeight),
             styleMask: [.borderless],
             backing: .buffered,
             defer: false
@@ -101,12 +105,23 @@ final class OverlayWindowController: NSObject {
         Log.notification.info("Overlay window shown for \(breakType.displayName)")
     }
 
-    /// Shows a full-screen overlay on every connected monitor for Tier 3 mandatory breaks.
+    /// Shows a full-screen overlay on every connected monitor (v2.4).
     ///
     /// - Parameters:
+    ///   - breakType: The type of break driving this overlay.
     ///   - healthScore: Current eye health score (0-100) to display.
+    ///   - dismissPolicy: How the user can dismiss this overlay.
+    ///   - postponeCount: Number of postpones already used.
     ///   - onTaken: Called when the user completes the full break countdown.
-    func showFullScreenOverlay(healthScore: Int, onTaken: @escaping @Sendable () -> Void) {
+    ///   - onPostponed: Called when the user postpones.
+    func showFullScreenOverlay(
+        breakType: BreakType = .mandatory,
+        healthScore: Int,
+        dismissPolicy: DismissPolicy = .postponeOnly(maxCount: 2),
+        postponeCount: Int = 0,
+        onTaken: @escaping @Sendable () -> Void,
+        onPostponed: @escaping @Sendable () -> Void = {}
+    ) {
         // Dismiss any existing overlays first
         dismissFullScreen()
         if isShowing {
@@ -121,11 +136,20 @@ final class OverlayWindowController: NSObject {
 
         for (index, screen) in screens.enumerated() {
             let contentView = FullScreenOverlayView(
+                breakType: breakType,
                 healthScore: healthScore,
+                dismissPolicy: dismissPolicy,
+                postponeCount: postponeCount,
                 onBreakTaken: { [weak self] in
                     Task { @MainActor in
                         self?.dismissFullScreen()
                         onTaken()
+                    }
+                },
+                onPostponed: { [weak self] in
+                    Task { @MainActor in
+                        self?.dismissFullScreen()
+                        onPostponed()
                     }
                 }
             )

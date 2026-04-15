@@ -2,6 +2,20 @@
 
 Medical-grade eye health guardian for macOS. Smart screen time monitoring with evidence-based break reminders following the AAO 20-20-20 rule.
 
+## Screenshots
+
+### 阿普 (Mascot)
+<!-- Replace with actual screenshot: the cute mint-green creature mascot floating on desktop -->
+![阿普 - EyeGuard Mascot](screenshots/mascot.png)
+
+### Break Reminder Overlay
+<!-- Replace with actual screenshot: full-screen semi-transparent overlay with mascot, countdown ring, and health tip -->
+![Break Reminder](screenshots/break-overlay.png)
+
+### Menu Bar
+<!-- Replace with actual screenshot: menu bar popover with health score, timer, and controls -->
+![Menu Bar](screenshots/menubar.png)
+
 ## Features
 
 ### Core Protection
@@ -24,12 +38,14 @@ Medical-grade eye health guardian for macOS. Smart screen time monitoring with e
 - **7/30 Day History**: Historical data visualization from daily JSON files
 - **Pie Chart Breakdown**: Score component visualization
 
-### Mascot (护眼精灵)
+### Mascot — 阿普 (Apu)
 - **Floating Character**: Draggable, always-on-top companion
-- **7 Emotional States**: Idle, happy, concerned, alerting, sleeping, exercising, celebrating
-- **Mouse Tracking**: Pupils follow your cursor
+- **Cute Creature Design**: Mint-green body, bean eyes, blush cheeks, tiny legs
+- **5 Emotional States**: Idle, concerned, alerting, resting, celebrating
+- **Mouse Tracking**: Eyes follow your cursor
 - **Speech Bubbles**: Contextual tips, break reminders, AI insights
-- **Right-Click Menu**: Quick access to breaks, exercises, tips, dashboard
+- **Hand Gestures**: Eye-rubbing, looking far, eye exercises
+- **Right-Click Menu**: Quick access to breaks, exercises, tips, dashboard, quit
 
 ### Eye Exercises (眼保健操)
 - **5 Guided Routines**: Focus shifting, figure-8, circle rotation, distance gazing, palming
@@ -72,6 +88,13 @@ Medical-grade eye health guardian for macOS. Smart screen time monitoring with e
 - **Static DateFormatters**: Shared instances eliminate repeated allocations
 - **Reusable Calculators**: Single HealthScoreCalculator instance per scheduler
 - **Launch Time Tracking**: Monitors startup performance (<1s target)
+
+### Reminder Modes (v2.4)
+- **Gentle / Aggressive / Strict / Custom**: Preset notification intensity levels
+- **Aggressive (Default)**: Floating popup for micro/macro breaks, full-screen for mandatory
+- **Mode-Aware Dismiss Policy**: Skippable, Postpone Only, or Mandatory per break type
+- **Break Absorption**: When multiple breaks align, highest priority fires, others reset silently
+- **Postpone System**: Delay breaks up to 2 times (5 min each) for Postpone Only policy
 
 ### Preferences
 - **Customizable Intervals**: Adjust break timing to your workflow
@@ -126,12 +149,47 @@ EyeGuard/Sources/
 
 ## Medical Basis
 
-- **AAO 20-20-20 Rule**: Every 20 min, look 20 feet away for 20 seconds
-- **OSHA**: Regular breaks for computer workers (hourly)
-- **EU Screen Equipment Directive**: Mandatory breaks every 2 hours
-- **WHO**: Regular breaks and ergonomic positioning
-- **NIOSH**: Eye strain prevention guidelines
-- Break intervals based on peer-reviewed Computer Vision Syndrome research
+EyeGuard uses three types of breaks targeting different physiological systems. Even if you rest your eyes every 20 minutes, a 120-minute mandatory break is still necessary because each break type serves a distinct purpose.
+
+### Why Three Break Types?
+
+| Break Type | Interval | Duration | Physiological Target | Source |
+|------------|----------|----------|---------------------|--------|
+| **Micro Break** | 20 min | 20 sec | Ciliary muscle accommodation spasm (near-focus fatigue) | AAO 20-20-20 Rule (Jeffrey Anshel) |
+| **Macro Break** | 60 min | 5 min | Musculoskeletal strain, RSI, postural fatigue | OSHA Computer Workstation Guidelines |
+| **Mandatory Break** | 120 min | 15 min | Deep vein thrombosis risk, systemic circulation, cognitive reset | EU Directive 90/270/EEC, NIOSH |
+
+- **Micro breaks** relax the ciliary muscles in your eyes. Looking 20 feet away lets the lens flatten, reducing accommodation strain. This prevents digital eye strain (Computer Vision Syndrome).
+- **Macro breaks** address your whole body. After an hour, your neck, shoulders, and back need movement. Static posture leads to repetitive strain injuries that 20 seconds of distance gazing cannot fix.
+- **Mandatory breaks** protect against prolonged sitting risks. After 2+ hours of continuous computer use, blood pooling in the legs increases DVT risk, and cognitive performance degrades. A 15-minute break allows systemic circulation recovery and mental reset.
+
+### Reminder Modes
+
+EyeGuard offers preset reminder modes (like "Typical/Custom" in software installers):
+
+| Setting | Gentle | Aggressive (Default) | Strict |
+|---------|--------|---------------------|--------|
+| Micro notification | System banner | Floating popup | Full screen |
+| Micro dismiss | Skippable | Skippable | Mandatory |
+| Macro notification | Floating popup | Floating popup | Full screen |
+| Macro dismiss | Skippable | Skippable | Postpone only (2x) |
+| Mandatory notification | Full screen | Full screen | Full screen |
+| Mandatory dismiss | Skippable | Postpone only (2x) | Mandatory |
+| Escalation | Tiered (2m then 5m) | Direct (no wait) | Direct |
+
+- **Gentle**: For users who want minimal interruption. All breaks can be freely skipped.
+- **Aggressive** (recommended): Prominent floating popups appear immediately. Mandatory breaks can only be postponed twice.
+- **Strict**: Maximum enforcement. Full-screen overlays for all breaks. Mandatory breaks cannot be dismissed.
+- **Custom**: Configure each break type's notification tier and dismiss policy individually.
+
+### References
+
+- American Academy of Ophthalmology (AAO): 20-20-20 Rule
+- OSHA: Computer Workstation Guidelines (regular hourly breaks)
+- EU Screen Equipment Directive 90/270/EEC (mandatory breaks every 2 hours)
+- WHO: Regular breaks and ergonomic positioning
+- NIOSH: Eye strain prevention guidelines
+- Cornell University Ergonomics: Computer Vision Syndrome research
 
 ## Tech Stack
 

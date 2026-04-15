@@ -3,6 +3,7 @@ import SwiftUI
 /// Manages the synchronization between BreakScheduler state and MascotViewModel.
 ///
 /// Extracted from MascotContainerView in v2.1 for better separation of concerns.
+/// Redesigned in v3.0: 5-state model with RestingMode sub-states.
 /// Handles:
 /// - Break event detection (taken/skipped)
 /// - Night mode state transitions
@@ -19,7 +20,7 @@ enum MascotStateSync {
     static func start(viewModel: MascotViewModel, scheduler: BreakScheduler) {
         Task { @MainActor in
             // Initial greeting
-            viewModel.showMessage("Hi! 我是护眼精灵 👋")
+            viewModel.showMessage("Hi! 我是阿普 👋")
 
             // Track previous break event counts for change detection
             var lastBreaksTaken = scheduler.breaksTakenToday
@@ -27,9 +28,9 @@ enum MascotStateSync {
             var celebrationEndTime: Date?
             var wasBreakInProgress = false
 
-            // Tip rotation: show a tip every 30 minutes (900 ticks at 2-sec interval)
+            // Tip rotation: show a tip every 60 minutes (1800 ticks at 2-sec interval)
             var ticksSinceLastTip: Int = 0
-            let tipRotationTicks: Int = 900  // 30 min x 60 sec / 2 sec per tick
+            let tipRotationTicks: Int = 1800  // 60 min x 60 sec / 2 sec per tick
 
             // Night mode: show night screen time every 15 minutes (450 ticks)
             var ticksSinceLastNightMessage: Int = 0
@@ -52,7 +53,7 @@ enum MascotStateSync {
                     ticksSinceLastNightMessage += 1
                     if ticksSinceLastNightMessage >= nightMessageTicks {
                         ticksSinceLastNightMessage = 0
-                        if viewModel.mascotState == .sleeping {
+                        if viewModel.mascotState == .resting && viewModel.restingMode == .sleeping {
                             let msg = NightModeManager.shared.nightScreenTimeMessage()
                             viewModel.showMessage(msg, duration: 10)
                         }
@@ -66,7 +67,7 @@ enum MascotStateSync {
                 if ticksSinceLastTip >= tipRotationTicks {
                     ticksSinceLastTip = 0
                     // Only show tip if mascot is in a calm state
-                    if viewModel.mascotState == .idle || viewModel.mascotState == .happy {
+                    if viewModel.mascotState == .idle {
                         let tip = TipDatabase.randomTip()
                         viewModel.showMessage(tip.shortBubbleText, duration: 15)
                         // Play tip rotation bell (v1.6)
@@ -78,7 +79,7 @@ enum MascotStateSync {
                 ticksSinceLastInsight += 1
                 if ticksSinceLastInsight >= insightTicks {
                     ticksSinceLastInsight = 0
-                    if viewModel.mascotState == .idle || viewModel.mascotState == .happy {
+                    if viewModel.mascotState == .idle {
                         let hour = Calendar.current.component(.hour, from: .now)
                         let insight = insightGenerator.generateMascotInsight(
                             screenTime: scheduler.totalScreenTimeToday,
@@ -91,10 +92,11 @@ enum MascotStateSync {
                     }
                 }
 
-                // Check for break-in-progress (exercising state)
+                // Check for break-in-progress (resting/exercising state)
                 if scheduler.isBreakInProgress && !wasBreakInProgress {
                     wasBreakInProgress = true
-                    viewModel.transition(to: .exercising)
+                    viewModel.restingMode = .exercising
+                    viewModel.transition(to: .resting)
                     if NightModeManager.shared.isNightModeActive {
                         viewModel.showMessage(
                             NightModeManager.shared.randomNightBreakMessage(),
@@ -146,7 +148,9 @@ enum MascotStateSync {
                         continue
                     }
                     celebrationEndTime = nil
-                    viewModel.transition(to: .happy)
+                    // After celebration, go to idle with high score flag
+                    viewModel.isHighScore = scheduler.currentHealthScore >= 80
+                    viewModel.transition(to: .idle)
                     continue
                 }
 
@@ -163,8 +167,9 @@ enum MascotStateSync {
     private static func updateMascotState(viewModel: MascotViewModel, scheduler: BreakScheduler) {
         // Night mode check via NightModeManager (v1.4)
         if NightModeManager.shared.isNightModeActive {
-            if viewModel.mascotState != .sleeping {
-                viewModel.transition(to: .sleeping)
+            if viewModel.mascotState != .resting || viewModel.restingMode != .sleeping {
+                viewModel.restingMode = .sleeping
+                viewModel.transition(to: .resting)
                 viewModel.showMessage(NightModeManager.shared.randomNightMessage())
             }
             return
@@ -174,7 +179,8 @@ enum MascotStateSync {
         if let nextBreak = scheduler.nextScheduledBreak {
             // Break is due (time ran out)
             if scheduler.timeUntilNextBreak <= 0 {
-                if viewModel.mascotState != .alerting && viewModel.mascotState != .exercising {
+                let isExercising = viewModel.mascotState == .resting && viewModel.restingMode == .exercising
+                if viewModel.mascotState != .alerting && !isExercising {
                     viewModel.transition(to: .alerting)
                     let message = breakAlertMessage(for: nextBreak)
                     viewModel.showMessage(message, duration: 15)
@@ -195,14 +201,14 @@ enum MascotStateSync {
 
         // Health score based states
         let score = scheduler.currentHealthScore
+        viewModel.isHighScore = score >= 80
 
         if score >= 80 {
-            if viewModel.mascotState != .happy && viewModel.mascotState != .idle {
-                viewModel.transition(to: .happy)
-            } else if viewModel.mascotState == .idle {
-                // Occasionally switch to happy when score is good
-                if Int.random(in: 0..<30) == 0 {
-                    viewModel.transition(to: .happy)
+            if viewModel.mascotState != .idle {
+                viewModel.transition(to: .idle)
+            } else {
+                // Occasionally show encouragement when score is good
+                if Int.random(in: 0..<450) == 0 {
                     viewModel.showMessage("做得好！继续保持 💪")
                 }
             }
@@ -213,6 +219,7 @@ enum MascotStateSync {
             }
         } else {
             if viewModel.mascotState != .idle {
+                viewModel.isHighScore = false
                 viewModel.transition(to: .idle)
             }
         }
@@ -222,11 +229,11 @@ enum MascotStateSync {
     private static func breakAlertMessage(for breakType: BreakType) -> String {
         switch breakType {
         case .micro:
-            return "👁️ 该休息眼睛了！看看远处20秒"
+            return "👁️ 阿普说：该休息眼睛了！看看远处20秒"
         case .macro:
-            return "☕ 休息一下吧！站起来活动5分钟"
+            return "☕ 阿普说：休息一下吧！站起来活动5分钟"
         case .mandatory:
-            return "🚶 该站起来活动了！休息15分钟"
+            return "🚶 阿普说：该站起来活动了！休息15分钟"
         }
     }
 }

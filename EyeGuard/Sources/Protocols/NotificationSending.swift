@@ -6,18 +6,24 @@ import Foundation
 /// Tests: Inject a mock conforming to this protocol.
 @MainActor
 protocol NotificationSending {
-    /// Sends a break notification with escalation.
+    /// Sends a break notification using mode-aware behavior (v2.4).
     ///
     /// - Parameters:
     ///   - breakType: The type of break to notify about.
+    ///   - behavior: Behavioral configuration for this break type (entry tier, dismiss policy).
+    ///   - escalation: Escalation strategy (direct or tiered).
     ///   - healthScore: Current eye health score (0-100) to display in overlays.
     ///   - onTaken: Callback when user acknowledges the break.
     ///   - onSkipped: Callback when user dismisses/skips the break.
+    ///   - onPostponed: Callback when user postpones the break (receives delay in seconds).
     func notify(
         breakType: BreakType,
+        behavior: BreakBehavior,
+        escalation: EscalationStrategy,
         healthScore: Int,
         onTaken: @escaping @Sendable () -> Void,
-        onSkipped: @escaping @Sendable () -> Void
+        onSkipped: @escaping @Sendable () -> Void,
+        onPostponed: @escaping @Sendable (TimeInterval) -> Void
     )
 
     /// Dismisses the current notification (user took the break).

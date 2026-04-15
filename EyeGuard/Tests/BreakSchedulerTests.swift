@@ -38,29 +38,50 @@ actor MockActivityMonitor: ActivityMonitoring {
 
 // MARK: - Mock NotificationSender
 
-/// Mock notification sender for testing BreakScheduler in isolation.
+/// Mock notification sender for testing BreakScheduler in isolation (v2.4).
 @MainActor
 final class MockNotificationSender: NotificationSending {
-    private(set) var notifyCalls: [(BreakType, Int, @Sendable () -> Void, @Sendable () -> Void)] = []
+    struct NotifyCall {
+        let breakType: BreakType
+        let behavior: BreakBehavior
+        let escalation: EscalationStrategy
+        let healthScore: Int
+        let onTaken: @Sendable () -> Void
+        let onSkipped: @Sendable () -> Void
+        let onPostponed: @Sendable (TimeInterval) -> Void
+    }
+
+    private(set) var notifyCalls: [NotifyCall] = []
     private(set) var acknowledgeCalls = 0
     private(set) var snoozeCalls: [(BreakType, @Sendable () -> Void)] = []
     private(set) var setupCalled = false
 
     var lastNotifiedBreakType: BreakType? {
-        notifyCalls.last?.0
+        notifyCalls.last?.breakType
     }
 
     var lastNotifiedHealthScore: Int? {
-        notifyCalls.last?.1
+        notifyCalls.last?.healthScore
     }
 
     func notify(
         breakType: BreakType,
+        behavior: BreakBehavior,
+        escalation: EscalationStrategy,
         healthScore: Int,
         onTaken: @escaping @Sendable () -> Void,
-        onSkipped: @escaping @Sendable () -> Void
+        onSkipped: @escaping @Sendable () -> Void,
+        onPostponed: @escaping @Sendable (TimeInterval) -> Void
     ) {
-        notifyCalls.append((breakType, healthScore, onTaken, onSkipped))
+        notifyCalls.append(NotifyCall(
+            breakType: breakType,
+            behavior: behavior,
+            escalation: escalation,
+            healthScore: healthScore,
+            onTaken: onTaken,
+            onSkipped: onSkipped,
+            onPostponed: onPostponed
+        ))
     }
 
     func acknowledgeBreak() {

@@ -78,6 +78,16 @@ struct PreferencesView: View {
     @AppStorage("reportDirectory")
     private var reportDirectory: String = EyeGuardConstants.reportsDirectory.path
 
+    // MARK: - Reminder Mode (v2.4)
+
+    @AppStorage("reminderMode")
+    private var reminderModeRaw: String = ReminderMode.aggressive.rawValue
+
+    private var reminderMode: ReminderMode {
+        get { ReminderMode(rawValue: reminderModeRaw) ?? .aggressive }
+        set { reminderModeRaw = newValue.rawValue }
+    }
+
     var body: some View {
         TabView {
             breakIntervalsTab
@@ -113,73 +123,95 @@ struct PreferencesView: View {
 
     private var breakIntervalsTab: some View {
         Form {
+            // Reminder Mode selector (v2.4)
             Section {
-                intervalSlider(
-                    title: "Micro Break Interval",
-                    value: $microBreakIntervalMinutes,
-                    range: 10...30,
-                    unit: "minutes",
-                    description: "20-20-20 rule: Look 20 ft away every 20 min"
-                )
-
-                durationSlider(
-                    title: "Micro Break Duration",
-                    value: $microBreakDurationSeconds,
-                    range: 10...60,
-                    unit: "seconds",
-                    description: "How long to rest your eyes"
-                )
-            } header: {
-                Label("Micro Break (20-20-20 Rule)", systemImage: "eye")
-            }
-
-            Section {
-                intervalSlider(
-                    title: "Macro Break Interval",
-                    value: $macroBreakIntervalMinutes,
-                    range: 30...90,
-                    unit: "minutes",
-                    description: "OSHA recommendation: break every 60 min"
-                )
-
-                durationSlider(
-                    title: "Macro Break Duration",
-                    value: $macroBreakDurationMinutes,
-                    range: 3...15,
-                    unit: "minutes",
-                    description: "Get up, stretch, move around"
-                )
-            } header: {
-                Label("Macro Break (Hourly)", systemImage: "cup.and.saucer")
-            }
-
-            Section {
-                intervalSlider(
-                    title: "Mandatory Break Interval",
-                    value: $mandatoryBreakIntervalMinutes,
-                    range: 60...180,
-                    unit: "minutes",
-                    description: "EU directive: max 2 hours continuous use"
-                )
-
-                durationSlider(
-                    title: "Mandatory Break Duration",
-                    value: $mandatoryBreakDurationMinutes,
-                    range: 10...30,
-                    unit: "minutes",
-                    description: "A full reset: walk, hydrate, rest eyes"
-                )
-            } header: {
-                Label("Mandatory Break (Extended)", systemImage: "figure.walk")
-            }
-
-            Section {
-                HStack {
-                    Spacer()
-                    Button("Reset to Defaults") {
-                        resetBreakDefaults()
+                Picker("Mode", selection: $reminderModeRaw) {
+                    ForEach(ReminderMode.allCases, id: \.rawValue) { mode in
+                        Label(mode.displayName, systemImage: mode.iconName)
+                            .tag(mode.rawValue)
                     }
-                    .foregroundStyle(.secondary)
+                }
+                .pickerStyle(.segmented)
+
+                // Show mode summary for preset modes
+                if let mode = ReminderMode(rawValue: reminderModeRaw),
+                   mode != .custom {
+                    ReminderModeSummaryView(mode: mode)
+                }
+            } header: {
+                Label("Reminder Mode 提醒模式", systemImage: "dial.medium")
+            }
+
+            // Only show sliders for Custom mode
+            if reminderMode == .custom {
+                Section {
+                    intervalSlider(
+                        title: "Micro Break Interval",
+                        value: $microBreakIntervalMinutes,
+                        range: 10...30,
+                        unit: "minutes",
+                        description: "20-20-20 rule: Look 20 ft away every 20 min"
+                    )
+
+                    durationSlider(
+                        title: "Micro Break Duration",
+                        value: $microBreakDurationSeconds,
+                        range: 10...60,
+                        unit: "seconds",
+                        description: "How long to rest your eyes"
+                    )
+                } header: {
+                    Label("Micro Break (20-20-20 Rule)", systemImage: "eye")
+                }
+
+                Section {
+                    intervalSlider(
+                        title: "Macro Break Interval",
+                        value: $macroBreakIntervalMinutes,
+                        range: 30...90,
+                        unit: "minutes",
+                        description: "OSHA recommendation: break every 60 min"
+                    )
+
+                    durationSlider(
+                        title: "Macro Break Duration",
+                        value: $macroBreakDurationMinutes,
+                        range: 3...15,
+                        unit: "minutes",
+                        description: "Get up, stretch, move around"
+                    )
+                } header: {
+                    Label("Macro Break (Hourly)", systemImage: "cup.and.saucer")
+                }
+
+                Section {
+                    intervalSlider(
+                        title: "Mandatory Break Interval",
+                        value: $mandatoryBreakIntervalMinutes,
+                        range: 60...180,
+                        unit: "minutes",
+                        description: "EU directive: max 2 hours continuous use"
+                    )
+
+                    durationSlider(
+                        title: "Mandatory Break Duration",
+                        value: $mandatoryBreakDurationMinutes,
+                        range: 10...30,
+                        unit: "minutes",
+                        description: "A full reset: walk, hydrate, rest eyes"
+                    )
+                } header: {
+                    Label("Mandatory Break (Extended)", systemImage: "figure.walk")
+                }
+
+                Section {
+                    HStack {
+                        Spacer()
+                        Button("Reset to Defaults") {
+                            resetBreakDefaults()
+                        }
+                        .foregroundStyle(.secondary)
+                    }
                 }
             }
         }
@@ -286,7 +318,7 @@ struct PreferencesView: View {
 
             Section {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("EyeGuard v2.1")
+                    Text("EyeGuard v2.4")
                         .font(.headline)
                     Text("Protect your eyes with science-based break reminders")
                         .font(.caption)

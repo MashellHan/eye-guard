@@ -1,282 +1,372 @@
 import SwiftUI
 
-/// The adorable eyeball mascot drawn entirely with SwiftUI shapes.
+/// A cute round creature mascot drawn entirely with SwiftUI shapes.
 ///
-/// A round, Q-style character with a large iris, expressive pupil,
-/// eyebrows, mouth, tiny stick-figure arms/legs, and state-driven expressions.
-/// Enhanced with pink blush cheeks, radial gradients, and polished highlights
-/// ported from the eyes-health project (v2.2).
-/// Size: 64×64 pt body, ~80×90 pt total with limbs.
+/// v3.2: Added state-driven body color, visible arms with eye-care gestures,
+/// and health-state visual feedback. The creature's appearance directly
+/// reflects eye health — users see the mascot and immediately know
+/// their eye fatigue level.
+///
+/// Size: 64×64 pt body, ~90×100 pt total with ears/legs/arms.
 struct MascotView: View {
     let state: MascotState
+    let restingMode: RestingMode
 
-    /// Whether the eyelids are currently closed (blink animation).
-    var isBlinking: Bool = false
+    /// Blink progress (0 = eyes open, 1 = eyes closed).
+    var eyelidClosedness: CGFloat = 0
 
-    /// Pupil tracking offset for eye exercise or idle look-around.
+    /// Eye tracking offset for exercises or idle look-around.
     var pupilOffset: CGSize = .zero
 
     /// Bounce offset for alerting/celebrating states.
     var bounceOffset: CGFloat = 0
 
-    /// Wave angle for arm animation (radians).
-    var waveAngle: Double = 0
+    /// Eye size multiplier (1.0 = normal, >1 for alerting).
+    var eyeScale: CGFloat = 1.0
 
-    /// Body size constant for proportional sizing.
+    /// Whether health score is high (drives stronger blush + sparkle).
+    var isHighScore: Bool = false
+
+    /// Alert glow opacity (pulsing ring).
+    var alertGlowOpacity: Double = 0
+
+    /// Current hand gesture.
+    var handGesture: HandGesture = .none
+
+    /// Wiggle angle for hand gesture animation.
+    var gestureWiggle: Double = 0
+
+    /// Body size constant.
     private let bodySize: CGFloat = 64
 
     var body: some View {
         ZStack {
-            // Legs — two small lines below body
+            // Alert glow (behind everything)
+            if state == .alerting {
+                alertGlowRing
+            }
+
+            // Tiny legs (behind body)
             legs
 
-            // Body — eyeball with radial gradient and subtle blue tint
-            eyeballBody
+            // Arms (behind body so they look attached)
+            arms
 
-            // Iris — colored circle with radial gradient
-            irisView
+            // Body
+            creatureBody
 
-            // Pupil — black circle with animated highlight
-            pupilView
+            // Ears
+            ears
 
-            // Sparkle highlight — follows pupil subtly
-            sparkleHighlight
+            // Eye underglow (sparkle or tired)
+            eyeUnderglow
 
-            // Eyelids (blink / sleeping) with skin-tone color
-            eyelids
-
-            // Pink blush cheeks — expression-dependent opacity
-            cheeksView
-
-            // Eyebrows
-            eyebrows
+            // Eyes
+            eyes
 
             // Mouth
             mouth
 
-            // Expression extras (exclamation marks, etc.)
-            expressionExtras
+            // Blush cheeks
+            blushCheeks
 
-            // Arms
-            arms
+            // Hand gesture overlay (in front of body)
+            gestureOverlay
 
-            // Sleeping zzz
-            if state == .sleeping {
-                sleepingZzz
-            }
-
-            // Celebrating sparkles
-            if state == .celebrating {
-                sparkles
-            }
+            // Expression overlays (zzz, particles, etc.)
+            expressionOverlay
         }
         .offset(y: bounceOffset)
     }
 
-    // MARK: - Eyeball Body
+    // MARK: - Alert Glow
 
-    /// Radial gradient body — white center fading to subtle blue tint at edges.
-    private var eyeballBody: some View {
-        Ellipse()
-            .fill(
-                RadialGradient(
-                    colors: [
-                        Color(white: 1.0),
-                        Color(red: 0.94, green: 0.96, blue: 1.0),
-                    ],
-                    center: .center,
-                    startRadius: 0,
-                    endRadius: bodySize / 2
-                )
-            )
-            .frame(width: bodySize, height: bodySize * 0.9)
-            .overlay(
-                Ellipse()
-                    .stroke(Color.gray.opacity(0.25), lineWidth: 1.5)
-            )
-            .shadow(color: .black.opacity(0.12), radius: 4, x: 0, y: 2)
+    private var alertGlowRing: some View {
+        RoundedRectangle(cornerRadius: 28)
+            .stroke(MascotColors.alertGlow.opacity(alertGlowOpacity), lineWidth: 3)
+            .frame(width: bodySize + 12, height: bodySize + 12)
+            .blur(radius: 4)
     }
 
-    // MARK: - Iris
+    // MARK: - Legs
 
-    private var irisColor: Color {
-        switch state {
-        case .idle:        Color(red: 0.3, green: 0.55, blue: 0.9)
-        case .happy:       Color(red: 0.3, green: 0.8, blue: 0.4)
-        case .concerned:   Color(red: 0.9, green: 0.75, blue: 0.2)
-        case .alerting:    Color(red: 0.9, green: 0.3, blue: 0.25)
-        case .sleeping:    Color(red: 0.5, green: 0.5, blue: 0.75)
-        case .exercising:  Color(red: 0.2, green: 0.7, blue: 0.7)
-        case .celebrating: Color(red: 0.7, green: 0.4, blue: 0.85)
+    private var legs: some View {
+        HStack(spacing: 12) {
+            RoundedRectangle(cornerRadius: 3)
+                .fill(legColor)
+                .frame(width: 8, height: 10)
+
+            RoundedRectangle(cornerRadius: 3)
+                .fill(legColor)
+                .frame(width: 8, height: 10)
+        }
+        .offset(y: bodySize / 2 + 3)
+    }
+
+    // MARK: - Arms
+
+    /// Small stubby arms at body sides — hidden during hand gestures.
+    @ViewBuilder
+    private var arms: some View {
+        if handGesture == .none {
+            HStack(spacing: bodySize + 2) {
+                // Left arm
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(armColor)
+                    .frame(width: 10, height: 14)
+                    .rotationEffect(.degrees(-8))
+
+                // Right arm
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(armColor)
+                    .frame(width: 10, height: 14)
+                    .rotationEffect(.degrees(8))
+            }
+            .offset(y: 2)
         }
     }
 
-    /// Radial gradient iris — rich center fading to translucent edge.
-    private var irisView: some View {
-        Circle()
-            .fill(
-                RadialGradient(
-                    colors: [irisColor, irisColor.opacity(0.65)],
-                    center: .center,
-                    startRadius: 0,
-                    endRadius: 17
-                )
-            )
-            .frame(width: 34, height: 34)
-            .offset(pupilOffset)
+    // MARK: - Body (color changes with state!)
+
+    private var mainBodyColor: Color {
+        switch state {
+        case .idle:
+            isHighScore
+                ? Color(red: 0.70, green: 0.92, blue: 0.78)   // brighter mint when healthy
+                : MascotColors.body
+        case .concerned:
+            Color(red: 0.82, green: 0.85, blue: 0.80)          // desaturated gray-green (tired)
+        case .alerting:
+            MascotColors.alertBody                               // warm peach
+        case .resting:
+            Color(red: 0.78, green: 0.85, blue: 0.90)          // soft blue (calm/rest)
+        case .celebrating:
+            Color(red: 0.78, green: 0.93, blue: 0.82)          // vibrant mint
+        }
     }
 
-    // MARK: - Pupil
+    private var mainBodyEdge: Color {
+        switch state {
+        case .idle:
+            isHighScore
+                ? Color(red: 0.55, green: 0.85, blue: 0.65)
+                : MascotColors.bodyEdge
+        case .concerned:
+            Color(red: 0.70, green: 0.73, blue: 0.68)
+        case .alerting:
+            MascotColors.alertBody.opacity(0.75)
+        case .resting:
+            Color(red: 0.65, green: 0.75, blue: 0.82)
+        case .celebrating:
+            Color(red: 0.60, green: 0.85, blue: 0.68)
+        }
+    }
 
-    /// Pupil with a shine highlight that subtly follows the pupil.
-    private var pupilView: some View {
+    private var armColor: Color {
+        mainBodyEdge
+    }
+
+    private var legColor: Color {
+        mainBodyEdge
+    }
+
+    private var earColor: Color {
+        mainBodyEdge
+    }
+
+    private var creatureBody: some View {
+        RoundedRectangle(cornerRadius: 26)
+            .fill(
+                LinearGradient(
+                    colors: [mainBodyColor, mainBodyEdge],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            .frame(width: bodySize, height: bodySize)
+            .overlay(
+                RoundedRectangle(cornerRadius: 26)
+                    .stroke(MascotColors.bodyStroke.opacity(0.25), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.10), radius: 5, x: 0, y: 3)
+    }
+
+    // MARK: - Ears
+
+    private var ears: some View {
+        ZStack {
+            // Left ear
+            Ellipse()
+                .fill(earColor)
+                .frame(width: 14, height: 12)
+                .overlay(
+                    Ellipse()
+                        .fill(MascotColors.earInner)
+                        .frame(width: 8, height: 6)
+                )
+                .rotationEffect(.degrees(-15))
+                .offset(x: -18, y: -30)
+
+            // Right ear
+            Ellipse()
+                .fill(earColor)
+                .frame(width: 14, height: 12)
+                .overlay(
+                    Ellipse()
+                        .fill(MascotColors.earInner)
+                        .frame(width: 8, height: 6)
+                )
+                .rotationEffect(.degrees(15))
+                .offset(x: 18, y: -30)
+        }
+    }
+
+    // MARK: - Eye Underglow
+
+    @ViewBuilder
+    private var eyeUnderglow: some View {
+        let eyeY: CGFloat = -5
+        let eyeSpacing: CGFloat = 14
+
+        if isHighScore && state == .idle {
+            // Healthy: golden sparkle glow behind eyes
+            HStack(spacing: eyeSpacing) {
+                Circle()
+                    .fill(MascotColors.eyeSparkle.opacity(0.50))
+                    .frame(width: 20, height: 20)
+                    .blur(radius: 5)
+                Circle()
+                    .fill(MascotColors.eyeSparkle.opacity(0.50))
+                    .frame(width: 20, height: 20)
+                    .blur(radius: 5)
+            }
+            .offset(y: eyeY)
+        } else if state == .concerned {
+            // Tired: dark circles under eyes
+            HStack(spacing: eyeSpacing) {
+                Ellipse()
+                    .fill(MascotColors.eyeTired.opacity(0.35))
+                    .frame(width: 14, height: 6)
+                Ellipse()
+                    .fill(MascotColors.eyeTired.opacity(0.35))
+                    .frame(width: 14, height: 6)
+            }
+            .offset(y: eyeY + 9)
+        }
+    }
+
+    // MARK: - Eyes
+
+    @ViewBuilder
+    private var eyes: some View {
+        let eyeY: CGFloat = -5
+        let eyeSpacing: CGFloat = 14
+        let baseEyeSize: CGFloat = 12 * eyeScale
+
+        if isSleepingEyes {
+            // Sleeping: curved closed eyes ᴗ ᴗ
+            HStack(spacing: eyeSpacing) {
+                SleepEyeShape()
+                    .stroke(MascotColors.eyeClosed, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                    .frame(width: 12, height: 6)
+                SleepEyeShape()
+                    .stroke(MascotColors.eyeClosed, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                    .frame(width: 12, height: 6)
+            }
+            .offset(y: eyeY)
+        } else if isCelebratingEyes {
+            // Celebrating: happy squint eyes ◠ ◠
+            HStack(spacing: eyeSpacing) {
+                HappyEyeShape()
+                    .stroke(MascotColors.eye, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                    .frame(width: 12, height: 6)
+                HappyEyeShape()
+                    .stroke(MascotColors.eye, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                    .frame(width: 12, height: 6)
+            }
+            .offset(y: eyeY)
+        } else if state == .concerned {
+            // Concerned: droopy half-open eyes
+            HStack(spacing: eyeSpacing) {
+                concernedEye(size: baseEyeSize)
+                concernedEye(size: baseEyeSize)
+            }
+            .offset(
+                x: pupilOffset.width * 0.3,
+                y: eyeY + 1 + pupilOffset.height * 0.3
+            )
+        } else if eyelidClosedness > 0.5 {
+            // Blinking: horizontal lines
+            HStack(spacing: eyeSpacing) {
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(MascotColors.eyeClosed)
+                    .frame(width: 10, height: 2)
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(MascotColors.eyeClosed)
+                    .frame(width: 10, height: 2)
+            }
+            .offset(y: eyeY)
+        } else {
+            // Normal bean eyes with highlights
+            HStack(spacing: eyeSpacing) {
+                beanEye(size: baseEyeSize)
+                beanEye(size: baseEyeSize)
+            }
+            .offset(
+                x: pupilOffset.width * 0.4,
+                y: eyeY + pupilOffset.height * 0.4
+            )
+        }
+    }
+
+    private var isSleepingEyes: Bool {
+        state == .resting && restingMode == .sleeping
+    }
+
+    private var isCelebratingEyes: Bool {
+        state == .celebrating
+    }
+
+    /// Normal eye: big dark circle + dual sparkle highlights.
+    private func beanEye(size: CGFloat) -> some View {
         ZStack {
             Circle()
-                .fill(.black)
-                .frame(width: 16, height: 16)
+                .fill(MascotColors.eye)
+                .frame(width: size, height: size)
 
-            // Primary shine highlight
+            // Primary highlight — upper-left
             Circle()
-                .fill(.white.opacity(0.85))
-                .frame(width: 5, height: 5)
-                .offset(x: -3, y: -3)
+                .fill(MascotColors.eyeHighlight)
+                .frame(width: size * 0.32, height: size * 0.32)
+                .offset(x: -size * 0.15, y: -size * 0.18)
 
-            // Secondary micro-highlight for depth
+            // Secondary highlight — lower-right
             Circle()
-                .fill(.white.opacity(0.45))
-                .frame(width: 2.5, height: 2.5)
-                .offset(x: 2, y: -4)
-        }
-        .offset(pupilOffset)
-    }
-
-    // MARK: - Sparkle Highlight
-
-    /// Subtle sparkle on the eyeball body that drifts with pupil movement.
-    private var sparkleHighlight: some View {
-        Circle()
-            .fill(.white.opacity(0.7))
-            .frame(width: bodySize * 0.08, height: bodySize * 0.08)
-            .offset(
-                x: -bodySize * 0.12 + pupilOffset.width * 0.15,
-                y: -bodySize * 0.15 + pupilOffset.height * 0.15
-            )
-    }
-
-    // MARK: - Eyelids
-
-    /// Skin-toned eyelids that smoothly animate per expression.
-    /// Shown when blinking or sleeping; uses SkinEyelidShape for smooth curves.
-    @ViewBuilder
-    private var eyelids: some View {
-        if isBlinking || state == .sleeping {
-            VStack(spacing: 0) {
-                // Top eyelid — skin-toned
-                Ellipse()
-                    .fill(Color(red: 0.96, green: 0.92, blue: 0.88))
-                    .frame(width: bodySize, height: bodySize * 0.52)
-                    .offset(y: -1)
-                // Bottom eyelid — skin-toned
-                Ellipse()
-                    .fill(Color(red: 0.96, green: 0.92, blue: 0.88))
-                    .frame(width: bodySize, height: bodySize * 0.52)
-                    .offset(y: 1)
-            }
+                .fill(Color.white.opacity(0.45))
+                .frame(width: size * 0.15, height: size * 0.15)
+                .offset(x: size * 0.12, y: size * 0.10)
         }
     }
 
-    // MARK: - Blush Cheeks
-
-    /// Pink blush circles below the eye — opacity varies by expression.
-    private var cheeksView: some View {
-        HStack(spacing: bodySize * 0.48) {
+    /// Tired/concerned eye: half-closed with no sparkle, looks drained.
+    private func concernedEye(size: CGFloat) -> some View {
+        ZStack {
+            // Slightly smaller, dimmer eye
             Circle()
-                .fill(Color.pink.opacity(cheeksOpacity))
-                .frame(width: bodySize * 0.14, height: bodySize * 0.14)
+                .fill(MascotColors.eye.opacity(0.7))
+                .frame(width: size * 0.85, height: size * 0.85)
+
+            // Only one dim highlight
             Circle()
-                .fill(Color.pink.opacity(cheeksOpacity))
-                .frame(width: bodySize * 0.14, height: bodySize * 0.14)
-        }
-        .offset(y: bodySize * 0.18)
-    }
+                .fill(Color.white.opacity(0.35))
+                .frame(width: size * 0.2, height: size * 0.2)
+                .offset(x: -size * 0.1, y: -size * 0.12)
 
-    /// Cheek blush intensity varies by emotional state.
-    private var cheeksOpacity: Double {
-        switch state {
-        case .happy, .celebrating: 0.5
-        case .idle, .exercising:   0.2
-        case .concerned:           0.25
-        case .alerting:            0.1
-        case .sleeping:            0.35
-        }
-    }
-
-    // MARK: - Eyebrows
-
-    @ViewBuilder
-    private var eyebrows: some View {
-        switch state {
-        case .happy, .celebrating:
-            // Happy: curved up, relaxed eyebrows
-            HappyBrow()
-                .stroke(Color.gray.opacity(0.5), lineWidth: 1.5)
-                .frame(width: 22, height: 5)
-                .offset(y: -26)
-
-        case .concerned:
-            // Concerned: angled down, worried
-            ZStack {
-                ConcernedBrow()
-                    .stroke(Color.gray.opacity(0.7), lineWidth: 1.5)
-                    .frame(width: 10, height: 5)
-                    .offset(x: -8, y: -26)
-
-                ConcernedBrow()
-                    .stroke(Color.gray.opacity(0.7), lineWidth: 1.5)
-                    .frame(width: 10, height: 5)
-                    .scaleEffect(x: -1)
-                    .offset(x: 8, y: -26)
-            }
-
-        case .alerting:
-            // Alerting: raised high, surprised
-            ZStack {
-                RaisedBrow()
-                    .stroke(Color.red.opacity(0.6), lineWidth: 1.5)
-                    .frame(width: 10, height: 6)
-                    .offset(x: -8, y: -30)
-
-                RaisedBrow()
-                    .stroke(Color.red.opacity(0.6), lineWidth: 1.5)
-                    .frame(width: 10, height: 6)
-                    .scaleEffect(x: -1)
-                    .offset(x: 8, y: -30)
-            }
-
-        case .sleeping:
-            // Sleeping: gentle relaxed brows
-            HappyBrow()
-                .stroke(Color.indigo.opacity(0.3), lineWidth: 1)
-                .frame(width: 20, height: 4)
-                .offset(y: -25)
-
-        case .exercising:
-            // Exercising: focused brows
-            ZStack {
-                FocusedBrow()
-                    .stroke(Color.teal.opacity(0.5), lineWidth: 1.5)
-                    .frame(width: 10, height: 4)
-                    .offset(x: -8, y: -27)
-
-                FocusedBrow()
-                    .stroke(Color.teal.opacity(0.5), lineWidth: 1.5)
-                    .frame(width: 10, height: 4)
-                    .scaleEffect(x: -1)
-                    .offset(x: 8, y: -27)
-            }
-
-        default:
-            EmptyView()
+            // Droopy eyelid overlay — top half covered
+            Ellipse()
+                .fill(mainBodyColor)
+                .frame(width: size * 1.2, height: size * 0.5)
+                .offset(y: -size * 0.35)
         }
     }
 
@@ -284,189 +374,268 @@ struct MascotView: View {
 
     @ViewBuilder
     private var mouth: some View {
+        let mouthY: CGFloat = 8
+
         switch state {
-        case .happy, .celebrating:
-            // Smile — wide arc
-            HappyMouth()
-                .stroke(Color.pink, lineWidth: 2)
-                .frame(width: 16, height: 8)
-                .offset(y: 20)
+        case .idle:
+            SmileShape()
+                .stroke(MascotColors.mouth, style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+                .frame(width: 10, height: 5)
+                .offset(y: mouthY)
 
         case .concerned:
-            // Small "O" mouth — worry
-            Circle()
-                .stroke(Color.gray.opacity(0.5), lineWidth: 1.5)
-                .frame(width: 6, height: 6)
-                .offset(y: 21)
+            // Wavy worried mouth ~
+            WavyMouthShape()
+                .stroke(MascotColors.mouth.opacity(0.6), style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+                .frame(width: 10, height: 4)
+                .offset(y: mouthY + 1)
 
         case .alerting:
-            // Open surprise mouth — larger "O"
             Ellipse()
-                .stroke(Color.red.opacity(0.5), lineWidth: 1.5)
-                .frame(width: 10, height: 8)
-                .offset(y: 20)
+                .stroke(MascotColors.mouth, lineWidth: 1.5)
+                .frame(width: 8, height: 6)
+                .offset(y: mouthY + 1)
 
-        case .sleeping:
-            // Tiny sleeping mouth — gentle arc
-            SleepMouth()
-                .stroke(Color.indigo.opacity(0.3), lineWidth: 1)
-                .frame(width: 8, height: 4)
-                .offset(y: 20)
-
-        case .exercising:
-            // Determined line mouth
-            RoundedRectangle(cornerRadius: 1)
-                .fill(Color.teal.opacity(0.4))
-                .frame(width: 10, height: 1.5)
-                .offset(y: 20)
-
-        default:
-            EmptyView()
-        }
-    }
-
-    // MARK: - Expression Extras
-
-    @ViewBuilder
-    private var expressionExtras: some View {
-        switch state {
-        case .alerting:
-            // Exclamation marks
-            ZStack {
-                Text("!")
-                    .font(.system(size: 10, weight: .black))
-                    .foregroundStyle(.red)
-                    .offset(x: 26, y: -20)
-
-                Text("!")
-                    .font(.system(size: 8, weight: .black))
-                    .foregroundStyle(.red.opacity(0.6))
-                    .offset(x: -28, y: -18)
+        case .resting:
+            if restingMode == .sleeping {
+                SmileShape()
+                    .stroke(MascotColors.mouth.opacity(0.5), style: StrokeStyle(lineWidth: 1.2, lineCap: .round))
+                    .frame(width: 8, height: 4)
+                    .offset(y: mouthY)
+            } else {
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(MascotColors.mouth.opacity(0.6))
+                    .frame(width: 8, height: 1.5)
+                    .offset(y: mouthY + 1)
             }
 
+        case .celebrating:
+            SmileShape()
+                .stroke(MascotColors.mouth, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                .frame(width: 14, height: 7)
+                .offset(y: mouthY)
+        }
+    }
+
+    // MARK: - Blush Cheeks
+
+    private var blushCheeks: some View {
+        let blushSize: CGFloat = 10
+        let opacity = blushOpacity
+
+        return HStack(spacing: bodySize * 0.36) {
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [blushColor.opacity(opacity), blushColor.opacity(0)],
+                        center: .center,
+                        startRadius: 0,
+                        endRadius: blushSize / 2
+                    )
+                )
+                .frame(width: blushSize, height: blushSize)
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [blushColor.opacity(opacity), blushColor.opacity(0)],
+                        center: .center,
+                        startRadius: 0,
+                        endRadius: blushSize / 2
+                    )
+                )
+                .frame(width: blushSize, height: blushSize)
+        }
+        .offset(y: 6)
+    }
+
+    private var blushColor: Color {
+        state == .alerting ? MascotColors.alertBlush : MascotColors.blush
+    }
+
+    private var blushOpacity: Double {
+        switch state {
+        case .idle:         isHighScore ? 0.55 : 0.25
+        case .concerned:    0.08  // almost no blush when tired
+        case .alerting:     0.35
+        case .resting:      restingMode == .sleeping ? 0.40 : 0.20
+        case .celebrating:  0.60
+        }
+    }
+
+    // MARK: - Gesture Overlay (visible arms doing eye-care actions)
+
+    @ViewBuilder
+    private var gestureOverlay: some View {
+        switch handGesture {
+        case .none:
+            EmptyView()
+
+        case .rubEyes:
+            // Both hands raised to eyes, rubbing back and forth
+            HStack(spacing: 6) {
+                gestureHand
+                    .rotationEffect(.degrees(25 + gestureWiggle))
+                    .offset(x: 3)
+                gestureHand
+                    .rotationEffect(.degrees(-25 - gestureWiggle))
+                    .offset(x: -3)
+            }
+            .offset(y: -5)
+
+        case .lookFar:
+            // Hand above eyes like a visor, looking into distance
+            ZStack {
+                gestureHand
+                    .frame(width: 20, height: 8)
+                    .rotationEffect(.degrees(gestureWiggle * 0.3))
+                    .offset(x: 0, y: -16)
+
+                // Tiny sparkle to indicate "looking far"
+                Circle()
+                    .fill(Color.yellow.opacity(0.6))
+                    .frame(width: 3, height: 3)
+                    .offset(x: 30, y: -20)
+                Circle()
+                    .fill(Color.yellow.opacity(0.4))
+                    .frame(width: 2, height: 2)
+                    .offset(x: 34, y: -26)
+            }
+
+        case .eyeExercise:
+            // Hands pointing outward from eyes, moving
+            HStack(spacing: 42) {
+                gestureHand
+                    .rotationEffect(.degrees(-30 + gestureWiggle * 0.5))
+                gestureHand
+                    .rotationEffect(.degrees(30 - gestureWiggle * 0.5))
+            }
+            .offset(y: -4)
+        }
+    }
+
+    private var gestureHand: some View {
+        RoundedRectangle(cornerRadius: 5)
+            .fill(
+                LinearGradient(
+                    colors: [MascotColors.hand, MascotColors.accent],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            .frame(width: 14, height: 12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 5)
+                    .stroke(MascotColors.bodyStroke.opacity(0.5), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.15), radius: 2, x: 0, y: 1)
+    }
+
+    // MARK: - Expression Overlays
+
+    @ViewBuilder
+    private var expressionOverlay: some View {
+        switch state {
+        case .resting where restingMode == .sleeping:
+            sleepingZzz
+        case .celebrating:
+            celebrationParticles
+        case .alerting:
+            alertExclamation
+        case .concerned:
+            // Sweat drop for tired state
+            sweatDrop
         default:
             EmptyView()
         }
     }
-
-    // MARK: - Arms
-
-    private var arms: some View {
-        ZStack {
-            // Left arm
-            RoundedRectangle(cornerRadius: 2)
-                .fill(Color.gray.opacity(0.6))
-                .frame(width: 14, height: 3)
-                .offset(x: -38, y: 6)
-                .rotationEffect(.degrees(-20 + waveAngle * 0.5), anchor: .trailing)
-
-            // Right arm
-            RoundedRectangle(cornerRadius: 2)
-                .fill(Color.gray.opacity(0.6))
-                .frame(width: 14, height: 3)
-                .offset(x: 38, y: 6)
-                .rotationEffect(.degrees(20 - waveAngle * 0.5), anchor: .leading)
-
-            // Hands — small circles at arm tips
-            Circle()
-                .fill(Color.gray.opacity(0.5))
-                .frame(width: 5, height: 5)
-                .offset(x: -46, y: 4)
-
-            Circle()
-                .fill(Color.gray.opacity(0.5))
-                .frame(width: 5, height: 5)
-                .offset(x: 46, y: 4)
-        }
-    }
-
-    // MARK: - Legs
-
-    private var legs: some View {
-        HStack(spacing: 14) {
-            // Left leg
-            RoundedRectangle(cornerRadius: 2)
-                .fill(Color.gray.opacity(0.5))
-                .frame(width: 3, height: 10)
-
-            // Right leg
-            RoundedRectangle(cornerRadius: 2)
-                .fill(Color.gray.opacity(0.5))
-                .frame(width: 3, height: 10)
-        }
-        .offset(y: 36)
-    }
-
-    // MARK: - Sleeping Zzz
 
     private var sleepingZzz: some View {
         ZStack {
             Text("z")
                 .font(.system(size: 8, weight: .bold))
-                .foregroundStyle(.indigo.opacity(0.6))
-                .offset(x: 20, y: -22)
-
+                .foregroundStyle(MascotColors.sleepText.opacity(0.6))
+                .offset(x: 24, y: -26)
             Text("z")
                 .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(.indigo.opacity(0.5))
-                .offset(x: 26, y: -30)
-
+                .foregroundStyle(MascotColors.sleepText.opacity(0.5))
+                .offset(x: 30, y: -34)
             Text("Z")
                 .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(.indigo.opacity(0.4))
-                .offset(x: 30, y: -40)
+                .foregroundStyle(MascotColors.sleepText.opacity(0.4))
+                .offset(x: 34, y: -44)
         }
     }
 
-    // MARK: - Sparkles
+    private var celebrationParticles: some View {
+        let count = MascotAnimations.particleCount
+        let radius = MascotAnimations.particleRadius
+        let colors = MascotColors.particleColors
 
-    private var sparkles: some View {
-        ZStack {
-            Text("✨")
-                .font(.system(size: 10))
-                .offset(x: -22, y: -26)
-
-            Text("⭐")
-                .font(.system(size: 8))
-                .offset(x: 28, y: -22)
-
-            Text("✨")
-                .font(.system(size: 8))
-                .offset(x: 18, y: 24)
+        return ZStack {
+            ForEach(0..<count, id: \.self) { i in
+                let angle = Double(i) / Double(count) * .pi * 2
+                Circle()
+                    .fill(colors[i % colors.count])
+                    .frame(width: 4, height: 4)
+                    .offset(x: cos(angle) * radius, y: sin(angle) * radius)
+                    .opacity(0.7)
+            }
         }
+    }
+
+    private var alertExclamation: some View {
+        Text("!")
+            .font(.system(size: 12, weight: .black))
+            .foregroundStyle(MascotColors.alertGlow)
+            .offset(x: 28, y: -24)
+    }
+
+    /// Tiny sweat drop when concerned/tired.
+    private var sweatDrop: some View {
+        Ellipse()
+            .fill(
+                LinearGradient(
+                    colors: [Color.cyan.opacity(0.5), Color.blue.opacity(0.3)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            .frame(width: 4, height: 6)
+            .offset(x: 24, y: -18)
     }
 }
 
 // MARK: - Custom Shapes
 
-/// A small smile arc shape.
-struct HappyMouth: Shape {
+/// Smile mouth arc ◡
+struct SmileShape: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
         path.move(to: CGPoint(x: rect.minX, y: rect.minY))
         path.addQuadCurve(
             to: CGPoint(x: rect.maxX, y: rect.minY),
-            control: CGPoint(x: rect.midX, y: rect.maxY + 2)
-        )
-        return path
-    }
-}
-
-/// A gentle sleeping mouth arc (slight curve).
-struct SleepMouth: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(x: rect.minX, y: rect.midY))
-        path.addQuadCurve(
-            to: CGPoint(x: rect.maxX, y: rect.midY),
             control: CGPoint(x: rect.midX, y: rect.maxY)
         )
         return path
     }
 }
 
-/// Happy eyebrow — gentle upward curve.
-struct HappyBrow: Shape {
+/// Wavy worried mouth ~ for concerned state
+struct WavyMouthShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.midY))
+        path.addCurve(
+            to: CGPoint(x: rect.maxX, y: rect.midY),
+            control1: CGPoint(x: rect.width * 0.3, y: rect.minY),
+            control2: CGPoint(x: rect.width * 0.7, y: rect.maxY)
+        )
+        return path
+    }
+}
+
+/// Happy squint eye ◠ (upside-down arc)
+struct HappyEyeShape: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
         path.move(to: CGPoint(x: rect.minX, y: rect.maxY))
@@ -478,37 +647,15 @@ struct HappyBrow: Shape {
     }
 }
 
-/// Concerned eyebrow — angled downward toward the center (inner side higher).
-struct ConcernedBrow: Shape {
+/// Sleeping eye ᴗ (downward arc)
+struct SleepEyeShape: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
         path.move(to: CGPoint(x: rect.minX, y: rect.minY))
         path.addQuadCurve(
-            to: CGPoint(x: rect.maxX, y: rect.maxY),
-            control: CGPoint(x: rect.midX, y: rect.minY))
-        return path
-    }
-}
-
-/// Raised eyebrow for surprise/alert — high arch.
-struct RaisedBrow: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(x: rect.minX, y: rect.maxY))
-        path.addQuadCurve(
-            to: CGPoint(x: rect.maxX, y: rect.maxY),
-            control: CGPoint(x: rect.midX, y: rect.minY - 2)
+            to: CGPoint(x: rect.maxX, y: rect.minY),
+            control: CGPoint(x: rect.midX, y: rect.maxY)
         )
-        return path
-    }
-}
-
-/// Focused eyebrow — slightly angled, determined look.
-struct FocusedBrow: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(x: rect.minX, y: rect.midY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
         return path
     }
 }
@@ -522,5 +669,13 @@ struct Triangle: Shape {
         path.addLine(to: CGPoint(x: rect.midX, y: rect.maxY))
         path.closeSubpath()
         return path
+    }
+}
+
+// MARK: - CGSize Scalar Multiplication
+
+extension CGSize {
+    static func * (lhs: CGSize, rhs: CGFloat) -> CGSize {
+        CGSize(width: lhs.width * rhs, height: lhs.height * rhs)
     }
 }

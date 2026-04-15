@@ -20,6 +20,15 @@ enum UserPreferencesManager {
         let mandatoryDuration = defaults.double(forKey: "mandatoryBreakDurationMinutes")
         let soundEnabled = defaults.object(forKey: "isNotificationSoundEnabled")
 
+        // Load reminder mode (v2.4), default to aggressive
+        let reminderMode: ReminderMode
+        if let modeString = defaults.string(forKey: "reminderMode"),
+           let mode = ReminderMode(rawValue: modeString) {
+            reminderMode = mode
+        } else {
+            reminderMode = EyeGuardConstants.defaultReminderMode
+        }
+
         return UserPreferences(
             microBreakInterval: (microInterval > 0 ? microInterval : 20) * 60,
             microBreakDuration: microDuration > 0 ? microDuration : 20,
@@ -31,7 +40,8 @@ enum UserPreferencesManager {
             isMacroBreakEnabled: true,
             isMandatoryBreakEnabled: true,
             isSoundEnabled: soundEnabled as? Bool ?? true,
-            isEscalationEnabled: true
+            isEscalationEnabled: true,
+            reminderMode: reminderMode
         )
     }
 

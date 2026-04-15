@@ -61,6 +61,17 @@ enum EyeGuardConstants {
     /// Recommended maximum daily screen time: 8 hours.
     static let recommendedMaxScreenTime: TimeInterval = 8 * 60 * 60
 
+    // MARK: - Reminder Mode
+
+    /// Default reminder mode for new users.
+    static let defaultReminderMode: ReminderMode = .aggressive
+
+    /// Postpone delay: 5 minutes per postpone.
+    static let postponeDelay: TimeInterval = 5 * 60
+
+    /// Maximum number of postpones per break notification.
+    static let maxPostponeCount: Int = 2
+
     // MARK: - File Paths
 
     /// Base directory for EyeGuard data.

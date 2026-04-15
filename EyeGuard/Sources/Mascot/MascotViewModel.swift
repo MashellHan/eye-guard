@@ -4,20 +4,27 @@ import Observation
 /// Observable state controller for the mascot, driving animations and
 /// state transitions from a single source of truth.
 ///
-/// Extracted from MascotContainerView in v2.1 for better code organization.
-/// Manages all mascot animation tasks (breathing, blinking, bouncing, etc.)
-/// and exposes state for the view layer.
+/// Redesigned in v3.0: removed arm waving, added eyelid closedness
+/// (continuous 0-1), pupil dilation, resting mode, alert glow,
+/// and spring-based animations throughout.
 @Observable
 @MainActor
 final class MascotViewModel {
     var mascotState: MascotState = .idle
+    var restingMode: RestingMode = .sleeping
     var showBubble: Bool = false
     var bubbleText: String = ""
-    var isBlinking: Bool = false
+    var eyelidClosedness: CGFloat = 0
     var breathScale: CGFloat = 1.0
     var bounceOffset: CGFloat = 0
-    var waveAngle: Double = 0
     var pupilOffset: CGSize = .zero
+    /// Eye size multiplier (1.0 = normal, alerting = larger).
+    var eyeScale: CGFloat = 1.0
+    var isHighScore: Bool = false
+    var alertGlowOpacity: Double = 0
+
+    /// Current hand gesture being performed.
+    var handGesture: HandGesture = .none
 
     /// Horizontal sway offset for sleeping state.
     var swayOffset: CGFloat = 0
@@ -38,17 +45,19 @@ final class MascotViewModel {
     private var blinkTask: Task<Void, Never>?
     private var breathTask: Task<Void, Never>?
     private var bounceTask: Task<Void, Never>?
-    private var waveTask: Task<Void, Never>?
     private var pupilTask: Task<Void, Never>?
     private var bubbleTask: Task<Void, Never>?
     private var swayTask: Task<Void, Never>?
     private var celebrateTask: Task<Void, Never>?
+    private var alertGlowTask: Task<Void, Never>?
+    private var gestureTask: Task<Void, Never>?
 
-    /// Starts all idle animations (breathing + blinking + look-around).
+    /// Starts all idle animations (breathing + blinking + look-around + gestures).
     func startIdleAnimations() {
         startBreathing()
         startBlinking()
         startIdleLookAround()
+        startPeriodicGestures()
     }
 
     /// Transitions to a new mascot state, updating animations.
@@ -58,41 +67,79 @@ final class MascotViewModel {
 
         // Cancel state-specific animations
         bounceTask?.cancel()
-        waveTask?.cancel()
         pupilTask?.cancel()
         swayTask?.cancel()
         celebrateTask?.cancel()
+        alertGlowTask?.cancel()
+        gestureTask?.cancel()
 
         bounceOffset = 0
-        waveAngle = 0
         pupilOffset = .zero
         swayOffset = 0
         celebrateScale = 1.0
         celebrateRotation = 0
+        alertGlowOpacity = 0
+        handGesture = .none
+
+        // Update eye scale for new state
+        updateEyeScale(for: newState)
 
         switch newState {
         case .idle:
             startIdleLookAround()
-
-        case .happy:
-            break // Just expression, breathing continues
+            startPeriodicGestures()
+            withAnimation(MascotAnimations.gentleSpring) {
+                eyelidClosedness = 0
+            }
 
         case .concerned:
-            break // Just expression change
+            withAnimation(MascotAnimations.defaultSpring) {
+                eyelidClosedness = 0
+            }
 
         case .alerting:
             startAlertBouncing()
-            startWaving()
+            startAlertGlow()
+            withAnimation(MascotAnimations.defaultSpring) {
+                eyelidClosedness = 0
+            }
 
-        case .sleeping:
-            pupilOffset = .zero
-            startSleepingSway()
-
-        case .exercising:
-            startExercisePattern()
+        case .resting:
+            switch restingMode {
+            case .sleeping:
+                withAnimation(MascotAnimations.gentleSpring) {
+                    eyelidClosedness = 1.0
+                }
+                pupilOffset = .zero
+                startSleepingSway()
+            case .exercising:
+                withAnimation(MascotAnimations.defaultSpring) {
+                    eyelidClosedness = 0
+                }
+                startExercisePattern()
+            }
 
         case .celebrating:
             startCelebrating()
+            withAnimation(MascotAnimations.bouncySpring) {
+                eyelidClosedness = 0
+            }
+        }
+    }
+
+    // MARK: - Eye Scale
+
+    private func updateEyeScale(for state: MascotState) {
+        let target: CGFloat
+        switch state {
+        case .idle:         target = 1.0
+        case .concerned:    target = 0.9
+        case .alerting:     target = 1.3  // Surprised big eyes
+        case .resting:      target = 1.0
+        case .celebrating:  target = 1.0
+        }
+        withAnimation(MascotAnimations.defaultSpring) {
+            eyeScale = target
         }
     }
 
@@ -129,17 +176,13 @@ final class MascotViewModel {
     // MARK: - Mouse Tracking
 
     /// Updates pupil position to look toward a mouse position relative to mascot center.
-    ///
-    /// - Parameters:
-    ///   - mousePosition: The mouse position in screen coordinates.
-    ///   - mascotCenter: The mascot center in screen coordinates.
     func updateHoverPupil(mousePosition: CGPoint, mascotCenter: CGPoint) {
         // Only track in states that allow it
-        guard mascotState == .idle || mascotState == .happy || mascotState == .concerned else {
+        guard mascotState == .idle || mascotState == .concerned else {
             return
         }
 
-        let maxOffset: CGFloat = 4.0 // Max pupil displacement from hover
+        let maxOffset: CGFloat = 3.0
         let dx = mousePosition.x - mascotCenter.x
         let dy = mousePosition.y - mascotCenter.y
         let distance = sqrt(dx * dx + dy * dy)
@@ -177,13 +220,13 @@ final class MascotViewModel {
         breathTask?.cancel()
         breathTask = Task {
             while !Task.isCancelled {
-                withAnimation(.easeInOut(duration: MascotAnimations.breathingDuration / 2)) {
+                withAnimation(MascotAnimations.gentleSpring) {
                     breathScale = MascotAnimations.breathingScaleMin
                 }
                 try? await Task.sleep(for: .seconds(MascotAnimations.breathingDuration / 2))
                 guard !Task.isCancelled else { return }
 
-                withAnimation(.easeInOut(duration: MascotAnimations.breathingDuration / 2)) {
+                withAnimation(MascotAnimations.gentleSpring) {
                     breathScale = MascotAnimations.breathingScaleMax
                 }
                 try? await Task.sleep(for: .seconds(MascotAnimations.breathingDuration / 2))
@@ -202,12 +245,19 @@ final class MascotViewModel {
                 try? await Task.sleep(for: .seconds(max(interval, 1.0)))
                 guard !Task.isCancelled else { return }
 
-                // Don't blink while sleeping (already has closed eyes)
-                guard mascotState != .sleeping else { continue }
+                // Don't blink while resting in sleep mode (already has closed eyes)
+                guard !(mascotState == .resting && restingMode == .sleeping) else { continue }
 
-                isBlinking = true
-                try? await Task.sleep(for: .seconds(MascotAnimations.blinkDuration))
-                isBlinking = false
+                // Quick blink: close and open eyelids
+                withAnimation(.easeIn(duration: MascotAnimations.blinkDuration / 2)) {
+                    eyelidClosedness = 1.0
+                }
+                try? await Task.sleep(for: .seconds(MascotAnimations.blinkDuration / 2))
+
+                withAnimation(.easeOut(duration: MascotAnimations.blinkDuration / 2)) {
+                    eyelidClosedness = 0
+                }
+                try? await Task.sleep(for: .seconds(MascotAnimations.blinkDuration / 2))
             }
         }
     }
@@ -217,13 +267,13 @@ final class MascotViewModel {
     private func startBouncing() {
         bounceTask = Task {
             while !Task.isCancelled {
-                withAnimation(.easeInOut(duration: MascotAnimations.bounceDuration / 2)) {
+                withAnimation(MascotAnimations.bouncySpring) {
                     bounceOffset = -MascotAnimations.bounceAmplitude
                 }
                 try? await Task.sleep(for: .seconds(MascotAnimations.bounceDuration / 2))
                 guard !Task.isCancelled else { return }
 
-                withAnimation(.easeInOut(duration: MascotAnimations.bounceDuration / 2)) {
+                withAnimation(MascotAnimations.bouncySpring) {
                     bounceOffset = 0
                 }
                 try? await Task.sleep(for: .seconds(MascotAnimations.bounceDuration / 2))
@@ -236,13 +286,13 @@ final class MascotViewModel {
     private func startAlertBouncing() {
         bounceTask = Task {
             while !Task.isCancelled {
-                withAnimation(.easeInOut(duration: MascotAnimations.alertBounceDuration / 2)) {
+                withAnimation(MascotAnimations.bouncySpring) {
                     bounceOffset = -MascotAnimations.alertBounceAmplitude
                 }
                 try? await Task.sleep(for: .seconds(MascotAnimations.alertBounceDuration / 2))
                 guard !Task.isCancelled else { return }
 
-                withAnimation(.easeInOut(duration: MascotAnimations.alertBounceDuration / 2)) {
+                withAnimation(MascotAnimations.bouncySpring) {
                     bounceOffset = 0
                 }
                 try? await Task.sleep(for: .seconds(MascotAnimations.alertBounceDuration / 2))
@@ -250,21 +300,21 @@ final class MascotViewModel {
         }
     }
 
-    // MARK: - Arm Waving
+    // MARK: - Alert Glow Pulse
 
-    private func startWaving() {
-        waveTask = Task {
+    private func startAlertGlow() {
+        alertGlowTask = Task {
             while !Task.isCancelled {
-                withAnimation(.easeInOut(duration: MascotAnimations.waveDuration / 2)) {
-                    waveAngle = MascotAnimations.waveAmplitude
+                withAnimation(.easeInOut(duration: MascotAnimations.alertGlowDuration / 2)) {
+                    alertGlowOpacity = 0.6
                 }
-                try? await Task.sleep(for: .seconds(MascotAnimations.waveDuration / 2))
+                try? await Task.sleep(for: .seconds(MascotAnimations.alertGlowDuration / 2))
                 guard !Task.isCancelled else { return }
 
-                withAnimation(.easeInOut(duration: MascotAnimations.waveDuration / 2)) {
-                    waveAngle = -MascotAnimations.waveAmplitude
+                withAnimation(.easeInOut(duration: MascotAnimations.alertGlowDuration / 2)) {
+                    alertGlowOpacity = 0.15
                 }
-                try? await Task.sleep(for: .seconds(MascotAnimations.waveDuration / 2))
+                try? await Task.sleep(for: .seconds(MascotAnimations.alertGlowDuration / 2))
             }
         }
     }
@@ -284,7 +334,7 @@ final class MascotViewModel {
                     height: target.height * range
                 )
 
-                withAnimation(.easeInOut(duration: MascotAnimations.exerciseStepDuration)) {
+                withAnimation(MascotAnimations.defaultSpring) {
                     pupilOffset = offset
                 }
                 try? await Task.sleep(for: .seconds(MascotAnimations.exerciseStepDuration))
@@ -309,7 +359,7 @@ final class MascotViewModel {
                 let dx = CGFloat.random(in: -range...range)
                 let dy = CGFloat.random(in: -range...range)
 
-                withAnimation(.easeInOut(duration: 0.6)) {
+                withAnimation(MascotAnimations.gentleSpring) {
                     pupilOffset = CGSize(width: dx, height: dy)
                 }
             }
@@ -321,13 +371,13 @@ final class MascotViewModel {
     private func startSleepingSway() {
         swayTask = Task {
             while !Task.isCancelled {
-                withAnimation(.easeInOut(duration: MascotAnimations.sleepSwayDuration / 2)) {
+                withAnimation(MascotAnimations.gentleSpring) {
                     swayOffset = MascotAnimations.sleepSwayAmplitude
                 }
                 try? await Task.sleep(for: .seconds(MascotAnimations.sleepSwayDuration / 2))
                 guard !Task.isCancelled else { return }
 
-                withAnimation(.easeInOut(duration: MascotAnimations.sleepSwayDuration / 2)) {
+                withAnimation(MascotAnimations.gentleSpring) {
                     swayOffset = -MascotAnimations.sleepSwayAmplitude
                 }
                 try? await Task.sleep(for: .seconds(MascotAnimations.sleepSwayDuration / 2))
@@ -341,18 +391,69 @@ final class MascotViewModel {
         startBouncing()
         celebrateTask = Task {
             while !Task.isCancelled {
-                withAnimation(.easeInOut(duration: MascotAnimations.celebratePulseDuration / 2)) {
+                withAnimation(MascotAnimations.bouncySpring) {
                     celebrateScale = MascotAnimations.celebrateScaleMax
                     celebrateRotation = MascotAnimations.celebrateRotation
                 }
                 try? await Task.sleep(for: .seconds(MascotAnimations.celebratePulseDuration / 2))
                 guard !Task.isCancelled else { return }
 
-                withAnimation(.easeInOut(duration: MascotAnimations.celebratePulseDuration / 2)) {
+                withAnimation(MascotAnimations.bouncySpring) {
                     celebrateScale = MascotAnimations.celebrateScaleMin
                     celebrateRotation = -MascotAnimations.celebrateRotation
                 }
                 try? await Task.sleep(for: .seconds(MascotAnimations.celebratePulseDuration / 2))
+            }
+        }
+    }
+
+    /// Wiggle angle for gesture hand animation.
+    var gestureWiggle: Double = 0
+
+    // MARK: - Periodic Eye-Care Gestures
+
+    /// Every 8-15 seconds in idle, perform a random eye-care gesture for 3.5s.
+    private func startPeriodicGestures() {
+        gestureTask?.cancel()
+        gestureTask = Task {
+            let gestures: [HandGesture] = [.rubEyes, .lookFar, .eyeExercise]
+
+            // First gesture comes sooner (3-5s) so user sees it quickly
+            let firstWait = Double.random(in: 3...5)
+            try? await Task.sleep(for: .seconds(firstWait))
+            guard !Task.isCancelled else { return }
+
+            while !Task.isCancelled {
+                guard mascotState == .idle else {
+                    try? await Task.sleep(for: .seconds(2))
+                    continue
+                }
+
+                let gesture = gestures.randomElement() ?? .rubEyes
+                withAnimation(MascotAnimations.bouncySpring) {
+                    handGesture = gesture
+                }
+
+                // Wiggle animation loop during gesture (3.5 seconds total)
+                for _ in 0..<7 {
+                    guard !Task.isCancelled else { return }
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        gestureWiggle = 12
+                    }
+                    try? await Task.sleep(for: .seconds(0.25))
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        gestureWiggle = -12
+                    }
+                    try? await Task.sleep(for: .seconds(0.25))
+                }
+
+                withAnimation(MascotAnimations.defaultSpring) {
+                    handGesture = .none
+                    gestureWiggle = 0
+                }
+
+                let wait = Double.random(in: 8...15)
+                try? await Task.sleep(for: .seconds(wait))
             }
         }
     }

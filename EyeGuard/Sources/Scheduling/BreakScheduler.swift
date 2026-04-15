@@ -338,7 +338,11 @@ final class BreakScheduler {
 
     /// Checks if any break is due and triggers notification.
     /// Uses `lastNotifiedCycle` per break type to prevent double-fire (BUG-003).
+    /// v2.4: Break absorption — when multiple breaks are due simultaneously,
+    /// only the highest-priority break fires; lower-priority timers reset silently.
     private func checkForDueBreaks() {
+        var dueBreaks: [(BreakType, Int)] = []
+
         for type in BreakType.allCases {
             guard isBreakTypeEnabled(type) else { continue }
 
@@ -349,27 +353,76 @@ final class BreakScheduler {
 
             let currentCycle = Int(elapsed / interval)
 
-            // Only fire if we crossed into a new cycle and haven't notified for it (BUG-003)
+            // Collect all breaks that crossed into a new cycle
             if currentCycle > 0 && currentCycle != lastNotifiedCycle[type] {
-                lastNotifiedCycle[type] = currentCycle
-                triggerBreakNotification(type)
+                dueBreaks.append((type, currentCycle))
             }
+        }
+
+        guard !dueBreaks.isEmpty else { return }
+
+        // Sort by priority descending — highest wins
+        let sorted = dueBreaks.sorted { $0.0.priority > $1.0.priority }
+        let winner = sorted[0]
+
+        // Fire the highest-priority break
+        lastNotifiedCycle[winner.0] = winner.1
+        triggerBreakNotification(winner.0)
+
+        // Silently reset lower-priority breaks (absorption)
+        for i in 1..<sorted.count {
+            let (type, cycle) = sorted[i]
+            lastNotifiedCycle[type] = cycle
+            elapsedPerType[type] = 0
+            lastNotifiedCycle[type] = -1
+            Log.scheduler.info(
+                "Break \(type.displayName) absorbed by \(winner.0.displayName)."
+            )
         }
     }
 
-    /// Sends a break notification wired to NotificationManager (H2).
-    private func triggerBreakNotification(_ breakType: BreakType) {
+    /// Sends a break notification using mode-aware behavior (v2.4).
+    /// Internal access for "Take Break Now" from mascot menu.
+    func triggerBreakNotification(_ breakType: BreakType) {
         Log.scheduler.info("Break due: \(breakType.displayName)")
 
-        notificationSender.notify(breakType: breakType, healthScore: currentHealthScore) { [weak self] in
-            Task { @MainActor in
-                self?.takeBreakNow(breakType)
+        let profile = preferences.activeProfile
+        let behavior = profile.behavior(for: breakType)
+
+        notificationSender.notify(
+            breakType: breakType,
+            behavior: behavior,
+            escalation: profile.escalationStrategy,
+            healthScore: currentHealthScore,
+            onTaken: { [weak self] in
+                Task { @MainActor in
+                    self?.takeBreakNow(breakType)
+                }
+            },
+            onSkipped: { [weak self] in
+                Task { @MainActor in
+                    self?.skipBreak(breakType)
+                }
+            },
+            onPostponed: { [weak self] delay in
+                Task { @MainActor in
+                    self?.postponeBreak(breakType, by: delay)
+                }
             }
-        } onSkipped: { [weak self] in
-            Task { @MainActor in
-                self?.skipBreak(breakType)
-            }
-        }
+        )
+    }
+
+    /// Postpones a break by the given delay (v2.4).
+    /// Sets elapsed time back so the break re-fires after `delay` seconds.
+    func postponeBreak(_ type: BreakType, by delay: TimeInterval) {
+        let interval = intervalForType(type)
+        // Set elapsed so the break is `delay` seconds away from re-triggering
+        elapsedPerType[type] = max(0, interval - delay)
+        // Reset notified cycle so it can fire again
+        lastNotifiedCycle[type] = Int(elapsedPerType[type, default: 0] / interval)
+        Log.scheduler.info(
+            "Break \(type.displayName) postponed by \(Int(delay))s."
+        )
     }
 
     /// Checks if continuous use has reached the mandatory break threshold (120 min).

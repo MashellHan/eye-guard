@@ -69,13 +69,23 @@ struct ExerciseSessionView: View {
                 completedView
             }
         }
-        .frame(width: 400, height: 520)
+        .frame(width: 420, height: 640)
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(
             RoundedRectangle(cornerRadius: 16)
                 .strokeBorder(.white.opacity(0.2), lineWidth: 1)
         )
+        .overlay(alignment: .topTrailing) {
+            // Close button always visible
+            Button(action: onSkip) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(.white.opacity(0.5))
+            }
+            .buttonStyle(.plain)
+            .padding(12)
+        }
         .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
         .scaleEffect(appeared ? 1.0 : 0.95)
         .opacity(appeared ? 1.0 : 0)
@@ -93,35 +103,36 @@ struct ExerciseSessionView: View {
     // MARK: - Intro View
 
     private var introView: some View {
-        VStack(spacing: 20) {
-            Spacer()
-
+        VStack(spacing: 16) {
             // Mascot with greeting
-            VStack(spacing: 8) {
+            VStack(spacing: 6) {
                 MascotView(
-                    state: .happy,
+                    state: .idle,
+                    restingMode: .sleeping,
                     pupilOffset: .zero,
-                    bounceOffset: -4
+                    bounceOffset: -4,
+                    isHighScore: true
                 )
-                .scaleEffect(1.5)
-                .frame(height: 100)
+                .scaleEffect(1.3)
+                .frame(height: 80)
 
                 Text("👋 眼保健操时间到！")
-                    .font(.title2.bold())
+                    .font(.title3.bold())
                     .foregroundStyle(.primary)
 
                 Text("Eye Exercise Time!")
-                    .font(.headline)
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
+            .padding(.top, 16)
 
             // Session info
-            VStack(spacing: 8) {
-                Text("We'll guide you through \(exercises.count) exercises")
+            VStack(spacing: 6) {
+                Text("共 \(exercises.count) 组练习")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
-                Text("Total time: ~\(totalSessionSeconds / 60) min \(totalSessionSeconds % 60) sec")
+                Text("预计时间：约 \(totalSessionSeconds / 60) 分 \(totalSessionSeconds % 60) 秒")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
 
@@ -134,7 +145,7 @@ struct ExerciseSessionView: View {
             // Buttons
             VStack(spacing: 10) {
                 Button(action: startSession) {
-                    Label("Start Exercises 开始", systemImage: "play.fill")
+                    Label("开始练习", systemImage: "play.fill")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
@@ -142,7 +153,7 @@ struct ExerciseSessionView: View {
                 .controlSize(.large)
 
                 Button(action: onSkip) {
-                    Text("Skip 跳过")
+                    Text("跳过")
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.regular)
@@ -230,7 +241,7 @@ struct ExerciseSessionView: View {
 
             // Progress text
             HStack {
-                Text("Exercise \(currentExerciseIndex + 1)/\(exercises.count)")
+                Text("第 \(currentExerciseIndex + 1)/\(exercises.count) 组")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
 
@@ -257,7 +268,8 @@ struct ExerciseSessionView: View {
 
     private var mascotExerciseView: some View {
         MascotView(
-            state: .exercising,
+            state: .resting,
+            restingMode: .exercising,
             pupilOffset: mascotPupilOffset
         )
         .scaleEffect(0.9)
@@ -272,7 +284,7 @@ struct ExerciseSessionView: View {
         HStack(spacing: 12) {
             // Skip exercise
             Button(action: skipCurrentExercise) {
-                Text("Skip 跳过")
+                Text("跳过")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
@@ -281,7 +293,7 @@ struct ExerciseSessionView: View {
             // Next exercise (or finish)
             if currentExerciseIndex < exercises.count - 1 {
                 Button(action: nextExercise) {
-                    Label("Next 下一个", systemImage: "forward.fill")
+                    Label("下一个", systemImage: "forward.fill")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
@@ -289,7 +301,7 @@ struct ExerciseSessionView: View {
                 .controlSize(.regular)
             } else {
                 Button(action: completeSession) {
-                    Label("Finish 完成", systemImage: "checkmark.circle.fill")
+                    Label("完成", systemImage: "checkmark.circle.fill")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
@@ -308,23 +320,20 @@ struct ExerciseSessionView: View {
             // Celebrating mascot
             MascotView(
                 state: .celebrating,
+                restingMode: .sleeping,
                 bounceOffset: -6
             )
-            .scaleEffect(1.5)
-            .frame(height: 100)
+            .scaleEffect(1.3)
+            .frame(height: 80)
 
             VStack(spacing: 8) {
                 Text("🎉 太棒了！")
                     .font(.title.bold())
                     .foregroundStyle(.primary)
 
-                Text("Exercise Complete!")
-                    .font(.title2)
+                Text("眼保健操完成！")
+                    .font(.title3)
                     .foregroundStyle(.secondary)
-
-                Text("Your eyes feel refreshed and ready!")
-                    .font(.subheadline)
-                    .foregroundStyle(.tertiary)
 
                 Text("你的眼睛已经得到了充分的放松！")
                     .font(.subheadline)
@@ -334,18 +343,18 @@ struct ExerciseSessionView: View {
             // Stats
             VStack(spacing: 4) {
                 HStack {
-                    Text("Exercises completed:")
+                    Text("完成练习：")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Text("\(exercises.count)")
+                    Text("\(exercises.count) 组")
                         .font(.caption.bold())
                         .foregroundStyle(.teal)
                 }
                 HStack {
-                    Text("Total time:")
+                    Text("用时：")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Text("\(elapsedSessionSeconds / 60)m \(elapsedSessionSeconds % 60)s")
+                    Text("\(elapsedSessionSeconds / 60) 分 \(elapsedSessionSeconds % 60) 秒")
                         .font(.caption.bold())
                         .foregroundStyle(.teal)
                 }
@@ -358,7 +367,7 @@ struct ExerciseSessionView: View {
             Spacer()
 
             Button(action: onComplete) {
-                Label("Done 完成", systemImage: "checkmark.circle.fill")
+                Label("关闭", systemImage: "checkmark.circle.fill")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)

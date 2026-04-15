@@ -115,10 +115,42 @@ final class MascotWindowController {
     // MARK: - Break Actions
 
     /// Handles "Take Break Now" from mascot context menu.
+    /// Directly shows the break overlay (skipping tiered escalation).
     private func handleTakeBreak() {
         guard let scheduler else { return }
         let breakType = scheduler.nextScheduledBreak ?? .micro
-        scheduler.takeBreakNow(breakType)
+
+        // Manual break: use .direct escalation to show overlay immediately,
+        // with .skippable dismiss policy so user can cancel if needed.
+        let behavior = BreakBehavior(
+            interval: 0,
+            duration: breakType.duration,
+            isEnabled: true,
+            entryTier: .fullScreen,
+            dismissPolicy: .skippable
+        )
+
+        NotificationManager.shared.notify(
+            breakType: breakType,
+            behavior: behavior,
+            escalation: .direct,
+            healthScore: scheduler.currentHealthScore,
+            onTaken: {
+                Task { @MainActor in
+                    scheduler.takeBreakNow(breakType)
+                }
+            },
+            onSkipped: {
+                Task { @MainActor in
+                    scheduler.skipBreak(breakType)
+                }
+            },
+            onPostponed: { delay in
+                Task { @MainActor in
+                    scheduler.postponeBreak(breakType, by: delay)
+                }
+            }
+        )
         Log.mascot.info("Mascot: user initiated break via mascot menu.")
     }
 
@@ -182,8 +214,9 @@ final class MascotWindowController {
         exerciseWindow?.close()
         exerciseWindow = nil
 
-        // Transition mascot to exercising state
-        viewModel?.transition(to: .exercising)
+        // Transition mascot to resting/exercising state
+        viewModel?.restingMode = .exercising
+        viewModel?.transition(to: .resting)
         viewModel?.showMessage("👁️ 跟着做眼保健操吧！", duration: 30)
 
         let sessionView = ExerciseSessionView(
@@ -201,7 +234,7 @@ final class MascotWindowController {
         let hostingView = NSHostingView(rootView: sessionView)
 
         let exWindow = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 400, height: 520),
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 640),
             styleMask: [.borderless],
             backing: .buffered,
             defer: false
@@ -219,8 +252,8 @@ final class MascotWindowController {
         // Position at center of screen
         if let screen = NSScreen.main {
             let screenFrame = screen.visibleFrame
-            let x = screenFrame.midX - 200
-            let y = screenFrame.midY - 260
+            let x = screenFrame.midX - 210
+            let y = screenFrame.midY - 320
             exWindow.setFrameOrigin(NSPoint(x: x, y: y))
         }
 

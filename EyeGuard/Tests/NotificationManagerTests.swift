@@ -14,7 +14,15 @@ struct NotificationManagerMockTests {
         let mock = MockNotificationSender()
         #expect(mock.notifyCalls.isEmpty)
 
-        mock.notify(breakType: .micro, healthScore: 85, onTaken: {}, onSkipped: {})
+        let behavior = BreakBehavior(
+            interval: 1200, duration: 20, isEnabled: true,
+            entryTier: .floating, dismissPolicy: .skippable
+        )
+        mock.notify(
+            breakType: .micro, behavior: behavior,
+            escalation: .direct, healthScore: 85,
+            onTaken: {}, onSkipped: {}, onPostponed: { _ in }
+        )
         #expect(mock.notifyCalls.count == 1)
         #expect(mock.lastNotifiedBreakType == .micro)
         #expect(mock.lastNotifiedHealthScore == 85)
@@ -50,14 +58,39 @@ struct NotificationManagerMockTests {
     func multipleNotifications() {
         let mock = MockNotificationSender()
 
-        mock.notify(breakType: .micro, healthScore: 90, onTaken: {}, onSkipped: {})
-        mock.notify(breakType: .macro, healthScore: 70, onTaken: {}, onSkipped: {})
-        mock.notify(breakType: .mandatory, healthScore: 50, onTaken: {}, onSkipped: {})
+        let microBehavior = BreakBehavior(
+            interval: 1200, duration: 20, isEnabled: true,
+            entryTier: .floating, dismissPolicy: .skippable
+        )
+        let macroBehavior = BreakBehavior(
+            interval: 3600, duration: 300, isEnabled: true,
+            entryTier: .floating, dismissPolicy: .skippable
+        )
+        let mandatoryBehavior = BreakBehavior(
+            interval: 7200, duration: 900, isEnabled: true,
+            entryTier: .fullScreen, dismissPolicy: .postponeOnly(maxCount: 2)
+        )
+
+        mock.notify(
+            breakType: .micro, behavior: microBehavior,
+            escalation: .direct, healthScore: 90,
+            onTaken: {}, onSkipped: {}, onPostponed: { _ in }
+        )
+        mock.notify(
+            breakType: .macro, behavior: macroBehavior,
+            escalation: .direct, healthScore: 70,
+            onTaken: {}, onSkipped: {}, onPostponed: { _ in }
+        )
+        mock.notify(
+            breakType: .mandatory, behavior: mandatoryBehavior,
+            escalation: .direct, healthScore: 50,
+            onTaken: {}, onSkipped: {}, onPostponed: { _ in }
+        )
 
         #expect(mock.notifyCalls.count == 3)
-        #expect(mock.notifyCalls[0].0 == .micro)
-        #expect(mock.notifyCalls[1].0 == .macro)
-        #expect(mock.notifyCalls[2].0 == .mandatory)
+        #expect(mock.notifyCalls[0].breakType == .micro)
+        #expect(mock.notifyCalls[1].breakType == .macro)
+        #expect(mock.notifyCalls[2].breakType == .mandatory)
     }
 }
 

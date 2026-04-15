@@ -16,13 +16,14 @@ struct SpeechBubbleView: View {
     @Environment(\.colorScheme) private var colorScheme
 
     /// Background color adapts to night mode and dark mode.
+    /// Warm tint added in v3.0 to match mascot palette.
     private var bubbleBackground: Color {
         if isNightMode {
             return Color(red: 0.98, green: 0.93, blue: 0.82)
         }
         return colorScheme == .dark
             ? Color(nsColor: .controlBackgroundColor)
-            : .white
+            : Color(red: 0.99, green: 0.97, blue: 0.95)
     }
 
     /// Text color adapts to night mode and dark mode.
@@ -53,7 +54,7 @@ struct SpeechBubbleView: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .background(
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: 16)
                         .fill(bubbleBackground)
                         .shadow(color: shadowColor, radius: 3, x: 0, y: 1)
                 )

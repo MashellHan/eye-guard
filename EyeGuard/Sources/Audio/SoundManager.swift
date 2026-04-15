@@ -107,7 +107,8 @@ final class SoundManager: SoundPlaying {
 
     /// Plays a sound effect of the given type.
     ///
-    /// Respects mute and volume settings. No-op if muted or volume is zero.
+    /// Currently only breakStart is enabled — other sounds are disabled
+    /// until higher-quality audio assets are available.
     ///
     /// - Parameter type: The sound effect category to play.
     func play(_ type: SoundType) {
@@ -118,36 +119,15 @@ final class SoundManager: SoundPlaying {
             playSystemSound(named: "Tink")
             Log.sound.info("Sound: break start chime")
 
-        case .breakComplete:
-            playSystemSound(named: "Hero")
-            Log.sound.info("Sound: break complete celebration")
-
-        case .tipRotation:
-            playSystemSound(named: "Pop")
-            Log.sound.info("Sound: tip rotation bell")
-
-        case .alert:
-            playSystemSound(named: "Sosumi")
-            Log.sound.info("Sound: alert tone")
-
-        case .ambient:
-            // Ambient is handled by startAmbient/stopAmbient
+        case .breakComplete, .tipRotation, .alert, .ambient:
+            // Disabled — only break start chime is active
             break
         }
     }
 
-    /// Starts ambient nature sound generation for the current preset.
-    ///
-    /// The ambient sound plays continuously until `stopAmbient()` is called.
-    /// Uses AVAudioEngine to generate tones procedurally.
+    /// Ambient sound is currently disabled.
     func startAmbient() {
-        guard !isMuted, volume > 0 else { return }
-        guard selectedAmbientPreset != .silence else { return }
-        guard !isAmbientPlaying else { return }
-
-        isAmbientPlaying = true
-        startAmbientEngine()
-        Log.sound.info("Ambient sound started: \(self.selectedAmbientPreset.rawValue)")
+        // Disabled — ambient sounds hidden until better audio assets
     }
 
     /// Stops any playing ambient sound.
@@ -158,28 +138,19 @@ final class SoundManager: SoundPlaying {
         Log.sound.info("Ambient sound stopped.")
     }
 
-    /// Convenience: plays the break-start chime and starts ambient sound.
+    /// Convenience: plays the break-start chime only (no ambient).
     func onBreakStart() {
         play(.breakStart)
-        // Delay ambient start slightly so the chime is heard clearly
-        ambientTask = Task {
-            try? await Task.sleep(for: .seconds(1.0))
-            guard !Task.isCancelled else { return }
-            await MainActor.run {
-                self.startAmbient()
-            }
-        }
     }
 
-    /// Convenience: stops ambient sound and plays the completion celebration.
+    /// Convenience: no-op (ambient and celebration sounds disabled).
     func onBreakComplete() {
-        stopAmbient()
-        play(.breakComplete)
+        // Disabled
     }
 
-    /// Convenience: plays the tip rotation bell.
+    /// Convenience: no-op (tip rotation bell disabled).
     func onTipRotation() {
-        play(.tipRotation)
+        // Disabled
     }
 
     // MARK: - System Sound Playback
@@ -227,11 +198,13 @@ final class SoundManager: SoundPlaying {
         let currentVolume = volume
 
         // Create a source node that generates audio samples
-        var phase: Double = 0.0
-        var modPhase: Double = 0.0
+        // Use nonisolated(unsafe) to allow mutation from the audio render thread.
+        // These variables are only accessed from the single audio callback thread.
+        nonisolated(unsafe) var phase: Double = 0.0
+        nonisolated(unsafe) var modPhase: Double = 0.0
 
         let sourceNode = AVAudioSourceNode(format: outputFormat) {
-            _, _, frameCount, bufferList -> OSStatus in
+            @Sendable _, _, frameCount, bufferList -> OSStatus in
 
             let ablPointer = UnsafeMutableAudioBufferListPointer(bufferList)
 

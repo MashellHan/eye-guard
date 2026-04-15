@@ -139,7 +139,35 @@ struct MenuBarView: View {
             Spacer()
 
             Button {
-                scheduler.takeBreakNow(.micro)
+                let breakType: BreakType = scheduler.nextScheduledBreak ?? .micro
+                let behavior = BreakBehavior(
+                    interval: 0,
+                    duration: breakType.duration,
+                    isEnabled: true,
+                    entryTier: .fullScreen,
+                    dismissPolicy: .skippable
+                )
+                NotificationManager.shared.notify(
+                    breakType: breakType,
+                    behavior: behavior,
+                    escalation: .direct,
+                    healthScore: scheduler.currentHealthScore,
+                    onTaken: {
+                        Task { @MainActor in
+                            scheduler.takeBreakNow(breakType)
+                        }
+                    },
+                    onSkipped: {
+                        Task { @MainActor in
+                            scheduler.skipBreak(breakType)
+                        }
+                    },
+                    onPostponed: { delay in
+                        Task { @MainActor in
+                            scheduler.postponeBreak(breakType, by: delay)
+                        }
+                    }
+                )
             } label: {
                 Label("Break Now", systemImage: "eye")
             }

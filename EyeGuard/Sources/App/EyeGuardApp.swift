@@ -5,7 +5,7 @@ import SwiftUI
 /// Uses `MenuBarExtra` to live exclusively in the menu bar (no dock icon).
 /// Wires up the core services and provides the menu bar UI.
 /// The menu bar title shows a countdown to the next 20-20-20 break.
-/// Launches the floating mascot character (护眼精灵) on screen (v0.9).
+/// Launches the floating mascot character (阿普) on screen (v0.9).
 /// Starts color analysis for screen content suggestions (v1.5).
 @main
 struct EyeGuardApp: App {
@@ -13,34 +13,37 @@ struct EyeGuardApp: App {
 
     @State private var scheduler = BreakScheduler()
 
+    /// Whether the mascot has been launched.
+    @State private var mascotLaunched = false
+
     var body: some Scene {
         MenuBarExtra {
             MenuBarView(scheduler: scheduler)
                 .onAppear {
-                    // Register scheduler with ReportDataProvider for quit-time report generation
+                    // Register scheduler with ReportDataProvider
                     ReportDataProvider.shared.register(scheduler: scheduler)
-
-                    // Launch mascot character (v0.9)
-                    launchMascot()
-
-                    // Color analysis (v1.5) — deferred until user opens color suggestions
-                    // to avoid triggering Screen Recording permission prompt on launch.
-                    // ColorAnalyzer.shared.startAnalysis()
+                    launchMascotIfNeeded()
                 }
         } label: {
             MenuBarLabel(scheduler: scheduler)
+                .task {
+                    // task runs once when the label appears (app startup)
+                    launchMascotIfNeeded()
+                }
         }
         .menuBarExtraStyle(.window)
     }
 
-    /// Creates and shows the mascot floating window, wired to the scheduler.
     @MainActor
-    private func launchMascot() {
-        guard AppDelegate.mascotController == nil else { return }
+    private func launchMascotIfNeeded() {
+        // Double-guard: check both @State flag and static controller
+        guard !mascotLaunched, AppDelegate.mascotController == nil else { return }
+        mascotLaunched = true
+
         let controller = MascotWindowController()
         controller.show(scheduler: scheduler)
         AppDelegate.mascotController = controller
-        Log.app.info("Mascot character (护眼精灵) launched.")
+        Log.app.info("Mascot character (阿普) launched.")
     }
 }
 

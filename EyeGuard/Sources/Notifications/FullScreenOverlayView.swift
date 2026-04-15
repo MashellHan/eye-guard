@@ -1,126 +1,71 @@
 import SwiftUI
 
-/// Pool of medical tips displayed during full-screen breaks.
-private let medicalTips: [String] = [
-    "Blink 20 times to refresh your tear film.",
-    "Gently massage your temples to relieve eye strain.",
-    "Place warm palms over closed eyes for 30 seconds.",
-    "Focus on a distant object to relax your ciliary muscles.",
-    "Roll your eyes slowly in a circle — 5 times each direction.",
-    "Splash cold water on your face to reduce puffiness.",
-    "Stretch your neck and shoulders to improve blood flow to your eyes.",
-    "Practice the 20-20-20 rule: every 20 min, look 20 ft away for 20 sec.",
-    "Stay hydrated — dehydration worsens dry eye symptoms.",
-    "Adjust your screen brightness to match your surroundings.",
-    "Position your monitor 20-26 inches from your eyes.",
-    "Reduce screen glare with an anti-glare filter or repositioning.",
+/// Pool of eye care tips displayed during breaks.
+/// Sourced from ophthalmologist-recommended exercises (AAO, WHO).
+private let eyeCareTips: [String] = [
+    "有意识地连续眨眼 20 次，让泪膜重新覆盖角膜",
+    "闭眼，双手搓热后轻覆眼睛 20 秒（掌心热敷法）",
+    "看向窗外最远的物体，保持 20 秒，放松睫状肌",
+    "眼球画 ∞ 字：缓慢追踪一个 8 字形，正反各 5 次",
+    "近远交替对焦：看手指 5 秒 → 看远处 5 秒，重复 4 次",
+    "闭眼缓慢转动眼球画圆，顺时针 5 圈再逆时针 5 圈",
+    "轻柔按压睛明穴（鼻梁两侧）10 秒，缓解酸胀",
+    "双手拇指按揉太阳穴，同时闭眼深呼吸 3 次",
+    "站起来活动一下，远眺窗外绿植或天空",
+    "用力闭眼 3 秒再睁开，重复 5 次，刺激泪腺分泌",
+    "上下左右各看 3 秒，锻炼眼外肌群",
+    "喝一杯水吧！充足的水分有助于缓解干眼",
 ]
 
-/// A full-screen overlay view for Tier 3 mandatory breaks.
+/// A full-screen overlay for break notifications.
 ///
-/// Displayed when the user has been using the computer for 120+ minutes
-/// continuously without a proper break. The overlay covers the entire screen
-/// with a semi-transparent dark background and blur effect.
-///
-/// Features:
-/// - Large eye icon and warning title
-/// - 15-minute countdown with circular progress ring
-/// - Health score display
-/// - Random medical tip
-/// - "Take 15-min Break" primary button (starts locked countdown)
-/// - "I Need 5 More Minutes" extension button (max 2 uses)
+/// Covers all screens with a semi-transparent dark background.
+/// Features a cute mascot, auto-starting countdown, health tip, and skip button.
 struct FullScreenOverlayView: View {
 
-    // MARK: - Properties
-
-    /// Current eye health score (0-100).
+    let breakType: BreakType
     let healthScore: Int
-
-    /// Called when the user completes the full break countdown.
+    let dismissPolicy: DismissPolicy
+    let postponeCount: Int
     let onBreakTaken: @Sendable () -> Void
+    let onPostponed: @Sendable () -> Void
 
-    // MARK: - State
-
-    /// Whether the break countdown is actively running.
-    @State private var isCountingDown: Bool = false
-
-    /// Remaining seconds in the countdown.
-    @State private var remainingSeconds: Int = 15 * 60
-
-    /// Total countdown duration (for progress calculation).
-    @State private var totalDuration: Int = 15 * 60
-
-    /// Number of 5-minute extensions used (max 2).
-    @State private var extensionsUsed: Int = 0
-
-    /// Timer driving the countdown.
+    @State private var remainingSeconds: Int = 0
+    @State private var totalDuration: Int = 0
     @State private var timer: Timer?
-
-    /// Controls fade-in appearance animation.
     @State private var appeared: Bool = false
+    @State private var currentTip: String = eyeCareTips.randomElement() ?? eyeCareTips[0]
 
-    /// Pulsing animation state for the countdown number.
-    @State private var isPulsing: Bool = false
-
-    /// Randomly selected medical tip (stable across re-renders).
-    @State private var currentTip: String = medicalTips.randomElement() ?? medicalTips[0]
-
-    // MARK: - Constants
-
-    /// Maximum number of 5-minute extensions allowed.
-    private let maxExtensions = 2
-
-    /// Extension duration in seconds.
-    private let extensionSeconds = 5 * 60
-
-    // MARK: - Computed
-
-    /// Progress from 0.0 (full time remaining) to 1.0 (complete).
     private var progress: Double {
         guard totalDuration > 0 else { return 1.0 }
         return Double(totalDuration - remainingSeconds) / Double(totalDuration)
     }
 
-    /// Formatted countdown string: "MM:SS".
     private var countdownText: String {
         let minutes = remainingSeconds / 60
         let seconds = remainingSeconds % 60
-        return String(format: "%02d:%02d", minutes, seconds)
+        if minutes > 0 {
+            return String(format: "%d:%02d", minutes, seconds)
+        }
+        return "\(seconds)"
     }
 
-    /// Health score color based on value.
-    private var healthScoreColor: Color {
-        if healthScore >= 80 {
-            return .green
-        } else if healthScore >= 50 {
-            return .yellow
-        } else if healthScore >= 30 {
-            return .orange
-        } else {
-            return .red
+    /// Break-type-specific title message.
+    private var titleMessage: String {
+        switch breakType {
+        case .micro:
+            return "阿普提醒你：休息 20 秒 👀"
+        case .macro:
+            return "阿普提醒你：站起来活动 5 分钟 ☕"
+        case .mandatory:
+            return "阿普提醒你：该好好休息了 🚶"
         }
     }
-
-    /// Motivational text based on health score.
-    private var healthScoreMotivation: String {
-        switch healthScore {
-        case 80...100:
-            return "Take a break to keep your excellent score!"
-        case 50..<80:
-            return "Take a break to improve it!"
-        case 30..<50:
-            return "Your eyes really need this rest!"
-        default:
-            return "Please take a break now — your eyes need urgent rest!"
-        }
-    }
-
-    // MARK: - Body
 
     var body: some View {
         ZStack {
-            // Semi-transparent dark background
-            Color.black.opacity(0.7)
+            // Semi-transparent background
+            Color.black.opacity(0.65)
                 .ignoresSafeArea()
 
             // Blur effect
@@ -128,171 +73,104 @@ struct FullScreenOverlayView: View {
                 .ignoresSafeArea()
 
             // Center content
-            VStack(spacing: 24) {
-                iconSection
-                warningSection
-                countdownSection
-                healthSection
-                tipSection
-                buttonSection
+            VStack(spacing: 20) {
+                Spacer()
+
+                // Mascot character
+                MascotView(
+                    state: .resting,
+                    restingMode: .sleeping,
+                    isHighScore: healthScore >= 80
+                )
+                .scaleEffect(1.8)
+                .padding(.bottom, 12)
+
+                // Simple message
+                Text(titleMessage)
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+
+                Text(currentTip)
+                    .font(.system(size: 15))
+                    .foregroundStyle(.white.opacity(0.7))
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 360)
+
+                // Countdown ring
+                ZStack {
+                    Circle()
+                        .stroke(.white.opacity(0.15), lineWidth: 6)
+                        .frame(width: 100, height: 100)
+
+                    Circle()
+                        .trim(from: 0, to: progress)
+                        .stroke(
+                            LinearGradient(
+                                colors: [.green, .cyan],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            style: StrokeStyle(lineWidth: 6, lineCap: .round)
+                        )
+                        .frame(width: 100, height: 100)
+                        .rotationEffect(.degrees(-90))
+                        .animation(.linear(duration: 1.0), value: progress)
+
+                    Text(countdownText)
+                        .font(.system(size: 36, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(.white)
+                        .contentTransition(.numericText())
+                }
+                .padding(.top, 8)
+
+                // Health score badge
+                HStack(spacing: 6) {
+                    Image(systemName: "heart.fill")
+                        .foregroundStyle(healthScore >= 80 ? .green : healthScore >= 50 ? .yellow : .red)
+                        .font(.caption)
+                    Text("眼睛健康分: \(healthScore)/100")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.white.opacity(0.6))
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 6)
+                .background(.white.opacity(0.08))
+                .clipShape(Capsule())
+
+                Spacer()
+
+                // Skip button at bottom
+                Button {
+                    stopTimer()
+                    onPostponed()
+                } label: {
+                    Text("跳过休息")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 8)
+                        .background(.white.opacity(0.08))
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .padding(.bottom, 40)
             }
-            .padding(48)
-            .frame(maxWidth: 520)
         }
         .opacity(appeared ? 1.0 : 0.0)
         .onAppear {
-            withAnimation(.easeIn(duration: 0.5)) {
+            let duration = Int(breakType.duration)
+            remainingSeconds = duration
+            totalDuration = duration
+            withAnimation(.easeIn(duration: 0.4)) {
                 appeared = true
             }
-            isPulsing = true
+            // Auto-start countdown immediately
+            startCountdownTimer()
         }
         .onDisappear {
             stopTimer()
         }
-    }
-
-    // MARK: - Sections
-
-    private var iconSection: some View {
-        Image(systemName: "eye.trianglebadge.exclamationmark")
-            .font(.system(size: 80))
-            .foregroundStyle(.yellow)
-            .symbolEffect(.pulse, options: .repeating, isActive: true)
-    }
-
-    private var warningSection: some View {
-        VStack(spacing: 8) {
-            Text("⚠️ You've been using the screen for over 2 hours!")
-                .font(.system(size: 24, weight: .bold))
-                .foregroundStyle(.white)
-                .multilineTextAlignment(.center)
-
-            Text("Your eyes need a longer break. Step away for 15 minutes.")
-                .font(.system(size: 16))
-                .foregroundStyle(.white.opacity(0.8))
-                .multilineTextAlignment(.center)
-        }
-    }
-
-    private var countdownSection: some View {
-        ZStack {
-            // Background ring
-            Circle()
-                .stroke(.white.opacity(0.2), lineWidth: 8)
-                .frame(width: 160, height: 160)
-
-            // Progress ring
-            Circle()
-                .trim(from: 0, to: progress)
-                .stroke(
-                    AngularGradient(
-                        colors: [.green, .blue, .green],
-                        center: .center
-                    ),
-                    style: StrokeStyle(lineWidth: 8, lineCap: .round)
-                )
-                .frame(width: 160, height: 160)
-                .rotationEffect(.degrees(-90))
-                .animation(.linear(duration: 1.0), value: progress)
-
-            // Countdown text
-            Text(countdownText)
-                .font(.system(size: 44, weight: .bold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(.white)
-                .contentTransition(.numericText())
-                .scaleEffect(isPulsing && isCountingDown ? 1.05 : 1.0)
-                .animation(
-                    .easeInOut(duration: 1.0).repeatForever(autoreverses: true),
-                    value: isPulsing && isCountingDown
-                )
-        }
-    }
-
-    private var healthSection: some View {
-        VStack(spacing: 6) {
-            HStack(spacing: 8) {
-                Image(systemName: "heart.fill")
-                    .foregroundStyle(healthScoreColor)
-                Text("Your eye health score: \(healthScore)/100")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.9))
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 10)
-            .background(.white.opacity(0.1))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-
-            Text(healthScoreMotivation)
-                .font(.system(size: 13))
-                .foregroundStyle(healthScoreColor.opacity(0.9))
-        }
-    }
-
-    private var tipSection: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "lightbulb.fill")
-                .foregroundStyle(.yellow)
-            Text(currentTip)
-                .font(.system(size: 14))
-                .foregroundStyle(.white.opacity(0.8))
-                .multilineTextAlignment(.leading)
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
-        .frame(maxWidth: 440)
-        .background(.white.opacity(0.05))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-    }
-
-    private var buttonSection: some View {
-        VStack(spacing: 12) {
-            if !isCountingDown {
-                // Primary: Start break
-                Button(action: startBreak) {
-                    Label("Take 15-min Break", systemImage: "leaf.fill")
-                        .font(.system(size: 18, weight: .semibold))
-                        .frame(maxWidth: 280)
-                        .padding(.vertical, 14)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(.green)
-                .controlSize(.large)
-
-                // Secondary: Extension (limited)
-                if extensionsUsed < maxExtensions {
-                    Button(action: requestExtension) {
-                        Text("I Need 5 More Minutes (\(maxExtensions - extensionsUsed) left)")
-                            .font(.system(size: 13))
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(.white.opacity(0.6))
-                    .controlSize(.small)
-                }
-            } else {
-                Text("Taking a break... your eyes thank you! 👁️")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.green.opacity(0.9))
-            }
-        }
-    }
-
-    // MARK: - Actions
-
-    private func startBreak() {
-        isCountingDown = true
-        totalDuration = remainingSeconds
-        startCountdownTimer()
-    }
-
-    private func requestExtension() {
-        guard extensionsUsed < maxExtensions else { return }
-        extensionsUsed += 1
-
-        // Dismiss overlay briefly, will be re-triggered by scheduler
-        // For now: add 5 minutes to the countdown
-        remainingSeconds += extensionSeconds
-        totalDuration += extensionSeconds
     }
 
     private func startCountdownTimer() {
@@ -303,17 +181,12 @@ struct FullScreenOverlayView: View {
                         remainingSeconds -= 1
                     }
                 }
-
                 if remainingSeconds <= 0 {
-                    completeBreak()
+                    stopTimer()
+                    onBreakTaken()
                 }
             }
         }
-    }
-
-    private func completeBreak() {
-        stopTimer()
-        onBreakTaken()
     }
 
     private func stopTimer() {
@@ -324,7 +197,6 @@ struct FullScreenOverlayView: View {
 
 // MARK: - Visual Effect Blur (NSVisualEffectView wrapper)
 
-/// Wraps `NSVisualEffectView` for use in SwiftUI, providing a background blur effect.
 struct VisualEffectBlur: NSViewRepresentable {
     func makeNSView(context: Context) -> NSVisualEffectView {
         let view = NSVisualEffectView()

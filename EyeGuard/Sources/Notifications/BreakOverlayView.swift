@@ -7,22 +7,21 @@ import SwiftUI
 /// - A title and instructional subtitle
 /// - Current health score with motivational text
 /// - A countdown timer with progress bar (once break starts)
-/// - "Take Break" and "Skip" buttons
-///
-/// Behavior flow:
-/// 1. User sees the prompt with two buttons
-/// 2. Tapping "Take Break" starts the countdown timer
-/// 3. Timer counts down from the break duration to 0
-/// 4. On completion, `onTaken` is called and the overlay dismisses
-/// 5. Tapping "Skip" calls `onSkipped` and dismisses immediately
+/// - Buttons controlled by `DismissPolicy` (v2.4):
+///   - `.skippable`: "Take Break" + "Skip"
+///   - `.postponeOnly`: "Take Break" + "Postpone (N left)"
+///   - `.mandatory`: "Take Break" only, auto-starts countdown
 struct BreakOverlayView: View {
 
     // MARK: - Properties
 
     let breakType: BreakType
     let healthScore: Int
+    let dismissPolicy: DismissPolicy
+    let postponeCount: Int
     let onTaken: @Sendable () -> Void
     let onSkipped: @Sendable () -> Void
+    let onPostponed: @Sendable () -> Void
     let onDismiss: @MainActor () -> Void
 
     @State private var countdown: Int = 0
@@ -42,6 +41,19 @@ struct BreakOverlayView: View {
     private var progress: Double {
         guard breakDurationSeconds > 0 else { return 1.0 }
         return Double(breakDurationSeconds - countdown) / Double(breakDurationSeconds)
+    }
+
+    /// Maximum postpones allowed for .postponeOnly policy.
+    private var maxPostpones: Int {
+        if case .postponeOnly(let maxCount) = dismissPolicy {
+            return maxCount
+        }
+        return 0
+    }
+
+    /// Remaining postpones available.
+    private var postponesRemaining: Int {
+        max(0, maxPostpones - postponeCount)
     }
 
     // MARK: - Body
@@ -75,6 +87,10 @@ struct BreakOverlayView: View {
         .onAppear {
             withAnimation(.spring(duration: 0.4)) {
                 appeared = true
+            }
+            // Mandatory policy: auto-start countdown immediately
+            if case .mandatory = dismissPolicy {
+                startBreak()
             }
         }
         .onDisappear {
@@ -171,12 +187,8 @@ struct BreakOverlayView: View {
                         .buttonStyle(.borderedProminent)
                         .controlSize(.large)
 
-                        Button(action: skipBreak) {
-                            Text("Skip")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.large)
+                        // Dismiss action depends on policy (v2.4)
+                        dismissButton
                     }
 
                     Button(action: startExercises) {
@@ -188,6 +200,34 @@ struct BreakOverlayView: View {
                     .controlSize(.regular)
                 }
             }
+        }
+    }
+
+    /// Dismiss/skip/postpone button based on dismiss policy (v2.4).
+    @ViewBuilder
+    private var dismissButton: some View {
+        switch dismissPolicy {
+        case .skippable:
+            Button(action: skipBreak) {
+                Text("Skip")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+
+        case .postponeOnly:
+            if postponesRemaining > 0 {
+                Button(action: postponeBreak) {
+                    Text("Later (\(postponesRemaining) left)")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+            }
+
+        case .mandatory:
+            // No dismiss button for mandatory breaks
+            EmptyView()
         }
     }
 
@@ -247,6 +287,12 @@ struct BreakOverlayView: View {
     private func skipBreak() {
         stopTimer()
         onSkipped()
+        onDismiss()
+    }
+
+    private func postponeBreak() {
+        stopTimer()
+        onPostponed()
         onDismiss()
     }
 
