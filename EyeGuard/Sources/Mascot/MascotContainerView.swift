@@ -13,6 +13,12 @@ struct MascotContainerView: View {
     /// External binding to the BreakScheduler for state synchronization.
     let scheduler: BreakScheduler
 
+    /// Callback for tap on the mascot.
+    var onTap: (@MainActor () -> Void)?
+
+    /// Callback for hover state changes.
+    var onHoverChanged: (@MainActor (Bool) -> Void)?
+
     /// Callback for "Take Break Now" from mascot menu.
     var onTakeBreak: (@MainActor () -> Void)?
 
@@ -63,19 +69,10 @@ struct MascotContainerView: View {
         }
         .frame(width: 120, height: 130)
         .onHover { isHovering in
-            if isHovering && !viewModel.showBubble {
-                viewModel.toggleBubble()
-            }
-        }
-        .onTapGesture(count: 2) {
-            // Double-click: toggle speech bubble
-            viewModel.toggleBubble()
+            onHoverChanged?(isHovering)
         }
         .onTapGesture(count: 1) {
-            viewModel.toggleBubble()
-        }
-        .onLongPressGesture(minimumDuration: 0.5) {
-            viewModel.toggleBubble()
+            onTap?()
         }
         .contextMenu {
             mascotContextMenu

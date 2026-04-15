@@ -32,6 +32,23 @@ final class MascotWindowController {
     /// Task for polling mouse position updates.
     private var mouseTrackTask: Task<Void, Never>?
 
+    // MARK: - Peek Mode (v3.1)
+
+    /// Whether the mascot is currently in peek (hidden) mode, showing only eyes/ears.
+    private var isPeeking: Bool = true
+
+    /// How many points of the mascot are visible in peek mode (ears + eyes ≈ 35pt).
+    private let peekVisibleHeight: CGFloat = 35
+
+    /// Auto-hide timer that returns mascot to peek after inactivity.
+    private var autoHideTask: Task<Void, Never>?
+
+    /// Whether the user is hovering over the mascot in peek mode.
+    private var isHoveringPeek: Bool = false
+
+    /// Task for monitoring speech bubble state to auto-reveal.
+    private var bubbleMonitorTask: Task<Void, Never>?
+
     /// Shows the mascot window on screen.
     ///
     /// - Parameter scheduler: The BreakScheduler to wire mascot state to.
@@ -44,6 +61,12 @@ final class MascotWindowController {
 
         let containerView = MascotContainerView(
             scheduler: scheduler,
+            onTap: { [weak self] in
+                self?.handleMascotTap()
+            },
+            onHoverChanged: { [weak self] isHovering in
+                self?.handleMascotHover(isHovering: isHovering)
+            },
             onTakeBreak: { [weak self] in
                 self?.handleTakeBreak()
             },
@@ -78,11 +101,12 @@ final class MascotWindowController {
         mascotWindow.backgroundColor = .clear
         mascotWindow.hasShadow = false
         mascotWindow.ignoresMouseEvents = false
-        mascotWindow.isMovableByWindowBackground = true
+        mascotWindow.isMovableByWindowBackground = false  // Disable drag in peek mode
         mascotWindow.collectionBehavior = [.canJoinAllSpaces, .stationary]
         mascotWindow.contentView = hostingView
 
-        // Position at bottom-right corner
+        // Start in peek position (only eyes/ears visible)
+        isPeeking = true
         positionBottomRight(mascotWindow)
 
         mascotWindow.makeKeyAndOrderFront(nil)
@@ -91,13 +115,20 @@ final class MascotWindowController {
         // Start mouse tracking for pupil follow (v1.1)
         startMouseTracking()
 
-        Log.mascot.info("Mascot window shown at bottom-right corner.")
+        // Start bubble monitor for auto-reveal on messages (v3.1)
+        startBubbleMonitor()
+
+        Log.mascot.info("Mascot window shown in peek mode at bottom-right corner.")
     }
 
     /// Hides the mascot window.
     func hide() {
         stateMonitorTask?.cancel()
         stateMonitorTask = nil
+        autoHideTask?.cancel()
+        autoHideTask = nil
+        bubbleMonitorTask?.cancel()
+        bubbleMonitorTask = nil
         stopMouseTracking()
         window?.orderOut(nil)
         window = nil
@@ -107,6 +138,7 @@ final class MascotWindowController {
     }
 
     /// Repositions the mascot to the bottom-right corner of the main screen.
+    /// Respects current peek/full mode.
     func reposition() {
         guard let window else { return }
         positionBottomRight(window)
@@ -322,11 +354,184 @@ final class MascotWindowController {
     // MARK: - Private
 
     /// Places the window at the bottom-right of the main screen's visible frame.
+    /// In peek mode, pushes the window down so only `peekVisibleHeight` pt are visible.
     private func positionBottomRight(_ window: NSWindow) {
         guard let screen = NSScreen.main else { return }
         let visibleFrame = screen.visibleFrame
         let x = visibleFrame.maxX - window.frame.width - 20
-        let y = visibleFrame.minY + 20
+
+        let y: CGFloat
+        if isPeeking {
+            // Push window below screen edge so only top portion (ears+eyes) is visible
+            y = visibleFrame.minY - (window.frame.height - peekVisibleHeight)
+        } else {
+            // Full mode: window fully visible above screen bottom
+            y = visibleFrame.minY + 20
+        }
+
         window.setFrameOrigin(NSPoint(x: x, y: y))
+    }
+
+    // MARK: - Peek Mode Transitions (v3.1)
+
+    /// Reveals the mascot from peek mode to full mode with spring animation.
+    private func revealMascot() {
+        guard isPeeking, let window, let screen = NSScreen.main else { return }
+        isPeeking = false
+        cancelAutoHide()
+
+        // Enable dragging in full mode
+        window.isMovableByWindowBackground = true
+
+        let visibleFrame = screen.visibleFrame
+        let targetY = visibleFrame.minY + 20
+
+        // Animate window position with spring-like effect
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.35
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            context.allowsImplicitAnimation = true
+            window.animator().setFrameOrigin(NSPoint(x: window.frame.origin.x, y: targetY))
+        }
+
+        // Trigger pop bounce on the mascot character
+        viewModel?.triggerPopBounce()
+
+        // Schedule auto-hide after 5 seconds
+        scheduleAutoHide()
+
+        Log.mascot.info("Mascot revealed from peek mode.")
+    }
+
+    /// Hides the mascot back to peek mode with smooth animation.
+    private func retractMascot() {
+        guard !isPeeking, let window, let screen = NSScreen.main else { return }
+
+        // Don't retract if context menu is open or bubble is showing
+        if viewModel?.showBubble == true { return }
+
+        isPeeking = true
+        cancelAutoHide()
+
+        // Disable dragging in peek mode
+        window.isMovableByWindowBackground = false
+
+        let visibleFrame = screen.visibleFrame
+        let targetY = visibleFrame.minY - (window.frame.height - peekVisibleHeight)
+
+        // Reset X position to bottom-right (in case user dragged it)
+        let targetX = visibleFrame.maxX - window.frame.width - 20
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.5
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            context.allowsImplicitAnimation = true
+            window.animator().setFrameOrigin(NSPoint(x: targetX, y: targetY))
+        }
+
+        Log.mascot.info("Mascot retracted to peek mode.")
+    }
+
+    /// Schedules auto-retract to peek mode after the given delay.
+    private func scheduleAutoHide(after delay: TimeInterval = 5) {
+        cancelAutoHide()
+        autoHideTask = Task {
+            try? await Task.sleep(for: .seconds(delay))
+            guard !Task.isCancelled else { return }
+            retractMascot()
+        }
+    }
+
+    /// Cancels the auto-hide timer.
+    private func cancelAutoHide() {
+        autoHideTask?.cancel()
+        autoHideTask = nil
+    }
+
+    /// Handles hover state changes in peek mode — micro-float 5pt up on hover.
+    private func peekHover(isHovering: Bool) {
+        guard isPeeking, let window else { return }
+        isHoveringPeek = isHovering
+
+        let offset: CGFloat = isHovering ? 5 : 0
+        let currentOrigin = window.frame.origin
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.2
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            context.allowsImplicitAnimation = true
+
+            if isHovering {
+                window.animator().setFrameOrigin(NSPoint(
+                    x: currentOrigin.x,
+                    y: currentOrigin.y + offset
+                ))
+            } else {
+                // Return to peek position
+                guard let screen = NSScreen.main else { return }
+                let visibleFrame = screen.visibleFrame
+                let peekY = visibleFrame.minY - (window.frame.height - peekVisibleHeight)
+                window.animator().setFrameOrigin(NSPoint(
+                    x: currentOrigin.x,
+                    y: peekY
+                ))
+            }
+        }
+    }
+
+    /// Monitors the viewModel's showBubble state to auto-reveal when a message appears.
+    private func startBubbleMonitor() {
+        bubbleMonitorTask?.cancel()
+        bubbleMonitorTask = Task {
+            var lastBubbleState = false
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(0.5))
+                guard !Task.isCancelled else { return }
+
+                guard let viewModel = self.viewModel else { continue }
+
+                let currentBubble = viewModel.showBubble
+
+                // Bubble just appeared while peeking → auto-reveal
+                if currentBubble && !lastBubbleState && isPeeking {
+                    revealMascot()
+                    // Extend auto-hide while bubble is showing
+                    scheduleAutoHide(after: 8)
+                }
+
+                // Bubble just disappeared → schedule retract
+                if !currentBubble && lastBubbleState && !isPeeking {
+                    scheduleAutoHide(after: 3)
+                }
+
+                lastBubbleState = currentBubble
+            }
+        }
+    }
+
+    // MARK: - Tap & Hover Handling (v3.1)
+
+    /// Handles tap on the mascot — reveals if peeking, toggles bubble if full.
+    private func handleMascotTap() {
+        if isPeeking {
+            revealMascot()
+        } else {
+            viewModel?.toggleBubble()
+            // Reset auto-hide timer on interaction
+            scheduleAutoHide()
+        }
+    }
+
+    /// Handles hover on the mascot — micro-float if peeking, show bubble if full.
+    private func handleMascotHover(isHovering: Bool) {
+        if isPeeking {
+            peekHover(isHovering: isHovering)
+        } else if isHovering {
+            // Reset auto-hide timer on hover
+            cancelAutoHide()
+        } else {
+            // Mouse left — schedule auto-hide
+            scheduleAutoHide()
+        }
     }
 }

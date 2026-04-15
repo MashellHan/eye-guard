@@ -175,6 +175,21 @@ final class MascotViewModel {
 
     // MARK: - Mouse Tracking
 
+    /// Triggers a one-time pop-bounce animation when the mascot is revealed from peek mode.
+    /// Does not change mascotState — just a visual "pop" effect.
+    func triggerPopBounce() {
+        withAnimation(MascotAnimations.bouncySpring) {
+            bounceOffset = -10
+        }
+        Task {
+            try? await Task.sleep(for: .seconds(0.2))
+            guard !Task.isCancelled else { return }
+            withAnimation(MascotAnimations.defaultSpring) {
+                bounceOffset = 0
+            }
+        }
+    }
+
     /// Updates pupil position to look toward a mouse position relative to mascot center.
     func updateHoverPupil(mousePosition: CGPoint, mascotCenter: CGPoint) {
         // Only track in states that allow it
