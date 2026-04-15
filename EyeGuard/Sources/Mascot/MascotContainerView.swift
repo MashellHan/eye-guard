@@ -533,6 +533,8 @@ struct MascotContainerView: View {
                     if viewModel.mascotState == .idle || viewModel.mascotState == .happy {
                         let tip = TipDatabase.randomTip()
                         viewModel.showMessage(tip.shortBubbleText, duration: 15)
+                        // Play tip rotation bell (v1.6)
+                        SoundManager.shared.onTipRotation()
                     }
                 }
 
@@ -557,6 +559,8 @@ struct MascotContainerView: View {
                     viewModel.transition(to: .celebrating)
                     let colorSuggestion = ColorAnalyzer.shared.suggestionBubbleText()
                     viewModel.showMessage("👏 做得好！\(colorSuggestion)", duration: 10)
+                    // Play celebration sound (v1.6)
+                    SoundManager.shared.onBreakComplete()
                     celebrationEndTime = Date.now.addingTimeInterval(
                         MascotAnimations.celebrationDisplayDuration
                     )

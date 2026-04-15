@@ -179,6 +179,9 @@ final class BreakScheduler {
         recordBreak(type: type, wasTaken: true)
         resetTimersAfterBreak(type)
 
+        // Start ambient sound during break (v1.6)
+        SoundManager.shared.startAmbient()
+
         // Auto-end break after the break duration
         Task {
             try? await Task.sleep(for: .seconds(type.duration))
@@ -193,6 +196,9 @@ final class BreakScheduler {
     func endBreak() {
         isBreakInProgress = false
         activeBreakType = nil
+
+        // Stop ambient sound when break ends (v1.6)
+        SoundManager.shared.stopAmbient()
     }
 
     /// Records that the user skipped a scheduled break.

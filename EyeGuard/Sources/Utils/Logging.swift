@@ -37,4 +37,10 @@ enum Log {
 
     /// Logger for color analysis subsystem.
     static let colorAnalysis = Logger(subsystem: "com.eyeguard", category: "ColorAnalysis")
+
+    /// Logger for sound/audio subsystem.
+    static let sound = Logger(subsystem: "com.eyeguard", category: "Sound")
+
+    /// Logger for dashboard subsystem.
+    static let dashboard = Logger(subsystem: "com.eyeguard", category: "Dashboard")
 }

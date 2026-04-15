@@ -79,6 +79,9 @@ final class NotificationManager: NotificationSending {
 
         sendTier1Notification(breakType: breakType)
 
+        // Play break start sound (v1.6)
+        SoundManager.shared.onBreakStart()
+
         // Start escalation chain
         escalationTask = Task {
             // Wait for Tier 1 → Tier 2 escalation
@@ -127,6 +130,9 @@ final class NotificationManager: NotificationSending {
         dismissAllOverlays()
         isNotificationActive = false
         clearCallbacks()
+
+        // Play break complete sound (v1.6)
+        SoundManager.shared.onBreakComplete()
 
         callback?()
     }

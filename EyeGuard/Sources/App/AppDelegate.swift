@@ -36,6 +36,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         // Generate daily report on app quit (v0.7)
         generateDailyReportSync()
 
+        // Stop any ambient sound (v1.6)
+        Task { @MainActor in
+            SoundManager.shared.stopAmbient()
+        }
+
         // Clean up mascot window (v0.9)
         Task { @MainActor in
             AppDelegate.mascotController?.hide()
