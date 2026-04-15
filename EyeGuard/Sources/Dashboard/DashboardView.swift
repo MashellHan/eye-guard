@@ -455,11 +455,14 @@ struct DashboardGauge: View {
 // MARK: - Dashboard Stat Card
 
 /// A card displaying a single statistic.
+/// Supports dark mode with adaptive background (v2.0).
 struct DashboardStatCard: View {
     let icon: String
     let iconColor: Color
     let title: String
     let value: String
+
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack(spacing: 6) {
@@ -479,7 +482,9 @@ struct DashboardStatCard: View {
         .padding(.vertical, 12)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(.quaternary.opacity(0.5))
+                .fill(colorScheme == .dark
+                    ? Color.white.opacity(0.05)
+                    : Color.black.opacity(0.04))
         )
     }
 }
@@ -487,11 +492,14 @@ struct DashboardStatCard: View {
 // MARK: - Summary Stat View
 
 /// A compact stat view for the history summary row.
+/// Supports dark mode with adaptive background (v2.0).
 struct SummaryStatView: View {
     let title: String
     let value: String
     let icon: String
     let color: Color
+
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack(spacing: 4) {
@@ -507,7 +515,9 @@ struct SummaryStatView: View {
         .padding(.vertical, 10)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(.quaternary.opacity(0.3))
+                .fill(colorScheme == .dark
+                    ? Color.white.opacity(0.04)
+                    : Color.black.opacity(0.03))
         )
     }
 }

@@ -17,8 +17,8 @@ PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 APP_NAME="EyeGuard"
 BUNDLE_ID="com.eyeguard.app"
-VERSION="1.1.0"
-BUILD_VERSION="11"
+VERSION="2.0.0"
+BUILD_VERSION="20"
 COPYRIGHT="Copyright $(date +%Y) EyeGuard. All rights reserved."
 
 APP_BUNDLE="$PROJECT_DIR/$APP_NAME.app"
