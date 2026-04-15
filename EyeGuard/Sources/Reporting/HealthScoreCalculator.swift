@@ -1,6 +1,47 @@
 import Foundation
 import os
 
+/// Trend direction for the health score over recent recalculations.
+enum ScoreTrend: String, Codable, Sendable {
+    case improving
+    case stable
+    case declining
+
+    /// Arrow symbol for display.
+    var symbol: String {
+        switch self {
+        case .improving: return "↑"
+        case .stable:    return "→"
+        case .declining: return "↓"
+        }
+    }
+
+    /// Display label.
+    var displayName: String {
+        switch self {
+        case .improving: return "Improving"
+        case .stable:    return "Stable"
+        case .declining: return "Declining"
+        }
+    }
+}
+
+/// Detailed breakdown of a single score component with explanation text.
+struct ScoreComponent: Codable, Sendable {
+    let name: String
+    let score: Int
+    let maxScore: Int
+    let explanation: String
+}
+
+/// Extended health score with component breakdowns and explanation text.
+struct HealthScoreBreakdown: Codable, Sendable {
+    let score: HealthScore
+    let components: [ScoreComponent]
+    let trend: ScoreTrend
+    let summaryText: String
+}
+
 /// Calculates a daily health score (0-100) based on user break behavior.
 ///
 /// Score breakdown:
@@ -33,6 +74,89 @@ struct HealthScoreCalculator: Sendable {
             screenTimeScore: screenTime,
             breakQuality: quality
         )
+    }
+
+    /// Calculates a full breakdown with per-component explanations and trend.
+    ///
+    /// - Parameters:
+    ///   - breakEvents: All break events recorded today.
+    ///   - totalScreenTime: Total active screen time in seconds.
+    ///   - longestContinuousSession: Longest unbroken usage stretch in seconds.
+    ///   - previousScores: Recent score history for trend calculation.
+    /// - Returns: A `HealthScoreBreakdown` with component details and trend.
+    func calculateBreakdown(
+        breakEvents: [BreakEvent],
+        totalScreenTime: TimeInterval,
+        longestContinuousSession: TimeInterval,
+        previousScores: [Int]
+    ) -> HealthScoreBreakdown {
+        let score = calculate(
+            breakEvents: breakEvents,
+            totalScreenTime: totalScreenTime,
+            longestContinuousSession: longestContinuousSession
+        )
+
+        let complianceExplanation = complianceExplanation(breakEvents)
+        let disciplineExplanation = disciplineExplanation(longestContinuousSession)
+        let screenTimeExplanation = screenTimeExplanation(totalScreenTime)
+        let qualityExplanation = qualityExplanation(breakEvents)
+
+        let components = [
+            ScoreComponent(
+                name: "Breaks",
+                score: score.breakCompliance,
+                maxScore: EyeGuardConstants.breakComplianceMaxPoints,
+                explanation: complianceExplanation
+            ),
+            ScoreComponent(
+                name: "Discipline",
+                score: score.continuousUseDiscipline,
+                maxScore: EyeGuardConstants.continuousUseDisciplineMaxPoints,
+                explanation: disciplineExplanation
+            ),
+            ScoreComponent(
+                name: "Time",
+                score: score.screenTimeScore,
+                maxScore: EyeGuardConstants.screenTimeMaxPoints,
+                explanation: screenTimeExplanation
+            ),
+            ScoreComponent(
+                name: "Quality",
+                score: score.breakQuality,
+                maxScore: EyeGuardConstants.breakQualityMaxPoints,
+                explanation: qualityExplanation
+            ),
+        ]
+
+        let trend = calculateTrend(currentScore: score.totalScore, previousScores: previousScores)
+        let summaryText = generateSummaryText(score: score.totalScore, trend: trend)
+
+        return HealthScoreBreakdown(
+            score: score,
+            components: components,
+            trend: trend,
+            summaryText: summaryText
+        )
+    }
+
+    // MARK: - Trend Calculation
+
+    /// Determines trend direction from recent score history.
+    /// Uses the last 5 scores (or fewer if not enough history).
+    func calculateTrend(currentScore: Int, previousScores: [Int]) -> ScoreTrend {
+        guard !previousScores.isEmpty else { return .stable }
+
+        let recentScores = Array(previousScores.suffix(5))
+        let averagePrevious = Double(recentScores.reduce(0, +)) / Double(recentScores.count)
+        let difference = Double(currentScore) - averagePrevious
+
+        if difference > 3.0 {
+            return .improving
+        } else if difference < -3.0 {
+            return .declining
+        } else {
+            return .stable
+        }
     }
 
     // MARK: - Component Calculations
@@ -118,5 +242,77 @@ struct HealthScoreCalculator: Sendable {
 
         let averageQuality = totalQuality / Double(takenBreaks.count)
         return Int(averageQuality * Double(EyeGuardConstants.breakQualityMaxPoints))
+    }
+
+    // MARK: - Explanation Text
+
+    private func complianceExplanation(_ events: [BreakEvent]) -> String {
+        guard !events.isEmpty else {
+            return "No breaks scheduled yet — keep it up!"
+        }
+        let taken = events.filter(\.wasTaken).count
+        let total = events.count
+        let percent = Int(Double(taken) / Double(total) * 100)
+        return "\(taken)/\(total) breaks taken (\(percent)%)"
+    }
+
+    private func disciplineExplanation(_ longestSession: TimeInterval) -> String {
+        let minutes = Int(longestSession / 60)
+        if longestSession <= EyeGuardConstants.microBreakInterval {
+            return "Great! Longest session: \(minutes)min (under 20min)"
+        } else if longestSession <= EyeGuardConstants.mandatoryBreakInterval {
+            return "Longest session: \(minutes)min — try shorter stretches"
+        } else {
+            return "Longest session: \(minutes)min — exceeded 2hr limit!"
+        }
+    }
+
+    private func screenTimeExplanation(_ totalTime: TimeInterval) -> String {
+        let hours = Int(totalTime / 3600)
+        let minutes = Int((totalTime.truncatingRemainder(dividingBy: 3600)) / 60)
+        let recommended = Int(EyeGuardConstants.recommendedMaxScreenTime / 3600)
+        if totalTime <= EyeGuardConstants.recommendedMaxScreenTime * 0.5 {
+            return "Screen time: \(hours)h \(minutes)m — well under \(recommended)h limit"
+        } else if totalTime <= EyeGuardConstants.recommendedMaxScreenTime {
+            return "Screen time: \(hours)h \(minutes)m — approaching \(recommended)h limit"
+        } else {
+            return "Screen time: \(hours)h \(minutes)m — over \(recommended)h limit!"
+        }
+    }
+
+    private func qualityExplanation(_ events: [BreakEvent]) -> String {
+        let takenBreaks = events.filter(\.wasTaken)
+        guard !takenBreaks.isEmpty else {
+            return "No breaks taken yet to measure quality"
+        }
+        var totalQuality = 0.0
+        for event in takenBreaks {
+            let quality = min(event.actualDuration / event.type.duration, 1.0)
+            totalQuality += quality
+        }
+        let avgPercent = Int(totalQuality / Double(takenBreaks.count) * 100)
+        return "Average break quality: \(avgPercent)%"
+    }
+
+    // MARK: - Summary Text
+
+    private func generateSummaryText(score: Int, trend: ScoreTrend) -> String {
+        let trendText: String
+        switch trend {
+        case .improving: trendText = "and improving"
+        case .stable:    trendText = "and stable"
+        case .declining: trendText = "but declining"
+        }
+
+        switch score {
+        case 80...100:
+            return "Your eye health is excellent \(trendText)!"
+        case 50..<80:
+            return "Your eye health is fair \(trendText). Take more breaks."
+        case 30..<50:
+            return "Your eye health needs attention \(trendText)."
+        default:
+            return "Your eye health is poor \(trendText). Please take a break!"
+        }
     }
 }

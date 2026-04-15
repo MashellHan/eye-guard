@@ -1,12 +1,14 @@
 import SwiftUI
 
-/// Menu bar popover view showing session status, controls, and quick stats.
+/// Menu bar popover view showing session status, controls, health score gauge, and quick stats.
 struct MenuBarView: View {
     @Bindable var scheduler: BreakScheduler
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             headerSection
+            Divider()
+            healthScoreSection
             Divider()
             timerSection
             Divider()
@@ -17,7 +19,7 @@ struct MenuBarView: View {
             footerSection
         }
         .padding()
-        .frame(width: 280)
+        .frame(width: 300)
     }
 
     // MARK: - Sections
@@ -31,6 +33,58 @@ struct MenuBarView: View {
                 .font(.headline)
             Spacer()
             statusBadge
+        }
+    }
+
+    private var healthScoreSection: some View {
+        VStack(spacing: 8) {
+            HStack {
+                Text("Eye Health Score")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                trendIndicator
+            }
+
+            HStack(spacing: 16) {
+                // Circular gauge
+                HealthScoreGauge(score: scheduler.currentHealthScore)
+
+                // Component breakdown
+                VStack(alignment: .leading, spacing: 3) {
+                    breakdownRow(
+                        label: "Breaks",
+                        score: scheduler.currentBreakdown?.score.breakCompliance
+                            ?? scheduler.currentHealthScore * 40 / 100,
+                        maxScore: 40
+                    )
+                    breakdownRow(
+                        label: "Discipline",
+                        score: scheduler.currentBreakdown?.score.continuousUseDiscipline
+                            ?? scheduler.currentHealthScore * 30 / 100,
+                        maxScore: 30
+                    )
+                    breakdownRow(
+                        label: "Time",
+                        score: scheduler.currentBreakdown?.score.screenTimeScore
+                            ?? scheduler.currentHealthScore * 20 / 100,
+                        maxScore: 20
+                    )
+                    breakdownRow(
+                        label: "Quality",
+                        score: scheduler.currentBreakdown?.score.breakQuality
+                            ?? scheduler.currentHealthScore * 10 / 100,
+                        maxScore: 10
+                    )
+                }
+            }
+
+            if let breakdown = scheduler.currentBreakdown {
+                Text(breakdown.summaryText)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
     }
 
@@ -110,9 +164,9 @@ struct MenuBarView: View {
                 )
                 Spacer()
                 StatItem(
-                    icon: "heart.fill",
-                    label: "Score",
-                    value: "\(scheduler.currentHealthScore)"
+                    icon: "clock",
+                    label: "Screen",
+                    value: TimeFormatting.formatDuration(scheduler.totalScreenTimeToday)
                 )
             }
         }
@@ -140,6 +194,113 @@ struct MenuBarView: View {
             Text(scheduler.isPaused ? "Paused" : "Active")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    private var trendIndicator: some View {
+        HStack(spacing: 2) {
+            Text(scheduler.currentTrend.symbol)
+                .font(.caption)
+                .foregroundStyle(trendColor)
+            Text(scheduler.currentTrend.displayName)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - Helpers
+
+    private var trendColor: Color {
+        switch scheduler.currentTrend {
+        case .improving: return .green
+        case .stable:    return .blue
+        case .declining: return .red
+        }
+    }
+
+    private func breakdownRow(label: String, score: Int, maxScore: Int) -> some View {
+        HStack(spacing: 4) {
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .frame(width: 58, alignment: .leading)
+            Text("\(score)/\(maxScore)")
+                .font(.system(.caption2, design: .monospaced))
+                .bold()
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(.quaternary)
+                        .frame(height: 4)
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(barColor(score: score, maxScore: maxScore))
+                        .frame(
+                            width: geometry.size.width * CGFloat(score) / CGFloat(max(maxScore, 1)),
+                            height: 4
+                        )
+                }
+            }
+            .frame(height: 4)
+        }
+    }
+
+    private func barColor(score: Int, maxScore: Int) -> Color {
+        let ratio = Double(score) / Double(max(maxScore, 1))
+        if ratio >= 0.8 { return .green }
+        if ratio >= 0.5 { return .yellow }
+        if ratio >= 0.3 { return .orange }
+        return .red
+    }
+}
+
+// MARK: - HealthScoreGauge
+
+/// A circular gauge displaying the health score with color coding.
+///
+/// Colors: Green (80-100), Yellow (50-79), Orange (30-49), Red (0-29)
+private struct HealthScoreGauge: View {
+    let score: Int
+
+    private var color: Color {
+        switch score {
+        case 80...100: return .green
+        case 50..<80:  return .yellow
+        case 30..<50:  return .orange
+        default:       return .red
+        }
+    }
+
+    private var progress: Double {
+        Double(min(max(score, 0), 100)) / 100.0
+    }
+
+    var body: some View {
+        ZStack {
+            // Background ring
+            Circle()
+                .stroke(.quaternary, lineWidth: 6)
+                .frame(width: 64, height: 64)
+
+            // Progress ring
+            Circle()
+                .trim(from: 0, to: progress)
+                .stroke(
+                    color,
+                    style: StrokeStyle(lineWidth: 6, lineCap: .round)
+                )
+                .frame(width: 64, height: 64)
+                .rotationEffect(.degrees(-90))
+                .animation(.easeInOut(duration: 0.5), value: progress)
+
+            // Score text
+            VStack(spacing: 0) {
+                Text("\(score)")
+                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .foregroundStyle(color)
+                Text("/100")
+                    .font(.system(size: 8, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 }

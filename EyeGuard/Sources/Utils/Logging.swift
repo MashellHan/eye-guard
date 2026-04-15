@@ -19,4 +19,7 @@ enum Log {
 
     /// Logger for app lifecycle events.
     static let app = Logger(subsystem: "com.eyeguard", category: "App")
+
+    /// Logger for data persistence operations.
+    static let persistence = Logger(subsystem: "com.eyeguard", category: "DataPersistence")
 }

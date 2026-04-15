@@ -32,6 +32,9 @@ final class NotificationManager: NotificationSending {
     private var onTakenCallback: (@Sendable () -> Void)?
     private var onSkippedCallback: (@Sendable () -> Void)?
 
+    /// Current health score for display in overlays.
+    private var currentHealthScore: Int = 100
+
     /// Tier 2 floating overlay window controller.
     private let overlayController = OverlayWindowController()
 
@@ -56,16 +59,19 @@ final class NotificationManager: NotificationSending {
     ///
     /// - Parameters:
     ///   - breakType: The type of break to notify about.
+    ///   - healthScore: Current eye health score (0-100) for overlay display.
     ///   - onTaken: Callback when user acknowledges the break.
     ///   - onSkipped: Callback when user dismisses/skips the break.
     func notify(
         breakType: BreakType,
+        healthScore: Int,
         onTaken: @escaping @Sendable () -> Void,
         onSkipped: @escaping @Sendable () -> Void
     ) {
         guard !isNotificationActive else { return }
         isNotificationActive = true
         currentTier = .gentle
+        currentHealthScore = healthScore
 
         // Store callbacks (H4)
         self.onTakenCallback = onTaken
@@ -227,6 +233,7 @@ final class NotificationManager: NotificationSending {
 
         overlayController.showBreakOverlay(
             breakType: breakType,
+            healthScore: currentHealthScore,
             onTaken: { [weak self] in
                 Task { @MainActor in
                     self?.acknowledgeBreak()
@@ -255,7 +262,7 @@ final class NotificationManager: NotificationSending {
             return
         }
 
-        escalateToTier3(healthScore: 65) { [weak self] in
+        escalateToTier3(healthScore: currentHealthScore) { [weak self] in
             Task { @MainActor in
                 self?.acknowledgeBreak()
             }

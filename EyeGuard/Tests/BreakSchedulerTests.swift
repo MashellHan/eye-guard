@@ -35,7 +35,7 @@ actor MockActivityMonitor: ActivityMonitoring {
 /// Mock notification sender for testing BreakScheduler in isolation.
 @MainActor
 final class MockNotificationSender: NotificationSending {
-    private(set) var notifyCalls: [(BreakType, @Sendable () -> Void, @Sendable () -> Void)] = []
+    private(set) var notifyCalls: [(BreakType, Int, @Sendable () -> Void, @Sendable () -> Void)] = []
     private(set) var acknowledgeCalls = 0
     private(set) var snoozeCalls: [(BreakType, @Sendable () -> Void)] = []
     private(set) var setupCalled = false
@@ -44,12 +44,17 @@ final class MockNotificationSender: NotificationSending {
         notifyCalls.last?.0
     }
 
+    var lastNotifiedHealthScore: Int? {
+        notifyCalls.last?.1
+    }
+
     func notify(
         breakType: BreakType,
+        healthScore: Int,
         onTaken: @escaping @Sendable () -> Void,
         onSkipped: @escaping @Sendable () -> Void
     ) {
-        notifyCalls.append((breakType, onTaken, onSkipped))
+        notifyCalls.append((breakType, healthScore, onTaken, onSkipped))
     }
 
     func acknowledgeBreak() {
@@ -293,5 +298,66 @@ struct BreakSchedulerTests {
 
         #expect(scheduler.longestContinuousSession == 0)
         #expect(scheduler.continuousUseWarnings == 0)
+    }
+
+    @Test("Initial score trend is stable")
+    @MainActor
+    func initialScoreTrend() {
+        let scheduler = BreakScheduler(
+            activityMonitor: MockActivityMonitor(),
+            notificationSender: MockNotificationSender()
+        )
+
+        #expect(scheduler.currentTrend == .stable)
+    }
+
+    @Test("Initial score history is empty")
+    @MainActor
+    func initialScoreHistory() {
+        let scheduler = BreakScheduler(
+            activityMonitor: MockActivityMonitor(),
+            notificationSender: MockNotificationSender()
+        )
+
+        #expect(scheduler.scoreHistory.isEmpty)
+    }
+
+    @Test("Reset daily clears trend and breakdown")
+    @MainActor
+    func resetDailyClearsTrendAndBreakdown() {
+        let scheduler = BreakScheduler(
+            activityMonitor: MockActivityMonitor(),
+            notificationSender: MockNotificationSender()
+        )
+
+        scheduler.takeBreakNow(.micro)
+        scheduler.skipBreak(.macro)
+        scheduler.resetDaily()
+
+        #expect(scheduler.currentTrend == .stable)
+        #expect(scheduler.currentBreakdown == nil)
+        #expect(scheduler.scoreHistory.isEmpty)
+    }
+
+    @Test("Health score breakdown is populated after break events")
+    @MainActor
+    func healthScoreBreakdownPopulated() {
+        let scheduler = BreakScheduler(
+            activityMonitor: MockActivityMonitor(),
+            notificationSender: MockNotificationSender()
+        )
+
+        scheduler.takeBreakNow(.micro)
+        scheduler.skipBreak(.macro)
+
+        // After break events, breakdown should be populated
+        #expect(scheduler.currentBreakdown != nil)
+        if let breakdown = scheduler.currentBreakdown {
+            #expect(breakdown.components.count == 4)
+            #expect(breakdown.components[0].name == "Breaks")
+            #expect(breakdown.components[1].name == "Discipline")
+            #expect(breakdown.components[2].name == "Time")
+            #expect(breakdown.components[3].name == "Quality")
+        }
     }
 }

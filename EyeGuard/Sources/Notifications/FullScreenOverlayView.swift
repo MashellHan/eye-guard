@@ -93,9 +93,25 @@ struct FullScreenOverlayView: View {
         if healthScore >= 80 {
             return .green
         } else if healthScore >= 50 {
+            return .yellow
+        } else if healthScore >= 30 {
             return .orange
         } else {
             return .red
+        }
+    }
+
+    /// Motivational text based on health score.
+    private var healthScoreMotivation: String {
+        switch healthScore {
+        case 80...100:
+            return "Take a break to keep your excellent score!"
+        case 50..<80:
+            return "Take a break to improve it!"
+        case 30..<50:
+            return "Your eyes really need this rest!"
+        default:
+            return "Please take a break now — your eyes need urgent rest!"
         }
     }
 
@@ -194,17 +210,23 @@ struct FullScreenOverlayView: View {
     }
 
     private var healthSection: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "heart.fill")
-                .foregroundStyle(healthScoreColor)
-            Text("Current Eye Health: \(healthScore)/100")
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(.white.opacity(0.9))
+        VStack(spacing: 6) {
+            HStack(spacing: 8) {
+                Image(systemName: "heart.fill")
+                    .foregroundStyle(healthScoreColor)
+                Text("Your eye health score: \(healthScore)/100")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.9))
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 10)
+            .background(.white.opacity(0.1))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+
+            Text(healthScoreMotivation)
+                .font(.system(size: 13))
+                .foregroundStyle(healthScoreColor.opacity(0.9))
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 10)
-        .background(.white.opacity(0.1))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     private var tipSection: some View {

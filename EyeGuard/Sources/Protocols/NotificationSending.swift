@@ -10,10 +10,12 @@ protocol NotificationSending {
     ///
     /// - Parameters:
     ///   - breakType: The type of break to notify about.
+    ///   - healthScore: Current eye health score (0-100) to display in overlays.
     ///   - onTaken: Callback when user acknowledges the break.
     ///   - onSkipped: Callback when user dismisses/skips the break.
     func notify(
         breakType: BreakType,
+        healthScore: Int,
         onTaken: @escaping @Sendable () -> Void,
         onSkipped: @escaping @Sendable () -> Void
     )

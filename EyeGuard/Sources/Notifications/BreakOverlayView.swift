@@ -5,6 +5,7 @@ import SwiftUI
 /// The view displays:
 /// - An eye icon with the break type
 /// - A title and instructional subtitle
+/// - Current health score with motivational text
 /// - A countdown timer with progress bar (once break starts)
 /// - "Take Break" and "Skip" buttons
 ///
@@ -19,6 +20,7 @@ struct BreakOverlayView: View {
     // MARK: - Properties
 
     let breakType: BreakType
+    let healthScore: Int
     let onTaken: @Sendable () -> Void
     let onSkipped: @Sendable () -> Void
     let onDismiss: @MainActor () -> Void
@@ -47,6 +49,7 @@ struct BreakOverlayView: View {
         VStack(spacing: 16) {
             iconSection
             titleSection
+            healthScoreSection
 
             if isBreaking {
                 countdownSection
@@ -55,7 +58,7 @@ struct BreakOverlayView: View {
             buttonSection
         }
         .padding(24)
-        .frame(width: 300, height: 220)
+        .frame(width: 320, height: 280)
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(
@@ -93,6 +96,47 @@ struct BreakOverlayView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+        }
+    }
+
+    private var healthScoreSection: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "heart.fill")
+                .foregroundStyle(healthScoreColor)
+                .font(.caption)
+            Text("Your eye health score: \(healthScore)/100")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text("—")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(healthScoreMotivation)
+                .font(.caption)
+                .foregroundStyle(healthScoreColor)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(.quaternary.opacity(0.5))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    /// Health score color based on value.
+    private var healthScoreColor: Color {
+        switch healthScore {
+        case 80...100: return .green
+        case 50..<80:  return .yellow
+        case 30..<50:  return .orange
+        default:       return .red
+        }
+    }
+
+    /// Motivational text based on health score.
+    private var healthScoreMotivation: String {
+        switch healthScore {
+        case 80...100: return "Keep it up!"
+        case 50..<80:  return "Take a break to improve it!"
+        case 30..<50:  return "Your eyes need rest!"
+        default:       return "Please take a break now!"
         }
     }
 

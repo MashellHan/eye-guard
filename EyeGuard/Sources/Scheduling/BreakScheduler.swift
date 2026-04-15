@@ -53,6 +53,15 @@ final class BreakScheduler {
     /// Number of continuous use warnings (Tier 3) issued today.
     private(set) var continuousUseWarnings: Int = 0
 
+    /// Current score trend direction.
+    private(set) var currentTrend: ScoreTrend = .stable
+
+    /// Full score breakdown with component details.
+    private(set) var currentBreakdown: HealthScoreBreakdown?
+
+    /// Recent score history for trend calculation.
+    private(set) var scoreHistory: [Int] = []
+
     // MARK: - Internal State
 
     private var sessionStartTime: Date = .now
@@ -85,6 +94,15 @@ final class BreakScheduler {
     /// The notification manager dependency (H6).
     private let notificationSender: any NotificationSending
 
+    /// Tick counter for periodic health score recalculation (every 60 ticks = 1 minute).
+    private var ticksSinceLastScoreUpdate: Int = 0
+
+    /// Tick counter for periodic data persistence (every 300 ticks = 5 minutes).
+    private var ticksSinceLastPersist: Int = 0
+
+    /// Data persistence manager for JSON file I/O.
+    private let persistenceManager = DataPersistenceManager()
+
     // MARK: - Initialization
 
     /// Creates a new BreakScheduler with injectable dependencies (H6).
@@ -102,6 +120,7 @@ final class BreakScheduler {
         self.notificationSender = notificationSender
         self.preferences = preferences
         startTimerLoop()
+        loadPersistedData()
     }
 
     // MARK: - Public Controls
@@ -137,6 +156,9 @@ final class BreakScheduler {
         totalScreenTimeToday = 0
         longestContinuousSession = 0
         continuousUseWarnings = 0
+        currentTrend = .stable
+        currentBreakdown = nil
+        scoreHistory = []
         resetSession()
         Log.scheduler.info("Daily counters reset for new day.")
     }
@@ -212,6 +234,20 @@ final class BreakScheduler {
         checkContinuousUse()
         checkDailyRollover()
 
+        // Periodic health score recalculation (every 60 seconds)
+        ticksSinceLastScoreUpdate += 1
+        if ticksSinceLastScoreUpdate >= 60 {
+            ticksSinceLastScoreUpdate = 0
+            recalculateHealthScore()
+        }
+
+        // Periodic data persistence (every 300 seconds = 5 minutes)
+        ticksSinceLastPersist += 1
+        if ticksSinceLastPersist >= 300 {
+            ticksSinceLastPersist = 0
+            persistData()
+        }
+
         // Poll activity monitor for idle state (H1)
         Task {
             let idle = await activityMonitor.isIdle
@@ -274,7 +310,7 @@ final class BreakScheduler {
     private func triggerBreakNotification(_ breakType: BreakType) {
         Log.scheduler.info("Break due: \(breakType.displayName)")
 
-        notificationSender.notify(breakType: breakType) { [weak self] in
+        notificationSender.notify(breakType: breakType, healthScore: currentHealthScore) { [weak self] in
             Task { @MainActor in
                 self?.takeBreakNow(breakType)
             }
@@ -370,20 +406,68 @@ final class BreakScheduler {
     /// Recalculates the current health score based on today's breaks.
     /// Uses `totalScreenTimeToday` for daily accumulation (BUG-002).
     /// Uses `longestContinuousSession` for continuous use discipline scoring.
+    /// Updates trend tracking and full breakdown.
     private func recalculateHealthScore() {
         let totalScheduled = breaksTakenToday + breaksSkippedToday
         guard totalScheduled > 0 else {
             currentHealthScore = 100
+            currentTrend = .stable
             return
         }
 
         let calculator = HealthScoreCalculator()
-        let score = calculator.calculate(
+        let breakdown = calculator.calculateBreakdown(
             breakEvents: todayBreakEvents,
             totalScreenTime: totalScreenTimeToday,
-            longestContinuousSession: longestContinuousSession
+            longestContinuousSession: longestContinuousSession,
+            previousScores: scoreHistory
         )
-        currentHealthScore = score.totalScore
+        currentHealthScore = breakdown.score.totalScore
+        currentTrend = breakdown.trend
+        currentBreakdown = breakdown
+
+        // Record score in history (keep last 20 entries)
+        scoreHistory = Array((scoreHistory + [currentHealthScore]).suffix(20))
+    }
+
+    /// Persists current data to JSON file asynchronously.
+    private func persistData() {
+        let events = todayBreakEvents
+        let screenTime = totalScreenTimeToday
+        let longestSession = longestContinuousSession
+        let history = scoreHistory
+
+        Task {
+            await persistenceManager.save(
+                breakEvents: events,
+                totalScreenTime: screenTime,
+                longestContinuousSession: longestSession,
+                scoreHistory: history
+            )
+        }
+    }
+
+    /// Loads persisted data for today on app start.
+    private func loadPersistedData() {
+        Task {
+            guard let data = await persistenceManager.load() else { return }
+            await MainActor.run {
+                self.todayBreakEvents = data.breakEvents
+                self.totalScreenTimeToday = data.totalScreenTime
+                self.longestContinuousSession = data.longestContinuousSession
+                self.scoreHistory = data.scoreHistory
+
+                let taken = data.breakEvents.filter(\.wasTaken).count
+                let skipped = data.breakEvents.filter { !$0.wasTaken }.count
+                self.breaksTakenToday = taken
+                self.breaksSkippedToday = skipped
+
+                self.recalculateHealthScore()
+                Log.scheduler.info(
+                    "Restored \(data.breakEvents.count) break events from persisted data."
+                )
+            }
+        }
     }
 
     /// Checks for daily rollover at midnight and resets counters.

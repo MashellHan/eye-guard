@@ -14,9 +14,10 @@ struct NotificationManagerMockTests {
         let mock = MockNotificationSender()
         #expect(mock.notifyCalls.isEmpty)
 
-        mock.notify(breakType: .micro, onTaken: {}, onSkipped: {})
+        mock.notify(breakType: .micro, healthScore: 85, onTaken: {}, onSkipped: {})
         #expect(mock.notifyCalls.count == 1)
         #expect(mock.lastNotifiedBreakType == .micro)
+        #expect(mock.lastNotifiedHealthScore == 85)
     }
 
     @Test("Mock notification sender tracks acknowledge calls")
@@ -49,9 +50,9 @@ struct NotificationManagerMockTests {
     func multipleNotifications() {
         let mock = MockNotificationSender()
 
-        mock.notify(breakType: .micro, onTaken: {}, onSkipped: {})
-        mock.notify(breakType: .macro, onTaken: {}, onSkipped: {})
-        mock.notify(breakType: .mandatory, onTaken: {}, onSkipped: {})
+        mock.notify(breakType: .micro, healthScore: 90, onTaken: {}, onSkipped: {})
+        mock.notify(breakType: .macro, healthScore: 70, onTaken: {}, onSkipped: {})
+        mock.notify(breakType: .mandatory, healthScore: 50, onTaken: {}, onSkipped: {})
 
         #expect(mock.notifyCalls.count == 3)
         #expect(mock.notifyCalls[0].0 == .micro)

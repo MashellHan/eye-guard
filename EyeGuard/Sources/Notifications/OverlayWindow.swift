@@ -40,10 +40,12 @@ final class OverlayWindowController: NSObject {
     ///
     /// - Parameters:
     ///   - breakType: The type of break being prompted.
+    ///   - healthScore: Current eye health score (0-100) to display.
     ///   - onTaken: Called when the user taps "Take Break" and the countdown completes.
     ///   - onSkipped: Called when the user taps "Skip".
     func showBreakOverlay(
         breakType: BreakType,
+        healthScore: Int = 100,
         onTaken: @escaping @Sendable () -> Void,
         onSkipped: @escaping @Sendable () -> Void
     ) {
@@ -58,6 +60,7 @@ final class OverlayWindowController: NSObject {
 
         let contentView = BreakOverlayView(
             breakType: breakType,
+            healthScore: healthScore,
             onTaken: onTaken,
             onSkipped: onSkipped,
             onDismiss: dismissAction
@@ -66,7 +69,7 @@ final class OverlayWindowController: NSObject {
         let hostingView = NSHostingView(rootView: contentView)
 
         let overlayWindow = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 320, height: 240),
+            contentRect: NSRect(x: 0, y: 0, width: 340, height: 300),
             styleMask: [.borderless],
             backing: .buffered,
             defer: false
