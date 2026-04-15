@@ -8,6 +8,9 @@ protocol ActivityMonitoring: Sendable {
     /// Whether the user is currently idle.
     var isIdle: Bool { get async }
 
+    /// Whether the screen is currently locked (v2.2).
+    var isScreenLocked: Bool { get async }
+
     /// Starts monitoring user input events.
     func startMonitoring() async
 

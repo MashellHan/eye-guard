@@ -4,6 +4,8 @@ import SwiftUI
 ///
 /// A round, Q-style character with a large iris, expressive pupil,
 /// eyebrows, mouth, tiny stick-figure arms/legs, and state-driven expressions.
+/// Enhanced with pink blush cheeks, radial gradients, and polished highlights
+/// ported from the eyes-health project (v2.2).
 /// Size: 64×64 pt body, ~80×90 pt total with limbs.
 struct MascotView: View {
     let state: MascotState
@@ -20,41 +22,31 @@ struct MascotView: View {
     /// Wave angle for arm animation (radians).
     var waveAngle: Double = 0
 
+    /// Body size constant for proportional sizing.
+    private let bodySize: CGFloat = 64
+
     var body: some View {
         ZStack {
             // Legs — two small lines below body
             legs
 
-            // Body — white circle (the eyeball)
-            Circle()
-                .fill(.white)
-                .frame(width: 64, height: 64)
-                .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
+            // Body — eyeball with radial gradient and subtle blue tint
+            eyeballBody
 
-            // Iris — colored circle
-            Circle()
-                .fill(irisGradient)
-                .frame(width: 34, height: 34)
-                .offset(pupilOffset)
+            // Iris — colored circle with radial gradient
+            irisView
 
-            // Pupil — black circle with highlight
-            ZStack {
-                Circle()
-                    .fill(.black)
-                    .frame(width: 16, height: 16)
+            // Pupil — black circle with animated highlight
+            pupilView
 
-                // Shine highlight
-                Circle()
-                    .fill(.white.opacity(0.8))
-                    .frame(width: 5, height: 5)
-                    .offset(x: -3, y: -3)
-            }
-            .offset(pupilOffset)
+            // Sparkle highlight — follows pupil subtly
+            sparkleHighlight
 
-            // Eyelids (blink / sleeping)
-            if isBlinking || state == .sleeping {
-                eyelids
-            }
+            // Eyelids (blink / sleeping) with skin-tone color
+            eyelids
+
+            // Pink blush cheeks — expression-dependent opacity
+            cheeksView
 
             // Eyebrows
             eyebrows
@@ -81,40 +73,141 @@ struct MascotView: View {
         .offset(y: bounceOffset)
     }
 
-    // MARK: - Iris Color
+    // MARK: - Eyeball Body
 
-    private var irisGradient: LinearGradient {
-        let color: Color = switch state {
-        case .idle:        .blue
-        case .happy:       .green
-        case .concerned:   .orange
-        case .alerting:    .red
-        case .sleeping:    .indigo
-        case .exercising:  .teal
-        case .celebrating: .purple
+    /// Radial gradient body — white center fading to subtle blue tint at edges.
+    private var eyeballBody: some View {
+        Ellipse()
+            .fill(
+                RadialGradient(
+                    colors: [
+                        Color(white: 1.0),
+                        Color(red: 0.94, green: 0.96, blue: 1.0),
+                    ],
+                    center: .center,
+                    startRadius: 0,
+                    endRadius: bodySize / 2
+                )
+            )
+            .frame(width: bodySize, height: bodySize * 0.9)
+            .overlay(
+                Ellipse()
+                    .stroke(Color.gray.opacity(0.25), lineWidth: 1.5)
+            )
+            .shadow(color: .black.opacity(0.12), radius: 4, x: 0, y: 2)
+    }
+
+    // MARK: - Iris
+
+    private var irisColor: Color {
+        switch state {
+        case .idle:        Color(red: 0.3, green: 0.55, blue: 0.9)
+        case .happy:       Color(red: 0.3, green: 0.8, blue: 0.4)
+        case .concerned:   Color(red: 0.9, green: 0.75, blue: 0.2)
+        case .alerting:    Color(red: 0.9, green: 0.3, blue: 0.25)
+        case .sleeping:    Color(red: 0.5, green: 0.5, blue: 0.75)
+        case .exercising:  Color(red: 0.2, green: 0.7, blue: 0.7)
+        case .celebrating: Color(red: 0.7, green: 0.4, blue: 0.85)
         }
+    }
 
-        return LinearGradient(
-            colors: [color.opacity(0.7), color],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+    /// Radial gradient iris — rich center fading to translucent edge.
+    private var irisView: some View {
+        Circle()
+            .fill(
+                RadialGradient(
+                    colors: [irisColor, irisColor.opacity(0.65)],
+                    center: .center,
+                    startRadius: 0,
+                    endRadius: 17
+                )
+            )
+            .frame(width: 34, height: 34)
+            .offset(pupilOffset)
+    }
+
+    // MARK: - Pupil
+
+    /// Pupil with a shine highlight that subtly follows the pupil.
+    private var pupilView: some View {
+        ZStack {
+            Circle()
+                .fill(.black)
+                .frame(width: 16, height: 16)
+
+            // Primary shine highlight
+            Circle()
+                .fill(.white.opacity(0.85))
+                .frame(width: 5, height: 5)
+                .offset(x: -3, y: -3)
+
+            // Secondary micro-highlight for depth
+            Circle()
+                .fill(.white.opacity(0.45))
+                .frame(width: 2.5, height: 2.5)
+                .offset(x: 2, y: -4)
+        }
+        .offset(pupilOffset)
+    }
+
+    // MARK: - Sparkle Highlight
+
+    /// Subtle sparkle on the eyeball body that drifts with pupil movement.
+    private var sparkleHighlight: some View {
+        Circle()
+            .fill(.white.opacity(0.7))
+            .frame(width: bodySize * 0.08, height: bodySize * 0.08)
+            .offset(
+                x: -bodySize * 0.12 + pupilOffset.width * 0.15,
+                y: -bodySize * 0.15 + pupilOffset.height * 0.15
+            )
     }
 
     // MARK: - Eyelids
 
+    /// Skin-toned eyelids that smoothly animate per expression.
+    /// Shown when blinking or sleeping; uses SkinEyelidShape for smooth curves.
+    @ViewBuilder
     private var eyelids: some View {
-        VStack(spacing: 0) {
-            // Top eyelid
-            Ellipse()
-                .fill(.white)
-                .frame(width: 64, height: 34)
-                .offset(y: -1)
-            // Bottom eyelid
-            Ellipse()
-                .fill(.white)
-                .frame(width: 64, height: 34)
-                .offset(y: 1)
+        if isBlinking || state == .sleeping {
+            VStack(spacing: 0) {
+                // Top eyelid — skin-toned
+                Ellipse()
+                    .fill(Color(red: 0.96, green: 0.92, blue: 0.88))
+                    .frame(width: bodySize, height: bodySize * 0.52)
+                    .offset(y: -1)
+                // Bottom eyelid — skin-toned
+                Ellipse()
+                    .fill(Color(red: 0.96, green: 0.92, blue: 0.88))
+                    .frame(width: bodySize, height: bodySize * 0.52)
+                    .offset(y: 1)
+            }
+        }
+    }
+
+    // MARK: - Blush Cheeks
+
+    /// Pink blush circles below the eye — opacity varies by expression.
+    private var cheeksView: some View {
+        HStack(spacing: bodySize * 0.48) {
+            Circle()
+                .fill(Color.pink.opacity(cheeksOpacity))
+                .frame(width: bodySize * 0.14, height: bodySize * 0.14)
+            Circle()
+                .fill(Color.pink.opacity(cheeksOpacity))
+                .frame(width: bodySize * 0.14, height: bodySize * 0.14)
+        }
+        .offset(y: bodySize * 0.18)
+    }
+
+    /// Cheek blush intensity varies by emotional state.
+    private var cheeksOpacity: Double {
+        switch state {
+        case .happy, .celebrating: 0.5
+        case .idle, .exercising:   0.2
+        case .concerned:           0.25
+        case .alerting:            0.1
+        case .sleeping:            0.35
         }
     }
 

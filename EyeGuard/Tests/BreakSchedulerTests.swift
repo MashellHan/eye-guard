@@ -8,12 +8,17 @@ import Testing
 /// Mock activity monitor for testing BreakScheduler in isolation.
 actor MockActivityMonitor: ActivityMonitoring {
     private(set) var isIdle: Bool = false
+    private(set) var isScreenLocked: Bool = false
     private(set) var startMonitoringCalled = false
     private(set) var stopMonitoringCalled = false
     private(set) var resetStateCalled = false
 
     func setIdle(_ idle: Bool) {
         isIdle = idle
+    }
+
+    func setScreenLocked(_ locked: Bool) {
+        isScreenLocked = locked
     }
 
     func startMonitoring() {
@@ -27,6 +32,7 @@ actor MockActivityMonitor: ActivityMonitoring {
     func resetState() {
         resetStateCalled = true
         isIdle = false
+        isScreenLocked = false
     }
 }
 
