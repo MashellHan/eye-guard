@@ -28,4 +28,7 @@ enum Log {
 
     /// Logger for the eye exercise subsystem.
     static let exercise = Logger(subsystem: "com.eyeguard", category: "Exercise")
+
+    /// Logger for the eye health tips subsystem.
+    static let tips = Logger(subsystem: "com.eyeguard", category: "Tips")
 }

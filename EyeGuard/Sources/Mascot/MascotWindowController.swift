@@ -55,6 +55,9 @@ final class MascotWindowController {
             },
             onStartExercises: { [weak self] in
                 self?.handleStartExercises()
+            },
+            onShowTip: { [weak self] in
+                self?.handleShowTip()
             }
         )
         let hostingView = NSHostingView(rootView: containerView)
@@ -149,6 +152,14 @@ final class MascotWindowController {
     private func handleStartExercises() {
         showExerciseWindow()
         Log.mascot.info("Mascot: user started eye exercises via mascot menu.")
+    }
+
+    /// Handles "Show Eye Tip" from mascot context menu.
+    /// Shows a random eye health tip in the mascot speech bubble.
+    private func handleShowTip() {
+        let tip = TipDatabase.randomTip()
+        viewModel?.showMessage(tip.shortBubbleText, duration: 15)
+        Log.mascot.info("Mascot: showing eye tip #\(tip.id): \(tip.title)")
     }
 
     /// The exercise session floating window.

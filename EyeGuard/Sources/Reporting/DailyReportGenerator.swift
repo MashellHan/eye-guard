@@ -208,6 +208,12 @@ struct DailyReportGenerator: Sendable {
         sections.append("")
         sections.append(renderDetailedBreakLog(breakEvents: breakEvents))
 
+        // --- Tip of the Day (v1.3) ---
+        sections.append("")
+        sections.append("## \u{1F4A1} Tip of the Day")
+        sections.append("")
+        sections.append(renderTipOfTheDay(date: date))
+
         // Footer
         sections.append("")
         sections.append("---")
@@ -435,5 +441,18 @@ struct DailyReportGenerator: Sendable {
         case 40..<60: return "\u{1F7E0}"
         default: return "\u{1F534}"
         }
+    }
+
+    /// Renders the Tip of the Day section using `TipDatabase` (v1.3).
+    private func renderTipOfTheDay(date: Date) -> String {
+        let tip = TipDatabase.tipOfTheDay(for: date)
+        var lines: [String] = []
+        lines.append("> **\(tip.title)**")
+        lines.append("> \(tip.titleChinese)")
+        lines.append(">")
+        lines.append("> \(tip.description)")
+        lines.append(">")
+        lines.append("> *Source: \(tip.source)*")
+        return lines.joined(separator: "\n")
     }
 }

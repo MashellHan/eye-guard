@@ -373,6 +373,9 @@ struct MascotContainerView: View {
     /// Callback for "Start Eye Exercises" from mascot menu.
     var onStartExercises: (@MainActor () -> Void)?
 
+    /// Callback for "Show Eye Tip" from mascot menu.
+    var onShowTip: (@MainActor () -> Void)?
+
     var body: some View {
         VStack(spacing: 4) {
             if viewModel.showBubble {
@@ -437,6 +440,12 @@ struct MascotContainerView: View {
             Label("Eye Exercises 眼保健操", systemImage: "figure.run")
         }
 
+        Button {
+            onShowTip?()
+        } label: {
+            Label("Show Eye Tip 护眼贴士", systemImage: "lightbulb")
+        }
+
         Divider()
 
         Button {
@@ -471,6 +480,7 @@ struct MascotContainerView: View {
 
     /// Periodically checks BreakScheduler state and updates mascot accordingly.
     /// Also monitors for break events (taken/skipped) to trigger celebrations/concerns.
+    /// Rotates eye health tips every 30 minutes (v1.3).
     private func startStateSync() {
         Task { @MainActor in
             // Initial greeting
@@ -482,9 +492,24 @@ struct MascotContainerView: View {
             var celebrationEndTime: Date?
             var wasBreakInProgress = false
 
+            // Tip rotation: show a tip every 30 minutes (900 ticks at 2-sec interval)
+            var ticksSinceLastTip: Int = 0
+            let tipRotationTicks: Int = 900  // 30 min × 60 sec / 2 sec per tick
+
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(2))
                 guard !Task.isCancelled else { return }
+
+                // Tip rotation (v1.3)
+                ticksSinceLastTip += 1
+                if ticksSinceLastTip >= tipRotationTicks {
+                    ticksSinceLastTip = 0
+                    // Only show tip if mascot is in a calm state
+                    if viewModel.mascotState == .idle || viewModel.mascotState == .happy {
+                        let tip = TipDatabase.randomTip()
+                        viewModel.showMessage(tip.shortBubbleText, duration: 15)
+                    }
+                }
 
                 // Check for break-in-progress (exercising state)
                 if scheduler.isBreakInProgress && !wasBreakInProgress {
