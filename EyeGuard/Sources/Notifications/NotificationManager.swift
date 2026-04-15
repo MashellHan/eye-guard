@@ -32,6 +32,9 @@ final class NotificationManager: NotificationSending {
     private var onTakenCallback: (@Sendable () -> Void)?
     private var onSkippedCallback: (@Sendable () -> Void)?
 
+    /// Tier 2 floating overlay window controller.
+    private let overlayController = OverlayWindowController()
+
     // MARK: - Singleton
 
     static let shared = NotificationManager()
@@ -217,11 +220,30 @@ final class NotificationManager: NotificationSending {
     // MARK: - Private: Tier 2 — Overlay Window
 
     private func showTier2Overlay(breakType: BreakType) {
-        // TODO: Implement custom NSWindow overlay
-        // - Semi-transparent background
-        // - 30-second countdown timer
-        // - "Take Break" and "Snooze" buttons
-        // - Floats above all windows
+        guard onTakenCallback != nil, onSkippedCallback != nil else {
+            Log.notification.warning("Tier 2: no callbacks stored, skipping overlay.")
+            return
+        }
+
+        overlayController.showBreakOverlay(
+            breakType: breakType,
+            onTaken: { [weak self] in
+                Task { @MainActor in
+                    self?.acknowledgeBreak()
+                }
+            },
+            onSkipped: { [weak self] in
+                Task { @MainActor in
+                    let callback = self?.onSkippedCallback
+                    self?.cancelEscalation()
+                    self?.dismissAllOverlays()
+                    self?.isNotificationActive = false
+                    self?.clearCallbacks()
+                    callback?()
+                }
+            }
+        )
+
         Log.notification.info("Tier 2 overlay shown: \(breakType.displayName)")
     }
 
@@ -249,6 +271,8 @@ final class NotificationManager: NotificationSending {
                 withIdentifiers: BreakType.allCases.map { "eyeguard.break.\($0.rawValue)" }
             )
         }
-        // TODO: Close Tier 2/3 overlay windows
+        // Dismiss Tier 2 overlay window
+        overlayController.dismiss()
+        // TODO: Close Tier 3 overlay windows
     }
 }
