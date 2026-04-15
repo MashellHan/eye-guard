@@ -62,6 +62,12 @@ final class BreakScheduler {
     /// Recent score history for trend calculation.
     private(set) var scoreHistory: [Int] = []
 
+    /// Whether a break is currently in progress (user taking a break).
+    private(set) var isBreakInProgress: Bool = false
+
+    /// The type of break currently in progress, if any.
+    private(set) var activeBreakType: BreakType?
+
     // MARK: - Internal State
 
     private var sessionStartTime: Date = .now
@@ -159,14 +165,34 @@ final class BreakScheduler {
         currentTrend = .stable
         currentBreakdown = nil
         scoreHistory = []
+        isBreakInProgress = false
+        activeBreakType = nil
         resetSession()
         Log.scheduler.info("Daily counters reset for new day.")
     }
 
     /// Immediately triggers a break of the given type.
+    /// Sets break-in-progress state for mascot exercising animation.
     func takeBreakNow(_ type: BreakType) {
+        isBreakInProgress = true
+        activeBreakType = type
         recordBreak(type: type, wasTaken: true)
         resetTimersAfterBreak(type)
+
+        // Auto-end break after the break duration
+        Task {
+            try? await Task.sleep(for: .seconds(type.duration))
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                self.endBreak()
+            }
+        }
+    }
+
+    /// Ends the current break-in-progress state.
+    func endBreak() {
+        isBreakInProgress = false
+        activeBreakType = nil
     }
 
     /// Records that the user skipped a scheduled break.

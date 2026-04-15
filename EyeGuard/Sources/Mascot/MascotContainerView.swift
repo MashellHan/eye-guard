@@ -15,6 +15,15 @@ final class MascotViewModel {
     var waveAngle: Double = 0
     var pupilOffset: CGSize = .zero
 
+    /// Horizontal sway offset for sleeping state.
+    var swayOffset: CGFloat = 0
+
+    /// Extra scale pulse for celebrating state.
+    var celebrateScale: CGFloat = 1.0
+
+    /// Rotation angle for celebrating state.
+    var celebrateRotation: Double = 0
+
     /// Internal animation tasks — cancelled on state change.
     private var blinkTask: Task<Void, Never>?
     private var breathTask: Task<Void, Never>?
@@ -22,6 +31,8 @@ final class MascotViewModel {
     private var waveTask: Task<Void, Never>?
     private var pupilTask: Task<Void, Never>?
     private var bubbleTask: Task<Void, Never>?
+    private var swayTask: Task<Void, Never>?
+    private var celebrateTask: Task<Void, Never>?
 
     /// Starts all idle animations (breathing + blinking + look-around).
     func startIdleAnimations() {
@@ -39,10 +50,15 @@ final class MascotViewModel {
         bounceTask?.cancel()
         waveTask?.cancel()
         pupilTask?.cancel()
+        swayTask?.cancel()
+        celebrateTask?.cancel()
 
         bounceOffset = 0
         waveAngle = 0
         pupilOffset = .zero
+        swayOffset = 0
+        celebrateScale = 1.0
+        celebrateRotation = 0
 
         switch newState {
         case .idle:
@@ -55,17 +71,18 @@ final class MascotViewModel {
             break // Just expression change
 
         case .alerting:
-            startBouncing()
+            startAlertBouncing()
             startWaving()
 
         case .sleeping:
             pupilOffset = .zero
+            startSleepingSway()
 
         case .exercising:
             startExercisePattern()
 
         case .celebrating:
-            startBouncing()
+            startCelebrating()
         }
     }
 
@@ -86,6 +103,15 @@ final class MascotViewModel {
     func hideBubble() {
         bubbleTask?.cancel()
         showBubble = false
+    }
+
+    /// Toggles speech bubble visibility.
+    func toggleBubble() {
+        if showBubble {
+            hideBubble()
+        } else if !bubbleText.isEmpty {
+            showBubble = true
+        }
     }
 
     // MARK: - Breathing
@@ -129,7 +155,7 @@ final class MascotViewModel {
         }
     }
 
-    // MARK: - Bouncing
+    // MARK: - Bouncing (default)
 
     private func startBouncing() {
         bounceTask = Task {
@@ -144,6 +170,25 @@ final class MascotViewModel {
                     bounceOffset = 0
                 }
                 try? await Task.sleep(for: .seconds(MascotAnimations.bounceDuration / 2))
+            }
+        }
+    }
+
+    // MARK: - Alert Bouncing (larger amplitude)
+
+    private func startAlertBouncing() {
+        bounceTask = Task {
+            while !Task.isCancelled {
+                withAnimation(.easeInOut(duration: MascotAnimations.alertBounceDuration / 2)) {
+                    bounceOffset = -MascotAnimations.alertBounceAmplitude
+                }
+                try? await Task.sleep(for: .seconds(MascotAnimations.alertBounceDuration / 2))
+                guard !Task.isCancelled else { return }
+
+                withAnimation(.easeInOut(duration: MascotAnimations.alertBounceDuration / 2)) {
+                    bounceOffset = 0
+                }
+                try? await Task.sleep(for: .seconds(MascotAnimations.alertBounceDuration / 2))
             }
         }
     }
@@ -210,24 +255,75 @@ final class MascotViewModel {
             }
         }
     }
+
+    // MARK: - Sleeping Sway
+
+    private func startSleepingSway() {
+        swayTask = Task {
+            while !Task.isCancelled {
+                withAnimation(.easeInOut(duration: MascotAnimations.sleepSwayDuration / 2)) {
+                    swayOffset = MascotAnimations.sleepSwayAmplitude
+                }
+                try? await Task.sleep(for: .seconds(MascotAnimations.sleepSwayDuration / 2))
+                guard !Task.isCancelled else { return }
+
+                withAnimation(.easeInOut(duration: MascotAnimations.sleepSwayDuration / 2)) {
+                    swayOffset = -MascotAnimations.sleepSwayAmplitude
+                }
+                try? await Task.sleep(for: .seconds(MascotAnimations.sleepSwayDuration / 2))
+            }
+        }
+    }
+
+    // MARK: - Celebrating
+
+    private func startCelebrating() {
+        startBouncing()
+        celebrateTask = Task {
+            while !Task.isCancelled {
+                withAnimation(.easeInOut(duration: MascotAnimations.celebratePulseDuration / 2)) {
+                    celebrateScale = MascotAnimations.celebrateScaleMax
+                    celebrateRotation = MascotAnimations.celebrateRotation
+                }
+                try? await Task.sleep(for: .seconds(MascotAnimations.celebratePulseDuration / 2))
+                guard !Task.isCancelled else { return }
+
+                withAnimation(.easeInOut(duration: MascotAnimations.celebratePulseDuration / 2)) {
+                    celebrateScale = MascotAnimations.celebrateScaleMin
+                    celebrateRotation = -MascotAnimations.celebrateRotation
+                }
+                try? await Task.sleep(for: .seconds(MascotAnimations.celebratePulseDuration / 2))
+            }
+        }
+    }
 }
 
 /// Container view combining the mascot character with a speech bubble.
 ///
 /// Manages the `MascotViewModel` lifecycle, applies breathing scale,
 /// and hosts the speech bubble above the mascot.
+/// Wires break events from the scheduler to mascot state transitions.
 struct MascotContainerView: View {
     @State private var viewModel = MascotViewModel()
 
     /// External binding to the BreakScheduler for state synchronization.
     let scheduler: BreakScheduler
 
+    /// Callback for "Take Break Now" from mascot menu.
+    var onTakeBreak: (@MainActor () -> Void)?
+
+    /// Callback for "Snooze 5 min" from mascot menu.
+    var onSnooze: (@MainActor () -> Void)?
+
     var body: some View {
         VStack(spacing: 4) {
             if viewModel.showBubble {
                 SpeechBubbleView(text: viewModel.bubbleText)
                     .transition(.scale.combined(with: .opacity))
-                    .animation(.easeInOut(duration: MascotAnimations.bubbleFadeDuration), value: viewModel.showBubble)
+                    .animation(
+                        .easeInOut(duration: MascotAnimations.bubbleFadeDuration),
+                        value: viewModel.showBubble
+                    )
             }
 
             MascotView(
@@ -237,26 +333,126 @@ struct MascotContainerView: View {
                 bounceOffset: viewModel.bounceOffset,
                 waveAngle: viewModel.waveAngle
             )
-            .scaleEffect(viewModel.breathScale)
+            .scaleEffect(viewModel.breathScale * viewModel.celebrateScale)
+            .rotationEffect(.degrees(viewModel.celebrateRotation))
+            .offset(x: viewModel.swayOffset)
         }
         .frame(width: 120, height: 130)
+        .onTapGesture {
+            handleSingleClick()
+        }
+        .onLongPressGesture(minimumDuration: 0.5) {
+            viewModel.toggleBubble()
+        }
+        .contextMenu {
+            mascotContextMenu
+        }
         .onAppear {
             viewModel.startIdleAnimations()
             startStateSync()
         }
     }
 
+    // MARK: - Context Menu
+
+    @ViewBuilder
+    private var mascotContextMenu: some View {
+        Button {
+            onTakeBreak?()
+        } label: {
+            Label("Take Break Now", systemImage: "eye")
+        }
+
+        Button {
+            onSnooze?()
+        } label: {
+            Label("Snooze 5 min", systemImage: "clock.badge.questionmark")
+        }
+
+        Divider()
+
+        Button {
+            PreferencesWindowController.shared.showPreferences()
+        } label: {
+            Label("Settings", systemImage: "gear")
+        }
+    }
+
+    // MARK: - Click Handling
+
+    private func handleSingleClick() {
+        // Toggle speech bubble on single click
+        viewModel.toggleBubble()
+    }
+
     // MARK: - State Synchronization
 
     /// Periodically checks BreakScheduler state and updates mascot accordingly.
+    /// Also monitors for break events (taken/skipped) to trigger celebrations/concerns.
     private func startStateSync() {
         Task { @MainActor in
             // Initial greeting
             viewModel.showMessage("Hi! 我是护眼精灵 👋")
 
+            // Track previous break event counts for change detection
+            var lastBreaksTaken = scheduler.breaksTakenToday
+            var lastBreaksSkipped = scheduler.breaksSkippedToday
+            var celebrationEndTime: Date?
+            var wasBreakInProgress = false
+
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(2))
                 guard !Task.isCancelled else { return }
+
+                // Check for break-in-progress (exercising state)
+                if scheduler.isBreakInProgress && !wasBreakInProgress {
+                    wasBreakInProgress = true
+                    viewModel.transition(to: .exercising)
+                    viewModel.showMessage("👁️ 跟着做眼保健操吧…", duration: 20)
+                    continue
+                }
+
+                if !scheduler.isBreakInProgress && wasBreakInProgress {
+                    wasBreakInProgress = false
+                    // Break just ended — celebrate!
+                    viewModel.transition(to: .celebrating)
+                    viewModel.showMessage("👏 做得好！眼睛感觉好多了吧")
+                    celebrationEndTime = Date.now.addingTimeInterval(
+                        MascotAnimations.celebrationDisplayDuration
+                    )
+                    lastBreaksTaken = scheduler.breaksTakenToday
+                    continue
+                }
+
+                // Check if a new break was taken (counter changed without in-progress)
+                if scheduler.breaksTakenToday > lastBreaksTaken {
+                    lastBreaksTaken = scheduler.breaksTakenToday
+                    viewModel.transition(to: .celebrating)
+                    viewModel.showMessage("👏 做得好！眼睛感觉好多了吧")
+                    celebrationEndTime = Date.now.addingTimeInterval(
+                        MascotAnimations.celebrationDisplayDuration
+                    )
+                    continue
+                }
+
+                // Check if a break was skipped
+                if scheduler.breaksSkippedToday > lastBreaksSkipped {
+                    lastBreaksSkipped = scheduler.breaksSkippedToday
+                    viewModel.transition(to: .concerned)
+                    viewModel.showMessage("😢 跳过休息了...眼睛会累的")
+                    continue
+                }
+
+                // If celebrating, wait until celebration period ends
+                if let endTime = celebrationEndTime {
+                    if Date.now < endTime {
+                        continue
+                    }
+                    celebrationEndTime = nil
+                    viewModel.transition(to: .happy)
+                    continue
+                }
+
                 updateMascotState()
             }
         }
@@ -267,12 +463,26 @@ struct MascotContainerView: View {
         // Late night check (after 10 PM or before 6 AM)
         let hour = Calendar.current.component(.hour, from: .now)
         if hour >= 22 || hour < 6 {
-            viewModel.transition(to: .sleeping)
+            if viewModel.mascotState != .sleeping {
+                viewModel.transition(to: .sleeping)
+                viewModel.showMessage("🌙 太晚了，早点休息吧")
+            }
             return
         }
 
-        // Break approaching — less than 2 minutes remaining
+        // Active break notification — mascot should alert
         if let nextBreak = scheduler.nextScheduledBreak {
+            // Break is due (time ran out)
+            if scheduler.timeUntilNextBreak <= 0 {
+                if viewModel.mascotState != .alerting && viewModel.mascotState != .exercising {
+                    viewModel.transition(to: .alerting)
+                    let message = breakAlertMessage(for: nextBreak)
+                    viewModel.showMessage(message, duration: 15)
+                }
+                return
+            }
+
+            // Break approaching — less than 2 minutes remaining
             if scheduler.timeUntilNextBreak <= 120 && scheduler.timeUntilNextBreak > 0 {
                 if viewModel.mascotState != .concerned {
                     viewModel.transition(to: .concerned)
@@ -305,6 +515,18 @@ struct MascotContainerView: View {
             if viewModel.mascotState != .idle {
                 viewModel.transition(to: .idle)
             }
+        }
+    }
+
+    /// Returns the appropriate break alert message based on break type.
+    private func breakAlertMessage(for breakType: BreakType) -> String {
+        switch breakType {
+        case .micro:
+            return "👁️ 该休息眼睛了！看看远处20秒"
+        case .macro:
+            return "☕ 休息一下吧！站起来活动5分钟"
+        case .mandatory:
+            return "🚶 该站起来活动了！休息15分钟"
         }
     }
 }

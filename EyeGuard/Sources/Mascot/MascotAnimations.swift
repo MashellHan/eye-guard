@@ -71,6 +71,34 @@ enum MascotAnimations {
     /// Interval between random idle pupil movements.
     static let idleLookInterval: Double = 4.0
 
+    // MARK: - Sleeping Sway
+
+    /// Horizontal sway amplitude for sleeping state (points).
+    static let sleepSwayAmplitude: CGFloat = 4.0
+
+    /// Duration for one full sway cycle (left → right → left).
+    static let sleepSwayDuration: Double = 3.0
+
+    // MARK: - Celebrating
+
+    /// Scale pulse range for celebrating state.
+    static let celebrateScaleMin: CGFloat = 0.95
+    static let celebrateScaleMax: CGFloat = 1.08
+
+    /// Duration for one celebrating pulse cycle.
+    static let celebratePulseDuration: Double = 0.5
+
+    /// Rotation angle (degrees) for celebrating wiggle.
+    static let celebrateRotation: Double = 8.0
+
+    // MARK: - Alerting
+
+    /// Vertical bounce amplitude for alerting (points, larger than default).
+    static let alertBounceAmplitude: CGFloat = 10.0
+
+    /// Duration for one alerting bounce cycle.
+    static let alertBounceDuration: Double = 0.35
+
     // MARK: - Speech Bubble
 
     /// How long the speech bubble stays visible.
@@ -78,4 +106,9 @@ enum MascotAnimations {
 
     /// Fade-in/out duration for the speech bubble.
     static let bubbleFadeDuration: Double = 0.3
+
+    // MARK: - Break Celebration
+
+    /// Duration to show celebrating state after break completion.
+    static let celebrationDisplayDuration: Double = 5.0
 }

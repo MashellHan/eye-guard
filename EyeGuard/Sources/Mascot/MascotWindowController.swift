@@ -10,6 +10,7 @@ import os
 /// - Draggable by the user
 /// - Visible on all desktops/spaces
 /// - Positioned at the bottom-right corner by default
+/// - Wired to break events via the scheduler (v1.0)
 @MainActor
 final class MascotWindowController {
 
@@ -31,7 +32,15 @@ final class MascotWindowController {
         guard window == nil else { return }
         self.scheduler = scheduler
 
-        let containerView = MascotContainerView(scheduler: scheduler)
+        let containerView = MascotContainerView(
+            scheduler: scheduler,
+            onTakeBreak: { [weak self] in
+                self?.handleTakeBreak()
+            },
+            onSnooze: { [weak self] in
+                self?.handleSnooze()
+            }
+        )
         let hostingView = NSHostingView(rootView: containerView)
         hostingView.frame = NSRect(x: 0, y: 0, width: 120, height: 130)
 
@@ -75,6 +84,28 @@ final class MascotWindowController {
     func reposition() {
         guard let window else { return }
         positionBottomRight(window)
+    }
+
+    // MARK: - Break Actions
+
+    /// Handles "Take Break Now" from mascot context menu.
+    private func handleTakeBreak() {
+        guard let scheduler else { return }
+        let breakType = scheduler.nextScheduledBreak ?? .micro
+        scheduler.takeBreakNow(breakType)
+        Log.mascot.info("Mascot: user initiated break via mascot menu.")
+    }
+
+    /// Handles "Snooze 5 min" from mascot context menu.
+    private func handleSnooze() {
+        guard let scheduler else { return }
+        let breakType = scheduler.nextScheduledBreak ?? .micro
+        NotificationManager.shared.snooze(breakType: breakType) {
+            Task { @MainActor in
+                scheduler.takeBreakNow(breakType)
+            }
+        }
+        Log.mascot.info("Mascot: user snoozed via mascot menu.")
     }
 
     // MARK: - Private

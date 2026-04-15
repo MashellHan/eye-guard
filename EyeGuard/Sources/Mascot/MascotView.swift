@@ -194,9 +194,22 @@ struct MascotView: View {
     // MARK: - Sleeping Zzz
 
     private var sleepingZzz: some View {
-        Text("💤")
-            .font(.system(size: 12))
-            .offset(x: 24, y: -28)
+        ZStack {
+            Text("z")
+                .font(.system(size: 8, weight: .bold))
+                .foregroundStyle(.indigo.opacity(0.6))
+                .offset(x: 20, y: -22)
+
+            Text("z")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(.indigo.opacity(0.5))
+                .offset(x: 26, y: -30)
+
+            Text("Z")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(.indigo.opacity(0.4))
+                .offset(x: 30, y: -40)
+        }
     }
 
     // MARK: - Sparkles
