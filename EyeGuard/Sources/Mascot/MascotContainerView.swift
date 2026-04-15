@@ -370,6 +370,9 @@ struct MascotContainerView: View {
     /// Callback for "Generate Report" from mascot menu.
     var onGenerateReport: (@MainActor () -> Void)?
 
+    /// Callback for "Start Eye Exercises" from mascot menu.
+    var onStartExercises: (@MainActor () -> Void)?
+
     var body: some View {
         VStack(spacing: 4) {
             if viewModel.showBubble {
@@ -426,6 +429,12 @@ struct MascotContainerView: View {
             onSnooze?()
         } label: {
             Label("Snooze 5 min", systemImage: "clock.badge.questionmark")
+        }
+
+        Button {
+            onStartExercises?()
+        } label: {
+            Label("Eye Exercises 眼保健操", systemImage: "figure.run")
         }
 
         Divider()

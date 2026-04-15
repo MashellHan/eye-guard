@@ -52,6 +52,9 @@ final class MascotWindowController {
             },
             onGenerateReport: { [weak self] in
                 self?.handleGenerateReport()
+            },
+            onStartExercises: { [weak self] in
+                self?.handleStartExercises()
             }
         )
         let hostingView = NSHostingView(rootView: containerView)
@@ -139,6 +142,92 @@ final class MascotWindowController {
             NSWorkspace.shared.open(EyeGuardConstants.reportsDirectory)
         }
         Log.mascot.info("Mascot: user requested report via mascot menu.")
+    }
+
+    /// Handles "Start Eye Exercises" from mascot context menu.
+    /// Opens a floating exercise session window.
+    private func handleStartExercises() {
+        showExerciseWindow()
+        Log.mascot.info("Mascot: user started eye exercises via mascot menu.")
+    }
+
+    /// The exercise session floating window.
+    private var exerciseWindow: NSWindow?
+
+    /// Shows the exercise session in a floating window.
+    func showExerciseWindow() {
+        // Dismiss any existing exercise window
+        exerciseWindow?.close()
+        exerciseWindow = nil
+
+        // Transition mascot to exercising state
+        viewModel?.transition(to: .exercising)
+        viewModel?.showMessage("👁️ 跟着做眼保健操吧！", duration: 30)
+
+        let sessionView = ExerciseSessionView(
+            onComplete: { [weak self] in
+                self?.dismissExerciseWindow()
+                self?.viewModel?.transition(to: .celebrating)
+                self?.viewModel?.showMessage("👏 眼保健操做完了！好棒！")
+            },
+            onSkip: { [weak self] in
+                self?.dismissExerciseWindow()
+                self?.viewModel?.transition(to: .idle)
+            }
+        )
+
+        let hostingView = NSHostingView(rootView: sessionView)
+
+        let exWindow = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 520),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+
+        exWindow.contentView = hostingView
+        exWindow.level = .floating
+        exWindow.isOpaque = false
+        exWindow.backgroundColor = .clear
+        exWindow.hasShadow = true
+        exWindow.isMovableByWindowBackground = true
+        exWindow.collectionBehavior = [.canJoinAllSpaces, .stationary]
+        exWindow.isReleasedWhenClosed = false
+
+        // Position at center of screen
+        if let screen = NSScreen.main {
+            let screenFrame = screen.visibleFrame
+            let x = screenFrame.midX - 200
+            let y = screenFrame.midY - 260
+            exWindow.setFrameOrigin(NSPoint(x: x, y: y))
+        }
+
+        exWindow.alphaValue = 0
+        exWindow.makeKeyAndOrderFront(nil)
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.3
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            exWindow.animator().alphaValue = 1
+        }
+
+        exerciseWindow = exWindow
+    }
+
+    /// Dismisses the exercise session window.
+    private func dismissExerciseWindow() {
+        guard let exWindow = exerciseWindow else { return }
+
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.3
+            context.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            exWindow.animator().alphaValue = 0
+        }, completionHandler: {
+            Task { @MainActor [weak self] in
+                exWindow.close()
+                self?.exerciseWindow = nil
+            }
+        })
     }
 
     // MARK: - Mouse Tracking (v1.1)

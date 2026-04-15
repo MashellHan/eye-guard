@@ -27,6 +27,7 @@ struct BreakOverlayView: View {
 
     @State private var countdown: Int = 0
     @State private var isBreaking: Bool = false
+    @State private var showExercises: Bool = false
     @State private var timer: Timer?
     @State private var appeared: Bool = false
 
@@ -51,11 +52,15 @@ struct BreakOverlayView: View {
             titleSection
             healthScoreSection
 
-            if isBreaking {
+            if showExercises {
+                exerciseSessionSection
+            } else if isBreaking {
                 countdownSection
             }
 
-            buttonSection
+            if !showExercises {
+                buttonSection
+            }
         }
         .padding(24)
         .frame(width: 320, height: 280)
@@ -157,23 +162,47 @@ struct BreakOverlayView: View {
     private var buttonSection: some View {
         Group {
             if !isBreaking {
-                HStack(spacing: 12) {
-                    Button(action: startBreak) {
-                        Label("Take Break", systemImage: "eye")
+                VStack(spacing: 8) {
+                    HStack(spacing: 12) {
+                        Button(action: startBreak) {
+                            Label("Take Break", systemImage: "eye")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+
+                        Button(action: skipBreak) {
+                            Text("Skip")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.large)
+                    }
+
+                    Button(action: startExercises) {
+                        Label("Start Eye Exercises 眼保健操", systemImage: "figure.run")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-
-                    Button(action: skipBreak) {
-                        Text("Skip")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.large)
+                    .tint(.teal)
+                    .controlSize(.regular)
                 }
             }
         }
+    }
+
+    // MARK: - Exercise Session
+
+    private var exerciseSessionSection: some View {
+        ExerciseSessionView(
+            onComplete: {
+                completeBreak()
+            },
+            onSkip: {
+                showExercises = false
+            }
+        )
+        .transition(.scale.combined(with: .opacity))
     }
 
     // MARK: - Helpers
@@ -207,6 +236,12 @@ struct BreakOverlayView: View {
         isBreaking = true
         countdown = breakDurationSeconds
         startCountdownTimer()
+    }
+
+    private func startExercises() {
+        withAnimation(.easeInOut(duration: 0.3)) {
+            showExercises = true
+        }
     }
 
     private func skipBreak() {
