@@ -6,6 +6,7 @@ import SwiftUI
 /// Wires up the core services and provides the menu bar UI.
 /// The menu bar title shows a countdown to the next 20-20-20 break.
 /// Launches the floating mascot character (护眼精灵) on screen (v0.9).
+/// Starts color analysis for screen content suggestions (v1.5).
 @main
 struct EyeGuardApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
@@ -21,6 +22,9 @@ struct EyeGuardApp: App {
 
                     // Launch mascot character (v0.9)
                     launchMascot()
+
+                    // Start color analysis (v1.5)
+                    ColorAnalyzer.shared.startAnalysis()
                 }
         } label: {
             MenuBarLabel(scheduler: scheduler)
@@ -45,15 +49,20 @@ struct EyeGuardApp: App {
 ///
 /// Format: 👁️ 18:32  (minutes:seconds until next break)
 /// Shows ⏸ when paused.
+/// Shows 🌙 prefix when night mode is active (v1.4).
 private struct MenuBarLabel: View {
     let scheduler: BreakScheduler
 
     var body: some View {
         let countdown = formatCountdown(scheduler.timeUntilNextBreak)
+        let nightIndicator = NightModeManager.shared.menuBarIndicator
         if scheduler.isPaused {
-            Label("⏸", systemImage: "eye.trianglebadge.exclamationmark")
+            Label("\(nightIndicator)⏸", systemImage: "eye.trianglebadge.exclamationmark")
         } else {
-            Label(countdown, systemImage: "eye.trianglebadge.exclamationmark")
+            Label(
+                "\(nightIndicator)\(countdown)",
+                systemImage: "eye.trianglebadge.exclamationmark"
+            )
         }
     }
 

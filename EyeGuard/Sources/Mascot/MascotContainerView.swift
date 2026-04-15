@@ -379,7 +379,10 @@ struct MascotContainerView: View {
     var body: some View {
         VStack(spacing: 4) {
             if viewModel.showBubble {
-                SpeechBubbleView(text: viewModel.bubbleText)
+                SpeechBubbleView(
+                    text: viewModel.bubbleText,
+                    isNightMode: NightModeManager.shared.isNightModeActive
+                )
                     .transition(.scale.combined(with: .opacity))
                     .animation(
                         .easeInOut(duration: MascotAnimations.bubbleFadeDuration),
@@ -481,6 +484,7 @@ struct MascotContainerView: View {
     /// Periodically checks BreakScheduler state and updates mascot accordingly.
     /// Also monitors for break events (taken/skipped) to trigger celebrations/concerns.
     /// Rotates eye health tips every 30 minutes (v1.3).
+    /// Integrates night mode for late-night guardian behavior (v1.4).
     private func startStateSync() {
         Task { @MainActor in
             // Initial greeting
@@ -496,9 +500,30 @@ struct MascotContainerView: View {
             var ticksSinceLastTip: Int = 0
             let tipRotationTicks: Int = 900  // 30 min × 60 sec / 2 sec per tick
 
+            // Night mode: show night screen time every 15 minutes (450 ticks)
+            var ticksSinceLastNightMessage: Int = 0
+            let nightMessageTicks: Int = 450  // 15 min × 60 sec / 2 sec per tick
+
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(2))
                 guard !Task.isCancelled else { return }
+
+                // Update night mode state (v1.4)
+                NightModeManager.shared.updateNightModeState()
+
+                // Night mode screen time display (v1.4)
+                if NightModeManager.shared.isNightModeActive {
+                    ticksSinceLastNightMessage += 1
+                    if ticksSinceLastNightMessage >= nightMessageTicks {
+                        ticksSinceLastNightMessage = 0
+                        if viewModel.mascotState == .sleeping {
+                            let msg = NightModeManager.shared.nightScreenTimeMessage()
+                            viewModel.showMessage(msg, duration: 10)
+                        }
+                    }
+                } else {
+                    ticksSinceLastNightMessage = 0
+                }
 
                 // Tip rotation (v1.3)
                 ticksSinceLastTip += 1
@@ -515,15 +540,23 @@ struct MascotContainerView: View {
                 if scheduler.isBreakInProgress && !wasBreakInProgress {
                     wasBreakInProgress = true
                     viewModel.transition(to: .exercising)
-                    viewModel.showMessage("👁️ 跟着做眼保健操吧…", duration: 20)
+                    if NightModeManager.shared.isNightModeActive {
+                        viewModel.showMessage(
+                            NightModeManager.shared.randomNightBreakMessage(),
+                            duration: 20
+                        )
+                    } else {
+                        viewModel.showMessage("👁️ 跟着做眼保健操吧…", duration: 20)
+                    }
                     continue
                 }
 
                 if !scheduler.isBreakInProgress && wasBreakInProgress {
                     wasBreakInProgress = false
-                    // Break just ended — celebrate!
+                    // Break just ended — celebrate and show color suggestion (v1.5)
                     viewModel.transition(to: .celebrating)
-                    viewModel.showMessage("👏 做得好！眼睛感觉好多了吧")
+                    let colorSuggestion = ColorAnalyzer.shared.suggestionBubbleText()
+                    viewModel.showMessage("👏 做得好！\(colorSuggestion)", duration: 10)
                     celebrationEndTime = Date.now.addingTimeInterval(
                         MascotAnimations.celebrationDisplayDuration
                     )
@@ -566,13 +599,13 @@ struct MascotContainerView: View {
     }
 
     /// Maps BreakScheduler state to MascotState.
+    /// Uses NightModeManager for night detection (v1.4).
     private func updateMascotState() {
-        // Late night check (after 10 PM or before 6 AM)
-        let hour = Calendar.current.component(.hour, from: .now)
-        if hour >= 22 || hour < 6 {
+        // Night mode check via NightModeManager (v1.4)
+        if NightModeManager.shared.isNightModeActive {
             if viewModel.mascotState != .sleeping {
                 viewModel.transition(to: .sleeping)
-                viewModel.showMessage("🌙 太晚了，早点休息吧")
+                viewModel.showMessage(NightModeManager.shared.randomNightMessage())
             }
             return
         }
