@@ -23,6 +23,9 @@
 | v1.8 | LLM integration prep | 169 | 2026-04-15 | ✅ |
 | v1.9 | Performance optimization | 169 | 2026-04-15 | ✅ |
 | v2.0 | Final polish + release | 182 | 2026-04-15 | ✅ |
+| v2.1 | Refactor: split large files + fix Screen Recording popup | 182 | 2026-04-15 | ✅ |
+| v2.2 | Enhanced mascot UI + screen lock detection | 206 | 2026-04-15 | ✅ |
+| v2.3 | Protocol abstractions for testability | 206 | 2026-04-15 | ✅ |
 
 ## Agent Collaboration Stats
 - **PM**: 4 spec docs, 2 UX wireframes, roadmap, iteration plan
@@ -31,8 +34,8 @@
 - **Tester**: 6 test reports, 7 bug reports (all fixed)
 
 ## Key Metrics
-- Total commits: 20+
-- Total Swift files: 48+
-- Total tests: 182
-- Test coverage: ~70% estimated
+- Total commits: 28+
+- Total Swift files: 50+
+- Total tests: 206
+- Test coverage: ~72% estimated
 - GitHub: https://github.com/MashellHan/eye-guard
