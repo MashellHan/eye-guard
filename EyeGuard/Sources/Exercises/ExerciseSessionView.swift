@@ -72,7 +72,7 @@ struct ExerciseSessionView: View {
                 completedView
             }
         }
-        .frame(width: 420, height: 640)
+        .frame(width: 420, height: 520)  // Reduced from 640 to fit content (BUG-005)
         .background(
             LinearGradient(
                 colors: [
@@ -156,7 +156,8 @@ struct ExerciseSessionView: View {
                 exerciseListPreview
             }
 
-            Spacer()
+            Spacer(minLength: 16)
+                .frame(maxHeight: 40)  // Limit whitespace between list and buttons (BUG-005)
 
             // Buttons
             VStack(spacing: 10) {
