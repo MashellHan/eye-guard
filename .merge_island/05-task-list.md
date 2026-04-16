@@ -33,7 +33,7 @@
 | 2.4 | 移植 Protocols/ (5 files) | P0 | 1h | ✅ EyeGuardProtocols + AppModule |
 | 2.5 | 创建 EyeGuardModule.swift 模块入口 | P0 | 2h | ✅ @Observable, activate/deactivate lifecycle |
 | 2.6 | ModeManager ↔ EyeGuardModule 接入 | P0 | 1h | ✅ AppDelegate 集成，模式切换联动 |
-| 2.7 | 合并 SoundManager | P1 | 2h | ⬜ |
+| 2.7 | 合并 SoundManager | P1 | 2h | ✅ EyeGuardSoundManager 独立于 MioIsland |
 | 2.8 | 移植 NightModeManager | P2 | 1h | ⬜ |
 | 2.9 | 移植 Constants + TimeFormatting | P1 | 30m | ✅ EyeGuardConstants.swift |
 
@@ -52,9 +52,9 @@
 
 | # | Task | Priority | Est | Status |
 |---|------|----------|-----|--------|
-| 4.1 | 移植 Exercises/ (3 files) | P0 | 2h | ⬜ |
-| 4.2 | 移植 TTS 功能到统一 SoundManager | P0 | 2h | ⬜ |
-| 4.3 | 移植 Tips/ (3 files) | P1 | 1h | ⬜ |
+| 4.1 | 移植 Exercises/ (3 files) | P0 | 2h | ✅ EyeExercise + ExerciseView + ExerciseSessionView |
+| 4.2 | 移植 TTS 功能到统一 SoundManager | P0 | 2h | ✅ EyeGuardSoundManager with TTS |
+| 4.3 | 移植 Tips/ (3 files) | P1 | 1h | ✅ EyeHealthTip + TipDatabase + TipBubbleView |
 | 4.4 | 全屏覆盖多显示器适配 | P1 | 1h | ⬜ |
 
 ## Phase 5: Notch 护眼面板
