@@ -74,7 +74,7 @@
 | 6.1 | 移植 Dashboard/ (3 files) | P1 | 2h | ✅ DashboardView + WindowController + HistoryManager |
 | 6.2 | 移植 Reporting/ (3 files) | P1 | 2h | ✅ DailyReportGenerator + ReportDataProvider (无 AI) |
 | 6.3 | 移植 DataPersistenceManager | P1 | 1h | ✅ 已在 Phase 2 完成 |
-| 6.4 | 合并 PreferencesView | P1 | 3h | ⬜ |
+| 6.4 | 合并 PreferencesView | P1 | 3h | ✅ PreferencesView + WindowController + ReminderMode extensions |
 | 6.5 | 移植 ColorAnalyzer (可选) | P3 | 1h | ⬜ |
 | 6.6 | 移植 AI/InsightGenerator (可选) | P3 | 1h | ⬜ |
 
