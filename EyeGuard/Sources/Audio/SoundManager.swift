@@ -189,9 +189,10 @@ final class SoundManager: SoundPlaying {
         utterance.volume = volume
         utterance.pitchMultiplier = 1.05
 
-        // Stop any current speech before starting new
+        // Don't interrupt ongoing speech — let it finish naturally (BUG-002)
         if speechSynthesizer.isSpeaking {
-            speechSynthesizer.stopSpeaking(at: .word)
+            Log.sound.debug("TTS: skipping '\(text)' — still speaking previous instruction.")
+            return
         }
 
         speechSynthesizer.speak(utterance)

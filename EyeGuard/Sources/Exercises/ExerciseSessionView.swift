@@ -73,7 +73,16 @@ struct ExerciseSessionView: View {
             }
         }
         .frame(width: 420, height: 640)
-        .background(.ultraThinMaterial)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color(red: 0.12, green: 0.14, blue: 0.18),
+                    Color(red: 0.16, green: 0.20, blue: 0.26),
+                ],
+                startPoint: .bottom,
+                endPoint: .top
+            )
+        )
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(
             RoundedRectangle(cornerRadius: 16)
@@ -512,7 +521,11 @@ struct ExerciseSessionView: View {
 
     /// Speaks the current exercise step instruction at transition boundaries.
     /// Maps elapsed time to instruction steps and speaks when entering a new step.
+    /// Guards against TTS overlap: skips if still speaking previous instruction (BUG-002).
     private func speakStepIfNeeded() {
+        // Don't interrupt ongoing TTS — let it finish naturally
+        guard !SoundManager.shared.isSpeaking else { return }
+
         let exercise = currentExercise
         let instructions = exercise.instructionsChinese
         guard !instructions.isEmpty else { return }
@@ -520,8 +533,8 @@ struct ExerciseSessionView: View {
         let exerciseDuration = exercise.duration
         let elapsed = exerciseDuration - remainingSeconds
 
-        // Calculate step index based on elapsed time
-        let stepDuration = max(1, exerciseDuration / instructions.count)
+        // Minimum 5s per step to ensure TTS can finish reading (BUG-002)
+        let stepDuration = max(5, exerciseDuration / instructions.count)
         let stepIndex = min(elapsed / stepDuration, instructions.count - 1)
 
         // Speak when step index changes
