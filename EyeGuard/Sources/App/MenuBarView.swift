@@ -24,6 +24,17 @@ struct MenuBarView: View {
         }
         .padding()
         .frame(width: 360)
+        .onChange(of: scheduler.currentSessionDuration > 3600) { _, isOver in
+            if isOver {
+                withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
+                    blinkOpacity = 0.3
+                }
+            } else {
+                withAnimation(.default) {
+                    blinkOpacity = 1.0
+                }
+            }
+        }
     }
 
     // MARK: - Sections
