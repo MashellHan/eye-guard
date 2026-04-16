@@ -390,85 +390,99 @@ final class MascotWindowController {
         Log.mascot.info("Mascot: opened dashboard via mascot menu.")
     }
 
-    /// The exercise session floating window.
-    private var exerciseWindow: NSWindow?
+    /// The exercise session fullscreen overlay windows (one per screen, feature-005).
+    private var exerciseWindows: [NSWindow] = []
 
-    /// Shows the exercise session in a floating window.
+    /// Shows the exercise session in a fullscreen overlay covering all screens (feature-005).
     func showExerciseWindow() {
-        // Dismiss any existing exercise window
-        exerciseWindow?.close()
-        exerciseWindow = nil
+        // Dismiss any existing exercise windows
+        dismissExerciseWindow()
 
         // Transition mascot to resting/exercising state
         viewModel?.restingMode = .exercising
         viewModel?.transition(to: .resting)
         viewModel?.showMessage("👁️ 跟着做眼保健操吧！", duration: 30)
 
-        let sessionView = ExerciseSessionView(
-            onComplete: { [weak self] in
-                self?.dismissExerciseWindow()
-                self?.viewModel?.transition(to: .celebrating)
-                self?.viewModel?.showMessage("👏 眼保健操做完了！好棒！")
-                self?.scheduler?.recordExerciseSession()
-            },
-            onSkip: { [weak self] in
-                self?.dismissExerciseWindow()
-                self?.viewModel?.transition(to: .idle)
+        let screens = NSScreen.screens
+        guard !screens.isEmpty else { return }
+
+        for (index, screen) in screens.enumerated() {
+            let sessionView = ExerciseSessionView(
+                onComplete: { [weak self] in
+                    self?.dismissExerciseWindow()
+                    self?.viewModel?.transition(to: .celebrating)
+                    self?.viewModel?.showMessage("👏 眼保健操做完了！好棒！")
+                    self?.scheduler?.recordExerciseSession()
+                },
+                onSkip: { [weak self] in
+                    self?.dismissExerciseWindow()
+                    self?.viewModel?.transition(to: .idle)
+                }
+            )
+
+            // Wrap in fullscreen container with dark background + blur
+            let fullscreenContent = ZStack {
+                Color.black.opacity(0.65)
+                    .ignoresSafeArea()
+                VisualEffectBlur()
+                    .ignoresSafeArea()
+                sessionView
             }
-        )
 
-        let hostingView = NSHostingView(rootView: sessionView)
+            let hostingView = NSHostingView(rootView: fullscreenContent)
 
-        let exWindow = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 640),
-            styleMask: [.borderless],
-            backing: .buffered,
-            defer: false
-        )
+            let exWindow = KeyableWindow(
+                contentRect: screen.frame,
+                styleMask: [.borderless],
+                backing: .buffered,
+                defer: false
+            )
 
-        exWindow.contentView = hostingView
-        exWindow.level = .floating
-        exWindow.isOpaque = false
-        exWindow.backgroundColor = .clear
-        exWindow.hasShadow = true
-        exWindow.isMovableByWindowBackground = true
-        exWindow.collectionBehavior = [.canJoinAllSpaces, .stationary]
-        exWindow.isReleasedWhenClosed = false
+            exWindow.contentView = hostingView
+            exWindow.level = NSWindow.Level(rawValue: Int(CGShieldingWindowLevel()))
+            exWindow.ignoresMouseEvents = false
+            exWindow.isOpaque = false
+            exWindow.backgroundColor = .clear
+            exWindow.hasShadow = false
+            exWindow.collectionBehavior = [.canJoinAllSpaces, .stationary]
+            exWindow.isReleasedWhenClosed = false
+            exWindow.setFrame(screen.frame, display: true)
 
-        // Position at center of screen
-        if let screen = NSScreen.main {
-            let screenFrame = screen.visibleFrame
-            let x = screenFrame.midX - 210
-            let y = screenFrame.midY - 320
-            exWindow.setFrameOrigin(NSPoint(x: x, y: y))
+            exWindow.alphaValue = 0
+            exWindow.makeKeyAndOrderFront(nil)
+
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.5
+                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                exWindow.animator().alphaValue = 1
+            }
+
+            exerciseWindows.append(exWindow)
+
+            Log.mascot.info(
+                "Exercise fullscreen overlay shown on screen \(index + 1) of \(screens.count)"
+            )
         }
-
-        exWindow.alphaValue = 0
-        exWindow.makeKeyAndOrderFront(nil)
-
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.3
-            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            exWindow.animator().alphaValue = 1
-        }
-
-        exerciseWindow = exWindow
     }
 
-    /// Dismisses the exercise session window.
+    /// Dismisses all exercise session fullscreen windows.
     private func dismissExerciseWindow() {
-        guard let exWindow = exerciseWindow else { return }
+        guard !exerciseWindows.isEmpty else { return }
 
-        NSAnimationContext.runAnimationGroup({ context in
-            context.duration = 0.3
-            context.timingFunction = CAMediaTimingFunction(name: .easeIn)
-            exWindow.animator().alphaValue = 0
-        }, completionHandler: {
-            Task { @MainActor [weak self] in
-                exWindow.close()
-                self?.exerciseWindow = nil
-            }
-        })
+        let windows = exerciseWindows
+        exerciseWindows = []
+
+        for exWindow in windows {
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = 0.3
+                context.timingFunction = CAMediaTimingFunction(name: .easeIn)
+                exWindow.animator().alphaValue = 0
+            }, completionHandler: {
+                Task { @MainActor in
+                    exWindow.close()
+                }
+            })
+        }
     }
 
     // MARK: - Mouse Tracking (v1.1)

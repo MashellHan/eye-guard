@@ -72,18 +72,12 @@ struct ExerciseSessionView: View {
                 completedView
             }
         }
-        .frame(width: 420, height: 520)  // Reduced from 640 to fit content (BUG-005)
+        .frame(maxWidth: 460)  // Content width limit for fullscreen mode (feature-005)
+        .padding(.vertical, 20)
         .background(
-            LinearGradient(
-                colors: [
-                    Color(red: 0.12, green: 0.14, blue: 0.18),
-                    Color(red: 0.16, green: 0.20, blue: 0.26),
-                ],
-                startPoint: .bottom,
-                endPoint: .top
-            )
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.ultraThinMaterial)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(
             RoundedRectangle(cornerRadius: 16)
                 .strokeBorder(.white.opacity(0.2), lineWidth: 1)
@@ -98,7 +92,6 @@ struct ExerciseSessionView: View {
             .buttonStyle(.plain)
             .padding(12)
         }
-        .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
         .scaleEffect(appeared ? 1.0 : 0.95)
         .opacity(appeared ? 1.0 : 0)
         .onExitCommand {
