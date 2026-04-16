@@ -407,26 +407,44 @@ final class MascotWindowController {
         guard !screens.isEmpty else { return }
 
         for (index, screen) in screens.enumerated() {
-            let sessionView = ExerciseSessionView(
-                onComplete: { [weak self] in
-                    self?.dismissExerciseWindow()
-                    self?.viewModel?.transition(to: .celebrating)
-                    self?.viewModel?.showMessage("👏 眼保健操做完了！好棒！")
-                    self?.scheduler?.recordExerciseSession()
-                },
-                onSkip: { [weak self] in
-                    self?.dismissExerciseWindow()
-                    self?.viewModel?.transition(to: .idle)
-                }
-            )
+            let isPrimaryScreen = index == 0
 
-            // Wrap in fullscreen container with dark background + blur
-            let fullscreenContent = ZStack {
-                Color.black.opacity(0.65)
-                    .ignoresSafeArea()
-                VisualEffectBlur()
-                    .ignoresSafeArea()
-                sessionView
+            // Only the primary screen gets the interactive exercise view;
+            // secondary screens show a dark overlay only (review-011 M1)
+            let fullscreenContent: AnyView
+            if isPrimaryScreen {
+                let sessionView = ExerciseSessionView(
+                    onComplete: { [weak self] in
+                        self?.dismissExerciseWindow()
+                        self?.viewModel?.transition(to: .celebrating)
+                        self?.viewModel?.showMessage("👏 眼保健操做完了！好棒！")
+                        self?.scheduler?.recordExerciseSession()
+                    },
+                    onSkip: { [weak self] in
+                        self?.dismissExerciseWindow()
+                        self?.viewModel?.transition(to: .idle)
+                    }
+                )
+
+                fullscreenContent = AnyView(
+                    ZStack {
+                        Color.black.opacity(0.65)
+                            .ignoresSafeArea()
+                        VisualEffectBlur()
+                            .ignoresSafeArea()
+                        sessionView
+                    }
+                )
+            } else {
+                // Secondary screens: dark overlay only, no timer/TTS
+                fullscreenContent = AnyView(
+                    ZStack {
+                        Color.black.opacity(0.65)
+                            .ignoresSafeArea()
+                        VisualEffectBlur()
+                            .ignoresSafeArea()
+                    }
+                )
             }
 
             let hostingView = NSHostingView(rootView: fullscreenContent)
@@ -440,7 +458,7 @@ final class MascotWindowController {
 
             exWindow.contentView = hostingView
             exWindow.level = NSWindow.Level(rawValue: Int(CGShieldingWindowLevel()))
-            exWindow.ignoresMouseEvents = false
+            exWindow.ignoresMouseEvents = !isPrimaryScreen  // Secondary screens are non-interactive
             exWindow.isOpaque = false
             exWindow.backgroundColor = .clear
             exWindow.hasShadow = false
