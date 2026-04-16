@@ -272,9 +272,11 @@ final class BreakScheduler {
             return
         }
         cancelPreAlert()
-        // User is already resting, reset micro-break timer
-        resetTimersAfterBreak(.micro)
-        Log.scheduler.info("Idle detected, micro timer reset.")
+        // User is resting — reset all break timers (BUG-007: was only micro)
+        for type in BreakType.allCases {
+            resetTimersAfterBreak(type)
+        }
+        Log.scheduler.info("Idle detected, all break timers reset.")
     }
 
     /// Called when user returns from idle (H1).
@@ -330,8 +332,9 @@ final class BreakScheduler {
         }
 
         // Update per-type elapsed times (H5)
-        // Don't accumulate during active notifications/breaks — user is being reminded (BUG-POPUP-001 v4)
-        if !isBreakInProgress && !notificationSender.isNotificationActive {
+        // Don't accumulate during active notifications/breaks (BUG-POPUP-001 v4)
+        // Don't accumulate while idle/screen locked — user is resting (BUG-007)
+        if !isBreakInProgress && !notificationSender.isNotificationActive && !wasIdle {
             for type in BreakType.allCases {
                 guard isBreakTypeEnabled(type) else { continue }
                 elapsedPerType[type, default: 0] += max(delta, 0)
