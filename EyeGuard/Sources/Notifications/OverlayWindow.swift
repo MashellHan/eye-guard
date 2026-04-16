@@ -122,6 +122,7 @@ final class OverlayWindowController: NSObject {
         exerciseSessionsToday: Int = 0,
         recommendedExerciseSessions: Int = 1,
         onTaken: @escaping @Sendable () -> Void,
+        onSkipped: @escaping @Sendable () -> Void = {},
         onPostponed: @escaping @Sendable () -> Void = {},
         onStartExercises: (@Sendable () -> Void)? = nil
     ) {
@@ -149,6 +150,12 @@ final class OverlayWindowController: NSObject {
                     Task { @MainActor in
                         self?.dismissFullScreen()
                         onTaken()
+                    }
+                },
+                onSkipped: { [weak self] in
+                    Task { @MainActor in
+                        self?.dismissFullScreen()
+                        onSkipped()
                     }
                 },
                 onPostponed: { [weak self] in

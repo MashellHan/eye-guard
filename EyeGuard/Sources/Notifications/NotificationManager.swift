@@ -309,6 +309,19 @@ final class NotificationManager: NotificationSending {
                         self?.acknowledgeBreak()
                     }
                 },
+                onSkipped: { [weak self] in
+                    Task { @MainActor in
+                        let callback = self?.onSkippedCallback
+                        self?.cancelEscalation()
+                        self?.dismissAllOverlays()
+                        self?.clearCallbacks()
+                        self?.activeBreakType = nil
+                        self?.activeBehavior = nil
+                        // Execute callback BEFORE releasing guard (BUG-POPUP-001 v5)
+                        callback?()
+                        self?.isNotificationActive = false
+                    }
+                },
                 onPostponed: { [weak self] in
                     Task { @MainActor in
                         guard let self, let bt = self.activeBreakType else { return }

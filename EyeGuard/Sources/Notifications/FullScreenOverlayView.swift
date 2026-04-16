@@ -31,6 +31,7 @@ struct FullScreenOverlayView: View {
     let exerciseSessionsToday: Int
     let recommendedExerciseSessions: Int
     let onBreakTaken: @Sendable () -> Void
+    let onSkipped: @Sendable () -> Void
     let onPostponed: @Sendable () -> Void
     let onStartExercises: (@Sendable () -> Void)?
 
@@ -174,7 +175,7 @@ struct FullScreenOverlayView: View {
                 // Skip button at bottom
                 Button {
                     stopTimer()
-                    onPostponed()
+                    onSkipped()
                 } label: {
                     Text("跳过休息")
                         .font(.system(size: 14))
@@ -194,7 +195,7 @@ struct FullScreenOverlayView: View {
             // Mandatory breaks cannot be dismissed with ESC
             guard case .mandatory = dismissPolicy else {
                 stopTimer()
-                onPostponed()
+                onSkipped()
                 return
             }
             shakeTrigger = true
