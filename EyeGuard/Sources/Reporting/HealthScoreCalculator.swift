@@ -165,15 +165,29 @@ struct HealthScoreCalculator: Sendable {
     // MARK: - Component Calculations
 
     /// Break compliance: what percentage of scheduled breaks were taken?
-    /// Full score = 100% compliance.
+    /// Uses recency weighting: last 10 breaks count 2x to make recent behavior
+    /// more impactful on the score. This gives users faster feedback when they
+    /// start taking breaks after skipping several.
     private func calculateBreakCompliance(_ events: [BreakEvent]) -> Int {
         guard !events.isEmpty else {
             return EyeGuardConstants.breakComplianceMaxPoints
         }
 
-        let taken = events.filter(\.wasTaken).count
-        let total = events.count
-        let ratio = Double(taken) / Double(total)
+        // Recency-weighted: last 10 breaks count double
+        let recentCount = min(events.count, 10)
+        let recentEvents = events.suffix(recentCount)
+        let olderEvents = events.dropLast(recentCount)
+
+        let recentTaken = Double(recentEvents.filter(\.wasTaken).count)
+        let recentTotal = Double(recentEvents.count)
+        let olderTaken = Double(olderEvents.filter(\.wasTaken).count)
+        let olderTotal = Double(olderEvents.count)
+
+        // Recent breaks have 2x weight
+        let weightedTaken = recentTaken * 2.0 + olderTaken
+        let weightedTotal = recentTotal * 2.0 + olderTotal
+
+        let ratio = weightedTotal > 0 ? weightedTaken / weightedTotal : 1.0
 
         return Int(ratio * Double(EyeGuardConstants.breakComplianceMaxPoints))
     }

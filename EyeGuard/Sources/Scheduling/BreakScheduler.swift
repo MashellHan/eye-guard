@@ -239,6 +239,9 @@ final class BreakScheduler {
 
         // Stop ambient sound when break ends (v1.6, v2.3 — uses injected soundPlayer)
         soundPlayer.stopAmbient()
+
+        // Recalculate score immediately so menu bar updates right away
+        recalculateHealthScore()
     }
 
     /// Records that the user skipped a scheduled break.
