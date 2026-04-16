@@ -104,6 +104,12 @@ final class BreakScheduler {
     /// Also set immediately on screen lock/unlock to avoid 5-second poll gap (BUG-008).
     private var wasIdle: Bool = false
 
+    /// Whether the screen is currently locked. Updated directly via
+    /// DistributedNotificationCenter for immediate response (BUG-007/BUG-008).
+    /// Used to gate elapsed accumulation — more reliable than idle polling
+    /// since it doesn't depend on CGEventTap accessibility permissions.
+    private var isScreenLocked: Bool = false
+
     /// Per-break-type elapsed time for independent tracking (H5/BUG-001).
     /// Treat as read-only externally; mutated only by `@testable import` tests.
     var elapsedPerType: [BreakType: TimeInterval] = [
@@ -167,6 +173,50 @@ final class BreakScheduler {
         self.preferences = preferences
         startTimerLoop()
         loadPersistedData()
+        registerScreenLockObserver()
+    }
+
+    // MARK: - Screen Lock Observer (BUG-007/BUG-008)
+
+    private var screenLockObserverToken: NSObjectProtocol?
+    private var screenUnlockObserverToken: NSObjectProtocol?
+
+    /// Register for screen lock/unlock notifications directly in BreakScheduler
+    /// so `isScreenLocked` updates immediately without depending on idle polling.
+    private func registerScreenLockObserver() {
+        let dnc = DistributedNotificationCenter.default()
+
+        screenLockObserverToken = dnc.addObserver(
+            forName: NSNotification.Name("com.apple.screenIsLocked"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                self.isScreenLocked = true
+                if !self.wasIdle {
+                    self.wasIdle = true
+                    self.handleIdleDetected()
+                }
+                Log.scheduler.notice("Screen locked — elapsed accumulation paused (BUG-008).")
+            }
+        }
+
+        screenUnlockObserverToken = dnc.addObserver(
+            forName: NSNotification.Name("com.apple.screenIsUnlocked"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                self.isScreenLocked = false
+                if self.wasIdle {
+                    self.wasIdle = false
+                    self.handleActivityResumed()
+                }
+                Log.scheduler.notice("Screen unlocked — elapsed accumulation resumed (BUG-008).")
+            }
+        }
     }
 
     // MARK: - Public Controls
@@ -334,8 +384,12 @@ final class BreakScheduler {
 
         // Update per-type elapsed times (H5)
         // Don't accumulate during active notifications/breaks (BUG-POPUP-001 v4)
-        // Don't accumulate while idle/screen locked — user is resting (BUG-007)
-        if !isBreakInProgress && !notificationSender.isNotificationActive && !wasIdle {
+        // Don't accumulate while screen locked — user is away (BUG-007/BUG-008)
+        // Note: idle detection (wasIdle) still resets timers via handleIdleDetected(),
+        // but does NOT block elapsed accumulation — only screen lock does, because
+        // idle detection requires CGEventTap accessibility permission which may not
+        // be granted, and blocking elapsed on idle would freeze the countdown.
+        if !isBreakInProgress && !notificationSender.isNotificationActive && !isScreenLocked {
             for type in BreakType.allCases {
                 guard isBreakTypeEnabled(type) else { continue }
                 elapsedPerType[type, default: 0] += max(delta, 0)
@@ -367,16 +421,24 @@ final class BreakScheduler {
 
         // Poll activity monitor every 5 seconds (not every tick)
         // Skip polling during active breaks to avoid idle/resume race (BUG-POPUP-001)
+        // Note: idle polling only updates wasIdle for informational purposes.
+        // Timer resets are now driven by screen lock/unlock notifications (BUG-008),
+        // NOT by idle detection, because idle detection depends on CGEventTap which
+        // requires accessibility permission and may not be available.
         if ticksSinceLastScoreUpdate % 5 == 0, !isBreakInProgress, !notificationSender.isNotificationActive {
             Task {
                 let idle = await activityMonitor.isIdle
-                if idle && !wasIdle {
+                let locked = await activityMonitor.isScreenLocked
+                if locked && !wasIdle {
+                    // Screen lock detected via polling (backup for notification observer)
                     handleIdleDetected()
                     wasIdle = true
-                } else if !idle && wasIdle {
+                } else if !locked && wasIdle {
                     handleActivityResumed()
                     wasIdle = false
                 }
+                // Update wasIdle for display purposes, but don't reset timers on mere idle
+                // (idle without screen lock just means CGEventTap didn't detect input)
             }
         }
     }
