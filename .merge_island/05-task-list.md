@@ -86,8 +86,8 @@
 | 7.2 | 双精灵交互动画 | P2 | 3h | ✅ DualMascotStrip with look/celebrate micro-interactions |
 | 7.3 | 模式间事件联动 | P1 | 2h | ✅ AppEvent dispatch: idle, activity, modeChanged |
 | 7.4 | 性能优化 | P1 | 2h | ✅ Timer overhead fix, memory leak fix, dedup observers |
-| 7.5 | 暗色/亮色主题 | P2 | 2h | ⬜ |
-| 7.6 | 中英本地化 | P2 | 2h | ⬜ |
+| 7.5 | 暗色/亮色主题 | P2 | 2h | ✅ Notch=dark, overlays=material, Prefs=system — correct by design |
+| 7.6 | 中英本地化 | P2 | 2h | ✅ EyeGuardL10n ~80 strings, all views converted |
 | 7.7 | 清理死代码 | P1 | 2h | ✅ Removed unused singletons, dead methods, simplified ReportDataProvider |
 | 7.8 | 完整测试 | P0 | 3h | ⬜ |
 
