@@ -178,6 +178,7 @@ final class SoundManager: SoundPlaying {
     ///
     /// Used for eye exercise step-by-step guidance.
     /// Respects mute and volume settings.
+    /// Utterances are queued by AVSpeechSynthesizer when already speaking.
     ///
     /// - Parameter text: Chinese text to speak (zh-CN voice).
     func speak(_ text: String) {
@@ -189,15 +190,10 @@ final class SoundManager: SoundPlaying {
         utterance.volume = volume
         utterance.pitchMultiplier = 1.05
 
-        // Don't interrupt ongoing speech — let it finish naturally (BUG-002)
-        if speechSynthesizer.isSpeaking {
-            Log.sound.debug("TTS: skipping '\(text)' — still speaking previous instruction.")
-            return
-        }
-
+        let wasAlreadySpeaking = speechSynthesizer.isSpeaking
         speechSynthesizer.speak(utterance)
         isSpeaking = true
-        Log.sound.info("TTS: \(text)")
+        Log.sound.info("TTS: \(text)\(wasAlreadySpeaking ? " (queued)" : "")")
     }
 
     /// Stops any current TTS speech.

@@ -526,11 +526,8 @@ struct ExerciseSessionView: View {
 
     /// Speaks the current exercise step instruction at transition boundaries.
     /// Maps elapsed time to instruction steps and speaks when entering a new step.
-    /// Guards against TTS overlap: skips if still speaking previous instruction (BUG-002).
+    /// TTS utterances are queued by AVSpeechSynthesizer when overlapping.
     private func speakStepIfNeeded() {
-        // Don't interrupt ongoing TTS — let it finish naturally
-        guard !SoundManager.shared.isSpeaking else { return }
-
         let exercise = currentExercise
         let instructions = exercise.instructionsChinese
         guard !instructions.isEmpty else { return }
