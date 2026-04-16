@@ -146,7 +146,7 @@ final class BreakScheduler {
         activityMonitor: any ActivityMonitoring = ActivityMonitor.shared,
         notificationSender: any NotificationSending = NotificationManager.shared,
         soundPlayer: any SoundPlaying = SoundManager.shared,
-        preferences: UserPreferences = .default
+        preferences: UserPreferences = UserPreferencesManager.load()
     ) {
         self.activityMonitor = activityMonitor
         self.notificationSender = notificationSender

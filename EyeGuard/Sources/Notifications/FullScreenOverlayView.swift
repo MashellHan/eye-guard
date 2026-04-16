@@ -58,6 +58,16 @@ struct FullScreenOverlayView: View {
         (breakType == .macro || breakType == .mandatory) && onStartExercises != nil
     }
 
+    /// Formatted total duration label (e.g. "共 5:00").
+    private var totalDurationText: String {
+        let minutes = totalDuration / 60
+        let seconds = totalDuration % 60
+        if minutes > 0 {
+            return String(format: "共 %d:%02d", minutes, seconds)
+        }
+        return "共 \(seconds) 秒"
+    }
+
     /// Break-type-specific title message.
     private var titleMessage: String {
         switch breakType {
@@ -124,11 +134,17 @@ struct FullScreenOverlayView: View {
                         .rotationEffect(.degrees(-90))
                         .animation(.linear(duration: 1.0), value: progress)
 
-                    Text(countdownText)
-                        .font(.system(size: 36, weight: .bold, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(.white)
-                        .contentTransition(.numericText())
+                    VStack(spacing: 2) {
+                        Text(countdownText)
+                            .font(.system(size: 36, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(.white)
+                            .contentTransition(.numericText())
+
+                        Text(totalDurationText)
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.4))
+                    }
                 }
                 .padding(.top, 8)
 

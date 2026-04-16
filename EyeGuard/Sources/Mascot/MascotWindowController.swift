@@ -37,7 +37,7 @@ final class MascotWindowController {
     /// Whether the mascot is currently in peek (hidden) mode, showing only eyes/ears.
     private var isPeeking: Bool = true
 
-    /// How many points of the mascot are visible in peek mode (ears + eyes ≈ 35pt).
+    /// How many points of the mascot are visible in peek mode (ears + eyes ≈ 50pt).
     private let peekVisibleHeight: CGFloat = 50
 
     /// Auto-hide timer that returns mascot to peek after inactivity.
