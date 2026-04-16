@@ -68,12 +68,16 @@ struct MascotContainerView: View {
             .offset(x: viewModel.swayOffset)
         }
         .frame(width: 120, height: 130)
+        .contentShape(Rectangle())
         .onHover { isHovering in
             onHoverChanged?(isHovering)
         }
-        .onTapGesture(count: 1) {
-            onTap?()
-        }
+        .simultaneousGesture(
+            TapGesture()
+                .onEnded {
+                    onTap?()
+                }
+        )
         .contextMenu {
             mascotContextMenu
         }

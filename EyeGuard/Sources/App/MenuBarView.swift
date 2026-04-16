@@ -16,14 +16,12 @@ struct MenuBarView: View {
             Divider()
             statsSection
             Divider()
-            insightSection
-            Divider()
-            reportSection
+            insightAndReportSection
             Divider()
             footerSection
         }
         .padding()
-        .frame(width: 300)
+        .frame(width: 340)
     }
 
     // MARK: - Sections
@@ -217,20 +215,8 @@ struct MenuBarView: View {
         }
     }
 
-    private var reportSection: some View {
-        HStack {
-            Button {
-                generateReport()
-            } label: {
-                Label("Generate Report", systemImage: "doc.text")
-            }
-            .font(.caption)
-            Spacer()
-        }
-    }
-
-    /// AI-powered insight summary (v1.8).
-    private var insightSection: some View {
+    /// AI insight + Generate Report combined in one section.
+    private var insightAndReportSection: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 4) {
                 Image(systemName: "brain")
@@ -239,6 +225,14 @@ struct MenuBarView: View {
                 Text("AI Insight")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+                Spacer()
+                Button {
+                    generateReport()
+                } label: {
+                    Label("Report", systemImage: "doc.text")
+                }
+                .font(.caption2)
+                .buttonStyle(.borderless)
             }
 
             let compliance = (scheduler.breaksTakenToday + scheduler.breaksSkippedToday) > 0
