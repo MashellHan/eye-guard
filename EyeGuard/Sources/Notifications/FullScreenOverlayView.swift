@@ -188,6 +188,11 @@ struct FullScreenOverlayView: View {
             }
         }
         .opacity(appeared ? 1.0 : 0.0)
+        .onKeyPress(.escape) {
+            stopTimer()
+            onPostponed()
+            return .handled
+        }
         .onAppear {
             let duration = Int(breakType.duration)
             remainingSeconds = duration

@@ -85,6 +85,12 @@ struct BreakOverlayView: View {
         )
         .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
         .scaleEffect(appeared ? 1.0 : 0.95)
+        .onKeyPress(.escape) {
+            stopTimer()
+            onSkipped()
+            onDismiss()
+            return .handled
+        }
         .onAppear {
             Log.notification.info("BreakOverlay appeared: \(breakType.displayName), policy=\(String(describing: dismissPolicy))")
             withAnimation(.spring(duration: 0.4)) {

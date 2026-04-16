@@ -72,7 +72,7 @@ final class OverlayWindowController: NSObject {
         let windowWidth: CGFloat = breakType == .macro ? 400 : 340
         let windowHeight: CGFloat = breakType == .macro ? 340 : 300
 
-        let overlayWindow = NSWindow(
+        let overlayWindow = KeyableWindow(
             contentRect: NSRect(x: 0, y: 0, width: windowWidth, height: windowHeight),
             styleMask: [.borderless],
             backing: .buffered,
@@ -169,7 +169,7 @@ final class OverlayWindowController: NSObject {
 
             let hostingView = NSHostingView(rootView: contentView)
 
-            let fullScreenWindow = NSWindow(
+            let fullScreenWindow = KeyableWindow(
                 contentRect: screen.frame,
                 styleMask: [.borderless],
                 backing: .buffered,
@@ -269,4 +269,12 @@ final class OverlayWindowController: NSObject {
 
         overlayWindow.setFrameOrigin(NSPoint(x: x, y: y))
     }
+}
+
+// MARK: - KeyableWindow
+
+/// A borderless NSWindow subclass that can become key window,
+/// enabling keyboard events (e.g. Escape to dismiss).
+final class KeyableWindow: NSWindow {
+    override var canBecomeKey: Bool { true }
 }
