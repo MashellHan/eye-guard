@@ -22,7 +22,7 @@ struct ExerciseSessionView: View {
 
     @State private var sessionPhase: SessionPhase = .intro
     @State private var currentExerciseIndex: Int = 0
-    @State private var currentStep: Int = 0
+    @State private var currentStep: Int = -1
     @State private var remainingSeconds: Int = 0
     @State private var totalSessionSeconds: Int = 0
     @State private var elapsedSessionSeconds: Int = 0
@@ -418,12 +418,10 @@ struct ExerciseSessionView: View {
         remainingSeconds = currentExercise.duration
         startCountdown()
 
-        // TTS: announce first exercise (v2.4)
+        // TTS: announce session start (v2.4, BUG-006: removed manual step speak to avoid double play)
         if isAudioGuidanceEnabled {
             SoundManager.shared.speakExerciseIntro()
-            let exercise = currentExercise
-            let firstInstruction = exercise.instructionsChinese.first ?? ""
-            SoundManager.shared.speakExerciseStep(exercise.chineseName, step: firstInstruction)
+            // First step will be spoken by speakStepIfNeeded() on timer tick
         }
     }
 
@@ -442,12 +440,12 @@ struct ExerciseSessionView: View {
 
         withAnimation(.easeInOut(duration: 0.3)) {
             currentExerciseIndex += 1
-            currentStep = 0
+            currentStep = -1  // Reset to -1 so speakStepIfNeeded triggers step 0 (BUG-006)
         }
         remainingSeconds = currentExercise.duration
         startCountdown()
 
-        // TTS: announce next exercise (v2.4)
+        // TTS: transition sound + encouragement (BUG-006: removed manual step speak)
         if isAudioGuidanceEnabled {
             SoundManager.shared.onExerciseStepTransition()
             // Encouragement at ~60% through the session
@@ -455,9 +453,7 @@ struct ExerciseSessionView: View {
             if currentExerciseIndex == encouragementIndex {
                 SoundManager.shared.speakEncouragement()
             }
-            let exercise = currentExercise
-            let firstInstruction = exercise.instructionsChinese.first ?? ""
-            SoundManager.shared.speakExerciseStep(exercise.chineseName, step: firstInstruction)
+            // First step will be spoken by speakStepIfNeeded() on timer tick
         }
     }
 
@@ -540,12 +536,14 @@ struct ExerciseSessionView: View {
         let exerciseDuration = exercise.duration
         let elapsed = exerciseDuration - remainingSeconds
 
-        // Minimum 5s per step to ensure TTS can finish reading (BUG-002)
-        let stepDuration = max(5, exerciseDuration / instructions.count)
+        // Minimum 8s per step to ensure TTS can finish Chinese speech + chime (BUG-006)
+        let stepDuration = max(8, exerciseDuration / instructions.count)
         let stepIndex = min(elapsed / stepDuration, instructions.count - 1)
 
-        // Speak when step index changes
-        if stepIndex != currentStep && stepIndex < instructions.count {
+        // Speak when step index changes, but only if TTS isn't still playing (BUG-006)
+        if stepIndex != currentStep && stepIndex < instructions.count
+            && !SoundManager.shared.isSpeaking
+        {
             currentStep = stepIndex
             SoundManager.shared.onExerciseStepTransition()
             // Small delay to let chime play before speech
