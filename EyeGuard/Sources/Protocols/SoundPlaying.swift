@@ -60,3 +60,18 @@ protocol SoundPlaying {
     /// Plays exercise completion celebration with TTS.
     func onExerciseComplete()
 }
+
+// MARK: - Default Implementations
+
+/// Empty defaults for TTS methods so mock conformances don't need to implement all of them.
+extension SoundPlaying {
+    func speak(_ text: String) {}
+    func stopSpeaking() {}
+    var isSpeaking: Bool { false }
+    func speakExerciseIntro() {}
+    func speakEncouragement() {}
+    func speakExerciseStep(_ exercise: String, step: String) {}
+    func speakInstruction(_ instruction: String) {}
+    func onExerciseStepTransition() {}
+    func onExerciseComplete() {}
+}
