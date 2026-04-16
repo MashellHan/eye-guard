@@ -85,7 +85,7 @@
 | 7.1 | Dual Mode Notch 分区布局 | P0 | 4h | ✅ DualModeNotchView split layout + NotchContentType.dualMode |
 | 7.2 | 双精灵交互动画 | P2 | 3h | ⬜ |
 | 7.3 | 模式间事件联动 | P1 | 2h | ✅ AppEvent dispatch: idle, activity, modeChanged |
-| 7.4 | 性能优化 | P1 | 2h | ⬜ |
+| 7.4 | 性能优化 | P1 | 2h | ✅ Timer overhead fix, memory leak fix, dedup observers |
 | 7.5 | 暗色/亮色主题 | P2 | 2h | ⬜ |
 | 7.6 | 中英本地化 | P2 | 2h | ⬜ |
 | 7.7 | 清理死代码 | P1 | 2h | 🔄 Removed unused protocols (NotificationSending, SoundPlaying) |
