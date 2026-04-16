@@ -669,7 +669,8 @@ final class BreakScheduler {
             breakEvents: todayBreakEvents,
             totalScreenTime: totalScreenTimeToday,
             longestContinuousSession: longestContinuousSession,
-            previousScores: scoreHistory
+            previousScores: scoreHistory,
+            exerciseSessionsToday: exerciseSessionsToday
         )
         currentHealthScore = breakdown.score.totalScore
         currentTrend = breakdown.trend

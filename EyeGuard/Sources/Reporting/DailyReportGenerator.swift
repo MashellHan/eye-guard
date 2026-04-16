@@ -438,12 +438,12 @@ struct DailyReportGenerator: Sendable {
             )
         }
 
-        // Break quality recommendations
+        // Break quality recommendations (base max is 6/10 without exercises, 10/10 with)
         if score.breakQuality < 3 {
             recommendations.append(
                 "- \u{1F7E0} **Important**: Your breaks are too short. When you take a break, look at something 20 feet away for the full recommended duration."
             )
-        } else if score.breakQuality < 7 {
+        } else if score.breakQuality < 5 {
             recommendations.append(
                 "- \u{1F7E1} **Suggestion**: When you take a break, make it count. Look away from the screen for the full duration."
             )

@@ -23,7 +23,7 @@ struct DailyReportGeneratorDetailedTests {
         #expect(report.totalBreaksScheduled == 0)
         #expect(report.totalScreenTime == 0)
         #expect(report.sessions.isEmpty)
-        #expect(report.healthScore.totalScore == 100)
+        #expect(report.healthScore.totalScore == 96) // Base quality 6/10 without exercises
     }
 
     @Test("Generate report with sessions produces correct counts")

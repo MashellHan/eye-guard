@@ -22,8 +22,8 @@ struct HealthScoreCalculatorDetailedTests {
         #expect(score.breakCompliance == 40)
         #expect(score.continuousUseDiscipline == 30)
         #expect(score.screenTimeScore == 20)
-        #expect(score.breakQuality == 10)
-        #expect(score.totalScore == 100)
+        #expect(score.breakQuality == 6) // Base quality without exercises (max 6/10)
+        #expect(score.totalScore == 96)
     }
 
     // MARK: - Break Compliance
@@ -186,7 +186,7 @@ struct HealthScoreCalculatorDetailedTests {
 
     // MARK: - Break Quality
 
-    @Test("Full duration breaks yield full quality score")
+    @Test("Full duration breaks yield full base quality score")
     func fullDurationBreaks() {
         let events = [
             BreakEvent(type: .micro, wasTaken: true, actualDuration: 20),
@@ -197,7 +197,22 @@ struct HealthScoreCalculatorDetailedTests {
             totalScreenTime: 60 * 60,
             longestContinuousSession: 20 * 60
         )
-        #expect(score.breakQuality == 10)
+        #expect(score.breakQuality == 6) // Base max without exercises
+    }
+
+    @Test("Full duration breaks with exercises yield max quality")
+    func fullDurationBreaksWithExercises() {
+        let events = [
+            BreakEvent(type: .micro, wasTaken: true, actualDuration: 20),
+            BreakEvent(type: .macro, wasTaken: true, actualDuration: 300),
+        ]
+        let score = calculator.calculate(
+            breakEvents: events,
+            totalScreenTime: 60 * 60,
+            longestContinuousSession: 20 * 60,
+            exerciseSessionsToday: 1
+        )
+        #expect(score.breakQuality == 10) // 6 base + 4 exercise bonus
     }
 
     @Test("Half duration breaks yield proportional quality score")
@@ -211,7 +226,7 @@ struct HealthScoreCalculatorDetailedTests {
             totalScreenTime: 60 * 60,
             longestContinuousSession: 20 * 60
         )
-        #expect(score.breakQuality == 5)
+        #expect(score.breakQuality == 3) // Half of base max 6
     }
 
     @Test("Skipped breaks are excluded from quality calculation")
@@ -225,7 +240,7 @@ struct HealthScoreCalculatorDetailedTests {
             totalScreenTime: 60 * 60,
             longestContinuousSession: 20 * 60
         )
-        #expect(score.breakQuality == 10)
+        #expect(score.breakQuality == 6) // Base max without exercises
     }
 
     // MARK: - Mixed Scenarios
@@ -248,7 +263,7 @@ struct HealthScoreCalculatorDetailedTests {
         #expect(score.continuousUseDiscipline > 0)
         #expect(score.screenTimeScore > 0)
         #expect(score.screenTimeScore < 20)
-        #expect(score.breakQuality == 10)
+        #expect(score.breakQuality == 6) // Base max without exercises
         #expect(score.totalScore > 30)
         #expect(score.totalScore < 80)
     }

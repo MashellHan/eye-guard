@@ -258,8 +258,13 @@ struct FullScreenOverlayView: View {
                     withAnimation {
                         remainingSeconds -= 1
                     }
+                    // Voice countdown for last 5 seconds (v3.2)
+                    if remainingSeconds <= 5 && remainingSeconds > 0 {
+                        SoundManager.shared.speakCountdown(remainingSeconds)
+                    }
                 }
                 if remainingSeconds <= 0 {
+                    SoundManager.shared.speakBreakComplete()
                     stopTimer()
                     onBreakTaken()
                 }

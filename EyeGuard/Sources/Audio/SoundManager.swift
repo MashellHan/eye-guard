@@ -228,6 +228,17 @@ final class SoundManager: SoundPlaying {
         speak("做得好！眼保健操完成")
     }
 
+    /// Speaks a countdown number (1-5) for the last seconds of a break.
+    func speakCountdown(_ seconds: Int) {
+        guard !isMuted, seconds > 0, seconds <= 5 else { return }
+        speak("\(seconds)")
+    }
+
+    /// Speaks break completion message.
+    func speakBreakComplete() {
+        speak("休息结束，继续加油")
+    }
+
     /// Plays exercise step transition chime.
     func onExerciseStepTransition() {
         play(.exerciseStep)

@@ -312,9 +312,14 @@ struct BreakOverlayView: View {
                     withAnimation {
                         countdown -= 1
                     }
+                    // Voice countdown for last 5 seconds (v3.2)
+                    if countdown <= 5 && countdown > 0 {
+                        SoundManager.shared.speakCountdown(countdown)
+                    }
                 }
 
                 if countdown <= 0 {
+                    SoundManager.shared.speakBreakComplete()
                     completeBreak()
                 }
             }

@@ -61,12 +61,13 @@ struct HealthScoreCalculator: Sendable {
     func calculate(
         breakEvents: [BreakEvent],
         totalScreenTime: TimeInterval,
-        longestContinuousSession: TimeInterval
+        longestContinuousSession: TimeInterval,
+        exerciseSessionsToday: Int = 0
     ) -> HealthScore {
         let compliance = calculateBreakCompliance(breakEvents)
         let discipline = calculateContinuousUseDiscipline(longestContinuousSession)
         let screenTime = calculateScreenTimeScore(totalScreenTime)
-        let quality = calculateBreakQuality(breakEvents)
+        let quality = calculateBreakQuality(breakEvents, exerciseSessions: exerciseSessionsToday)
 
         return HealthScore(
             breakCompliance: compliance,
@@ -88,12 +89,14 @@ struct HealthScoreCalculator: Sendable {
         breakEvents: [BreakEvent],
         totalScreenTime: TimeInterval,
         longestContinuousSession: TimeInterval,
-        previousScores: [Int]
+        previousScores: [Int],
+        exerciseSessionsToday: Int = 0
     ) -> HealthScoreBreakdown {
         let score = calculate(
             breakEvents: breakEvents,
             totalScreenTime: totalScreenTime,
-            longestContinuousSession: longestContinuousSession
+            longestContinuousSession: longestContinuousSession,
+            exerciseSessionsToday: exerciseSessionsToday
         )
 
         let complianceExplanation = complianceExplanation(breakEvents)
@@ -225,11 +228,17 @@ struct HealthScoreCalculator: Sendable {
     }
 
     /// Break quality: did the user actually take the full break duration?
-    /// Full score = all taken breaks met recommended duration.
-    private func calculateBreakQuality(_ events: [BreakEvent]) -> Int {
+    /// Base score caps at 6/10 without exercises. Exercises add up to +4 bonus.
+    private func calculateBreakQuality(_ events: [BreakEvent], exerciseSessions: Int = 0) -> Int {
+        let maxPoints = EyeGuardConstants.breakQualityMaxPoints
+        let baseMax = 6 // Base quality without exercises
+        let exerciseBonus = 4 // Bonus for doing exercises
+
         let takenBreaks = events.filter(\.wasTaken)
         guard !takenBreaks.isEmpty else {
-            return EyeGuardConstants.breakQualityMaxPoints
+            // No breaks yet — full base score + exercise bonus if applicable
+            let bonus = exerciseSessions > 0 ? exerciseBonus : 0
+            return min(baseMax + bonus, maxPoints)
         }
 
         var totalQuality = 0.0
@@ -241,7 +250,9 @@ struct HealthScoreCalculator: Sendable {
         }
 
         let averageQuality = totalQuality / Double(takenBreaks.count)
-        return Int(averageQuality * Double(EyeGuardConstants.breakQualityMaxPoints))
+        let baseScore = Int(averageQuality * Double(baseMax))
+        let bonus = exerciseSessions > 0 ? exerciseBonus : 0
+        return min(baseScore + bonus, maxPoints)
     }
 
     // MARK: - Explanation Text
