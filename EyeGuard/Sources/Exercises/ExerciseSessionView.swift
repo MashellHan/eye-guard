@@ -76,7 +76,7 @@ struct ExerciseSessionView: View {
         .padding(.vertical, 20)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(.ultraThinMaterial)
+                .fill(.thickMaterial)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 16)
@@ -94,6 +94,7 @@ struct ExerciseSessionView: View {
         }
         .scaleEffect(appeared ? 1.0 : 0.95)
         .opacity(appeared ? 1.0 : 0)
+        .colorScheme(.dark)  // Force dark mode for consistent text on dark overlay
         .onExitCommand {
             onSkip()
         }
