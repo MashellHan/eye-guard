@@ -8,7 +8,7 @@
 | 0.2 | 重命名 Xcode target/scheme ClaudeIsland → MioGuard | P0 | 1h | 🚧 需要 Xcode（非 CLT） |
 | 0.3 | 更新 Bundle ID + Info.plist | P0 | 30m | 🚧 需要 Xcode（非 CLT） |
 | 0.4 | 创建 Core/ModeManager.swift | P0 | 2h | ✅ @Observable, UserDefaults 持久化 |
-| 0.5 | 右键菜单添加模式切换 | P1 | 1h | ⬜ |
+| 0.5 | 右键菜单添加模式切换 | P1 | 1h | ✅ ModeSwitchRow in NotchMenuView |
 | 0.6 | 验证所有 MioIsland 功能正常 | P0 | 1h | 🚧 需要 Xcode build |
 
 ## Phase 1: 精灵系统统一
