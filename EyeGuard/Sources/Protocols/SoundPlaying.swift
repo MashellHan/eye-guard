@@ -30,4 +30,33 @@ protocol SoundPlaying {
 
     /// Whether all sounds are muted.
     var isMuted: Bool { get set }
+
+    // MARK: - TTS Voice Guidance
+
+    /// Speaks a text instruction using TTS.
+    func speak(_ text: String)
+
+    /// Stops any current TTS speech.
+    func stopSpeaking()
+
+    /// Whether TTS is currently speaking.
+    var isSpeaking: Bool { get }
+
+    /// Speaks an exercise intro greeting.
+    func speakExerciseIntro()
+
+    /// Speaks a random encouragement phrase.
+    func speakEncouragement()
+
+    /// Speaks an exercise name and step instruction.
+    func speakExerciseStep(_ exercise: String, step: String)
+
+    /// Speaks a step instruction only.
+    func speakInstruction(_ instruction: String)
+
+    /// Plays exercise step transition chime.
+    func onExerciseStepTransition()
+
+    /// Plays exercise completion celebration with TTS.
+    func onExerciseComplete()
 }

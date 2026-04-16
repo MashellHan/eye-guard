@@ -104,7 +104,7 @@ final class BreakScheduler {
     private var wasIdle: Bool = false
 
     /// Per-break-type elapsed time for independent tracking (H5/BUG-001).
-    /// Internal access for `@testable import` verification.
+    /// Treat as read-only externally; mutated only by `@testable import` tests.
     var elapsedPerType: [BreakType: TimeInterval] = [
         .micro: 0,
         .macro: 0,

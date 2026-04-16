@@ -450,8 +450,9 @@ struct ExerciseSessionView: View {
         // TTS: announce next exercise (v2.4)
         if isAudioGuidanceEnabled {
             SoundManager.shared.onExerciseStepTransition()
-            // Encouragement after exercise 3 (v3.2)
-            if currentExerciseIndex == 3 {
+            // Encouragement at ~60% through the session
+            let encouragementIndex = max(1, exercises.count * 3 / 5)
+            if currentExerciseIndex == encouragementIndex {
                 SoundManager.shared.speakEncouragement()
             }
             let exercise = currentExercise

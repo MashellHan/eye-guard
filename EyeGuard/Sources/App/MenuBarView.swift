@@ -116,10 +116,16 @@ struct MenuBarView: View {
                 Spacer()
             }
 
-            Text(TimeFormatting.formatTimerDisplay(elapsedSinceLastBreak))
-                .font(.system(.title, design: .monospaced))
-                .foregroundStyle(screenTimeColor)
-                .opacity(elapsedSinceLastBreak > 3600 ? (blinkOpacity) : 1.0)
+            if elapsedSinceLastBreak < 5 {
+                Text("刚刚休息过 ✨")
+                    .font(.system(.title3, design: .rounded))
+                    .foregroundStyle(.green)
+            } else {
+                Text(TimeFormatting.formatTimerDisplay(elapsedSinceLastBreak))
+                    .font(.system(.title, design: .monospaced))
+                    .foregroundStyle(screenTimeColor)
+                    .opacity(elapsedSinceLastBreak > 3600 ? (blinkOpacity) : 1.0)
+            }
 
             // Progress bar toward next break
             if let nextBreak = scheduler.nextScheduledBreak {
