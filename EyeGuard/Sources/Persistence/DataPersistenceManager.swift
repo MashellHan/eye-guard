@@ -8,19 +8,22 @@ struct DailyData: Codable, Sendable {
     let totalScreenTime: TimeInterval
     let longestContinuousSession: TimeInterval
     let scoreHistory: [Int]
+    let exerciseSessionsToday: Int
 
     init(
         date: String,
         breakEvents: [BreakEvent],
         totalScreenTime: TimeInterval,
         longestContinuousSession: TimeInterval,
-        scoreHistory: [Int]
+        scoreHistory: [Int],
+        exerciseSessionsToday: Int = 0
     ) {
         self.date = date
         self.breakEvents = breakEvents
         self.totalScreenTime = totalScreenTime
         self.longestContinuousSession = longestContinuousSession
         self.scoreHistory = scoreHistory
+        self.exerciseSessionsToday = exerciseSessionsToday
     }
 }
 
@@ -63,6 +66,7 @@ struct DataPersistenceManager: Sendable {
         totalScreenTime: TimeInterval,
         longestContinuousSession: TimeInterval,
         scoreHistory: [Int],
+        exerciseSessionsToday: Int = 0,
         date: Date = .now
     ) async {
         let dateString = Self.formatDateString(date)
@@ -71,7 +75,8 @@ struct DataPersistenceManager: Sendable {
             breakEvents: breakEvents,
             totalScreenTime: totalScreenTime,
             longestContinuousSession: longestContinuousSession,
-            scoreHistory: scoreHistory
+            scoreHistory: scoreHistory,
+            exerciseSessionsToday: exerciseSessionsToday
         )
 
         let fileURL = Self.fileURL(for: dateString)

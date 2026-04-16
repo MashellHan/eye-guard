@@ -40,6 +40,11 @@ final class NotificationManager: NotificationSending {
     /// Active break type for the current notification.
     private var activeBreakType: BreakType?
 
+    /// Exercise context for full-screen overlay display (v2.5).
+    private var exerciseSessionsToday: Int = 0
+    private var recommendedExerciseSessions: Int = 1
+    private var onStartExercisesCallback: (@Sendable () -> Void)?
+
     /// Postpone count per break type (reset when break is taken or skipped).
     private var postponeCountByBreakType: [BreakType: Int] = [:]
 
@@ -81,7 +86,10 @@ final class NotificationManager: NotificationSending {
         healthScore: Int,
         onTaken: @escaping @Sendable () -> Void,
         onSkipped: @escaping @Sendable () -> Void,
-        onPostponed: @escaping @Sendable (TimeInterval) -> Void
+        onPostponed: @escaping @Sendable (TimeInterval) -> Void,
+        exerciseSessionsToday: Int = 0,
+        recommendedExerciseSessions: Int = 1,
+        onStartExercises: (@Sendable () -> Void)? = nil
     ) {
         guard !isNotificationActive else { return }
         isNotificationActive = true
@@ -93,6 +101,9 @@ final class NotificationManager: NotificationSending {
         self.onTakenCallback = onTaken
         self.onSkippedCallback = onSkipped
         self.onPostponedCallback = onPostponed
+        self.exerciseSessionsToday = exerciseSessionsToday
+        self.recommendedExerciseSessions = recommendedExerciseSessions
+        self.onStartExercisesCallback = onStartExercises
 
         // Play break start sound (v1.6)
         SoundManager.shared.onBreakStart()
@@ -268,11 +279,28 @@ final class NotificationManager: NotificationSending {
 
         case .fullScreen:
             overlayController.dismiss()
+
+            let exerciseAction: (@Sendable () -> Void)? = onStartExercisesCallback.map { callback in
+                { @Sendable [weak self] in
+                    Task { @MainActor in
+                        self?.cancelEscalation()
+                        self?.dismissAllOverlays()
+                        self?.isNotificationActive = false
+                        self?.clearCallbacks()
+                        self?.activeBreakType = nil
+                        self?.activeBehavior = nil
+                        callback()
+                    }
+                }
+            }
+
             overlayController.showFullScreenOverlay(
                 breakType: breakType,
                 healthScore: currentHealthScore,
                 dismissPolicy: behavior.dismissPolicy,
                 postponeCount: postponeCount,
+                exerciseSessionsToday: exerciseSessionsToday,
+                recommendedExerciseSessions: recommendedExerciseSessions,
                 onTaken: { [weak self] in
                     Task { @MainActor in
                         self?.acknowledgeBreak()
@@ -283,7 +311,8 @@ final class NotificationManager: NotificationSending {
                         guard let self, let bt = self.activeBreakType else { return }
                         self.postponeBreak(breakType: bt)
                     }
-                }
+                },
+                onStartExercises: exerciseAction
             )
 
             Log.notification.info("Full-screen overlay shown: \(breakType.displayName)")
@@ -311,6 +340,7 @@ final class NotificationManager: NotificationSending {
         onTakenCallback = nil
         onSkippedCallback = nil
         onPostponedCallback = nil
+        onStartExercisesCallback = nil
     }
 
     // MARK: - Private: Notification Permission

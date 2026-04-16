@@ -16,6 +16,9 @@ protocol NotificationSending {
     ///   - onTaken: Callback when user acknowledges the break.
     ///   - onSkipped: Callback when user dismisses/skips the break.
     ///   - onPostponed: Callback when user postpones the break (receives delay in seconds).
+    ///   - exerciseSessionsToday: Number of exercise sessions completed today (v2.5).
+    ///   - recommendedExerciseSessions: Recommended exercise sessions based on screen time (v2.5).
+    ///   - onStartExercises: Optional callback when user starts exercises from break overlay (v2.5).
     func notify(
         breakType: BreakType,
         behavior: BreakBehavior,
@@ -23,7 +26,10 @@ protocol NotificationSending {
         healthScore: Int,
         onTaken: @escaping @Sendable () -> Void,
         onSkipped: @escaping @Sendable () -> Void,
-        onPostponed: @escaping @Sendable (TimeInterval) -> Void
+        onPostponed: @escaping @Sendable (TimeInterval) -> Void,
+        exerciseSessionsToday: Int,
+        recommendedExerciseSessions: Int,
+        onStartExercises: (@Sendable () -> Void)?
     )
 
     /// Dismisses the current notification (user took the break).
@@ -38,4 +44,32 @@ protocol NotificationSending {
 
     /// Requests notification permission from the user.
     func setup()
+}
+
+// MARK: - Default Exercise Parameters
+
+extension NotificationSending {
+    /// Convenience overload without exercise parameters (backward compatibility).
+    func notify(
+        breakType: BreakType,
+        behavior: BreakBehavior,
+        escalation: EscalationStrategy,
+        healthScore: Int,
+        onTaken: @escaping @Sendable () -> Void,
+        onSkipped: @escaping @Sendable () -> Void,
+        onPostponed: @escaping @Sendable (TimeInterval) -> Void
+    ) {
+        notify(
+            breakType: breakType,
+            behavior: behavior,
+            escalation: escalation,
+            healthScore: healthScore,
+            onTaken: onTaken,
+            onSkipped: onSkipped,
+            onPostponed: onPostponed,
+            exerciseSessionsToday: 0,
+            recommendedExerciseSessions: 1,
+            onStartExercises: nil
+        )
+    }
 }

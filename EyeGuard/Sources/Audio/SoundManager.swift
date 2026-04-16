@@ -3,17 +3,15 @@ import AVFoundation
 import Foundation
 import os
 
-/// Manages sound effects and ambient audio for EyeGuard.
+/// Manages sound effects, TTS audio guidance, and ambient audio for EyeGuard.
 ///
 /// Provides:
 /// - Notification chimes when breaks start (gentle tone)
 /// - Celebration sounds when breaks complete (ascending chime)
 /// - Soft bell for tip rotation events
+/// - TTS voice guidance for eye exercises (AVSpeechSynthesizer, zh-CN)
 /// - Ambient nature sound generation during breaks (AVAudioEngine)
 /// - Volume control and mute toggle via UserDefaults
-///
-/// Uses NSSound for system sound playback and AVAudioEngine for
-/// procedurally generated ambient tones (no external audio files needed).
 @MainActor
 final class SoundManager: SoundPlaying {
 
@@ -35,6 +33,8 @@ final class SoundManager: SoundPlaying {
         case alert
         /// Ambient nature sound during breaks.
         case ambient
+        /// Step transition chime for exercises.
+        case exerciseStep
     }
 
     /// Ambient sound presets available during breaks.
@@ -70,6 +70,13 @@ final class SoundManager: SoundPlaying {
 
     /// Task managing the ambient sound lifecycle.
     private var ambientTask: Task<Void, Never>?
+
+    /// AVSpeechSynthesizer for TTS exercise guidance (v2.4).
+    @ObservationIgnored
+    private let speechSynthesizer = AVSpeechSynthesizer()
+
+    /// Whether TTS is currently speaking.
+    private(set) var isSpeaking: Bool = false
 
     /// Current volume level (0.0 – 1.0).
     var volume: Float {
@@ -107,9 +114,6 @@ final class SoundManager: SoundPlaying {
 
     /// Plays a sound effect of the given type.
     ///
-    /// Currently only breakStart is enabled — other sounds are disabled
-    /// until higher-quality audio assets are available.
-    ///
     /// - Parameter type: The sound effect category to play.
     func play(_ type: SoundType) {
         guard !isMuted, volume > 0 else { return }
@@ -119,8 +123,23 @@ final class SoundManager: SoundPlaying {
             playSystemSound(named: "Tink")
             Log.sound.info("Sound: break start chime")
 
-        case .breakComplete, .tipRotation, .alert, .ambient:
-            // Disabled — only break start chime is active
+        case .breakComplete:
+            playSystemSound(named: "Glass")
+            Log.sound.info("Sound: break complete")
+
+        case .exerciseStep:
+            playSystemSound(named: "Pop")
+            Log.sound.info("Sound: exercise step transition")
+
+        case .tipRotation:
+            playSystemSound(named: "Purr")
+            Log.sound.info("Sound: tip rotation")
+
+        case .alert:
+            playSystemSound(named: "Sosumi")
+            Log.sound.info("Sound: alert")
+
+        case .ambient:
             break
         }
     }
@@ -138,19 +157,79 @@ final class SoundManager: SoundPlaying {
         Log.sound.info("Ambient sound stopped.")
     }
 
-    /// Convenience: plays the break-start chime only (no ambient).
+    /// Convenience: plays the break-start chime.
     func onBreakStart() {
         play(.breakStart)
     }
 
-    /// Convenience: no-op (ambient and celebration sounds disabled).
+    /// Convenience: plays the break-complete celebration.
     func onBreakComplete() {
-        // Disabled
+        play(.breakComplete)
     }
 
-    /// Convenience: no-op (tip rotation bell disabled).
+    /// Convenience: plays the tip rotation bell.
     func onTipRotation() {
-        // Disabled
+        play(.tipRotation)
+    }
+
+    // MARK: - TTS Voice Guidance (v2.4)
+
+    /// Speaks a Chinese text instruction using AVSpeechSynthesizer.
+    ///
+    /// Used for eye exercise step-by-step guidance.
+    /// Respects mute and volume settings.
+    ///
+    /// - Parameter text: Chinese text to speak (zh-CN voice).
+    func speak(_ text: String) {
+        guard !isMuted else { return }
+
+        let utterance = AVSpeechUtterance(string: text)
+        utterance.voice = AVSpeechSynthesisVoice(language: "zh-CN")
+        utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 0.9
+        utterance.volume = volume
+        utterance.pitchMultiplier = 1.05
+
+        // Stop any current speech before starting new
+        if speechSynthesizer.isSpeaking {
+            speechSynthesizer.stopSpeaking(at: .word)
+        }
+
+        speechSynthesizer.speak(utterance)
+        isSpeaking = true
+        Log.sound.info("TTS: \(text)")
+    }
+
+    /// Stops any current TTS speech.
+    func stopSpeaking() {
+        if speechSynthesizer.isSpeaking {
+            speechSynthesizer.stopSpeaking(at: .immediate)
+        }
+        isSpeaking = false
+    }
+
+    /// Speaks an exercise name and first instruction.
+    /// - Parameters:
+    ///   - exercise: The exercise to announce.
+    ///   - step: The step instruction to speak.
+    func speakExerciseStep(_ exercise: String, step: String) {
+        speak("\(exercise)。\(step)")
+    }
+
+    /// Speaks an exercise step instruction only.
+    /// - Parameter instruction: The step instruction text.
+    func speakInstruction(_ instruction: String) {
+        speak(instruction)
+    }
+
+    /// Plays exercise completion celebration with TTS.
+    func onExerciseComplete() {
+        play(.breakComplete)
+        speak("做得好！眼保健操完成")
+    }
+
+    /// Plays exercise step transition chime.
+    func onExerciseStepTransition() {
+        play(.exerciseStep)
     }
 
     // MARK: - System Sound Playback
@@ -174,12 +253,6 @@ final class SoundManager: SoundPlaying {
     // MARK: - Ambient Sound Engine
 
     /// Starts the AVAudioEngine with a procedurally generated ambient tone.
-    ///
-    /// Each preset generates a different frequency/modulation pattern:
-    /// - Rain: filtered noise at low frequencies
-    /// - Ocean: slowly modulated low-frequency oscillation
-    /// - Forest: higher frequency chirps with random timing
-    /// - Wind: band-pass filtered noise with slow modulation
     private func startAmbientEngine() {
         let engine = AVAudioEngine()
         self.audioEngine = engine
@@ -197,9 +270,6 @@ final class SoundManager: SoundPlaying {
         let preset = selectedAmbientPreset
         let currentVolume = volume
 
-        // Create a source node that generates audio samples
-        // Use nonisolated(unsafe) to allow mutation from the audio render thread.
-        // These variables are only accessed from the single audio callback thread.
         nonisolated(unsafe) var phase: Double = 0.0
         nonisolated(unsafe) var modPhase: Double = 0.0
 
@@ -213,34 +283,28 @@ final class SoundManager: SoundPlaying {
 
                 switch preset {
                 case .rain:
-                    // Rain: low-pass filtered white noise
                     let noise = Float.random(in: -1.0...1.0)
-                    // Simple low-pass approximation via mixing with previous
                     let lpf = noise * 0.15 * currentVolume * 0.3
                     sample = lpf
 
                 case .ocean:
-                    // Ocean: slow sine wave modulation of noise
-                    let modFreq = 0.08 // Very slow modulation
+                    let modFreq = 0.08
                     modPhase += modFreq / sampleRate
                     let modulation = Float(sin(modPhase * 2.0 * .pi))
-                    let envelope = (modulation + 1.0) / 2.0 // 0..1
+                    let envelope = (modulation + 1.0) / 2.0
                     let noise = Float.random(in: -1.0...1.0)
                     sample = noise * envelope * 0.12 * currentVolume * 0.3
 
                 case .forest:
-                    // Forest: gentle sine tone with random chirps
                     let baseFreq = 1200.0 + sin(modPhase * 0.5) * 400.0
                     phase += baseFreq / sampleRate
                     modPhase += 0.3 / sampleRate
                     let chirp = Float(sin(phase * 2.0 * .pi))
-                    // Chirp envelope: mostly silent, occasional short bursts
                     let chirpEnvelope = Float(max(0, sin(modPhase * 2.0 * .pi)))
                     let thresholdedEnvelope = chirpEnvelope > 0.95 ? chirpEnvelope : 0.0
                     sample = chirp * thresholdedEnvelope * 0.08 * currentVolume * 0.3
 
                 case .wind:
-                    // Wind: band-filtered noise with slow volume modulation
                     modPhase += 0.15 / sampleRate
                     let modulation = Float(sin(modPhase * 2.0 * .pi))
                     let envelope = (modulation + 1.0) / 2.0 * 0.7 + 0.3

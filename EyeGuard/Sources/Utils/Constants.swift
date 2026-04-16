@@ -90,3 +90,10 @@ enum EyeGuardConstants {
         baseDirectory.appendingPathComponent("data", isDirectory: true)
     }
 }
+
+// MARK: - Notification Names
+
+extension Notification.Name {
+    /// Posted when user taps "Start Eye Exercises" from the break overlay.
+    static let startExercisesFromBreak = Notification.Name("EyeGuard.startExercisesFromBreak")
+}

@@ -71,7 +71,10 @@ final class MockNotificationSender: NotificationSending {
         healthScore: Int,
         onTaken: @escaping @Sendable () -> Void,
         onSkipped: @escaping @Sendable () -> Void,
-        onPostponed: @escaping @Sendable (TimeInterval) -> Void
+        onPostponed: @escaping @Sendable (TimeInterval) -> Void,
+        exerciseSessionsToday: Int,
+        recommendedExerciseSessions: Int,
+        onStartExercises: (@Sendable () -> Void)?
     ) {
         notifyCalls.append(NotifyCall(
             breakType: breakType,

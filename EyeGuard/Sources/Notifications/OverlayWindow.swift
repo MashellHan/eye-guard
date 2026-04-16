@@ -119,8 +119,11 @@ final class OverlayWindowController: NSObject {
         healthScore: Int,
         dismissPolicy: DismissPolicy = .postponeOnly(maxCount: 2),
         postponeCount: Int = 0,
+        exerciseSessionsToday: Int = 0,
+        recommendedExerciseSessions: Int = 1,
         onTaken: @escaping @Sendable () -> Void,
-        onPostponed: @escaping @Sendable () -> Void = {}
+        onPostponed: @escaping @Sendable () -> Void = {},
+        onStartExercises: (@Sendable () -> Void)? = nil
     ) {
         // Dismiss any existing overlays first
         dismissFullScreen()
@@ -140,6 +143,8 @@ final class OverlayWindowController: NSObject {
                 healthScore: healthScore,
                 dismissPolicy: dismissPolicy,
                 postponeCount: postponeCount,
+                exerciseSessionsToday: exerciseSessionsToday,
+                recommendedExerciseSessions: recommendedExerciseSessions,
                 onBreakTaken: { [weak self] in
                     Task { @MainActor in
                         self?.dismissFullScreen()
@@ -150,6 +155,14 @@ final class OverlayWindowController: NSObject {
                     Task { @MainActor in
                         self?.dismissFullScreen()
                         onPostponed()
+                    }
+                },
+                onStartExercises: onStartExercises.map { callback in
+                    { [weak self] in
+                        Task { @MainActor in
+                            self?.dismissFullScreen()
+                            callback()
+                        }
                     }
                 }
             )

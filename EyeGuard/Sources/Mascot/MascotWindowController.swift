@@ -38,7 +38,7 @@ final class MascotWindowController {
     private var isPeeking: Bool = true
 
     /// How many points of the mascot are visible in peek mode (ears + eyes ≈ 35pt).
-    private let peekVisibleHeight: CGFloat = 35
+    private let peekVisibleHeight: CGFloat = 50
 
     /// Auto-hide timer that returns mascot to peek after inactivity.
     private var autoHideTask: Task<Void, Never>?
@@ -48,6 +48,18 @@ final class MascotWindowController {
 
     /// Task for monitoring speech bubble state to auto-reveal.
     private var bubbleMonitorTask: Task<Void, Never>?
+
+    /// Observer for exercise-from-break notification.
+    private var exerciseFromBreakObserver: Any?
+
+    /// The popover panel that mirrors the menu bar popover.
+    private var popoverWindow: NSPanel?
+
+    /// Event monitor for click-outside-to-dismiss.
+    private var clickOutsideMonitor: Any?
+
+    /// Global event monitor for click-outside-to-dismiss.
+    private var clickOutsideGlobalMonitor: Any?
 
     /// Shows the mascot window on screen.
     ///
@@ -118,6 +130,17 @@ final class MascotWindowController {
         // Start bubble monitor for auto-reveal on messages (v3.1)
         startBubbleMonitor()
 
+        // Listen for exercise-from-break notifications (v2.5)
+        exerciseFromBreakObserver = NotificationCenter.default.addObserver(
+            forName: .startExercisesFromBreak,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.showExerciseWindow()
+            }
+        }
+
         Log.mascot.info("Mascot window shown in peek mode at bottom-right corner.")
     }
 
@@ -129,6 +152,13 @@ final class MascotWindowController {
         autoHideTask = nil
         bubbleMonitorTask?.cancel()
         bubbleMonitorTask = nil
+        popoverWindow?.close()
+        removeClickOutsideMonitor()
+        popoverWindow = nil
+        if let observer = exerciseFromBreakObserver {
+            NotificationCenter.default.removeObserver(observer)
+            exerciseFromBreakObserver = nil
+        }
         stopMouseTracking()
         window?.orderOut(nil)
         window = nil
@@ -256,6 +286,7 @@ final class MascotWindowController {
                 self?.dismissExerciseWindow()
                 self?.viewModel?.transition(to: .celebrating)
                 self?.viewModel?.showMessage("👏 眼保健操做完了！好棒！")
+                self?.scheduler?.recordExerciseSession()
             },
             onSkip: { [weak self] in
                 self?.dismissExerciseWindow()
@@ -410,6 +441,11 @@ final class MascotWindowController {
         // Don't retract if context menu is open or bubble is showing
         if viewModel?.showBubble == true { return }
 
+        // Dismiss popover before retracting
+        if let popover = popoverWindow {
+            dismissPopover(popover)
+        }
+
         isPeeking = true
         cancelAutoHide()
 
@@ -511,15 +547,147 @@ final class MascotWindowController {
 
     // MARK: - Tap & Hover Handling (v3.1)
 
-    /// Handles tap on the mascot — reveals if peeking, toggles bubble if full.
+    /// Handles tap on the mascot — reveals if peeking, shows popover if full.
     private func handleMascotTap() {
         if isPeeking {
             revealMascot()
         } else {
-            viewModel?.toggleBubble()
+            togglePopover()
             // Reset auto-hide timer on interaction
-            scheduleAutoHide()
+            cancelAutoHide()
         }
+    }
+
+    /// Shows or hides the menu-bar-style popover anchored above the mascot.
+    private func togglePopover() {
+        if let existing = popoverWindow {
+            dismissPopover(existing)
+            return
+        }
+        showPopover()
+    }
+
+    /// Creates and shows the popover window above the mascot.
+    private func showPopover() {
+        guard let mascotWindow = window, let scheduler else { return }
+
+        let menuBarView = MenuBarView(scheduler: scheduler)
+        let hostingView = NSHostingView(rootView: menuBarView)
+
+        // Size the hosting view to fit content
+        let fittingSize = hostingView.fittingSize
+        hostingView.frame = NSRect(origin: .zero, size: fittingSize)
+
+        let panel = NSPanel(
+            contentRect: NSRect(origin: .zero, size: fittingSize),
+            styleMask: [.titled, .closable, .fullSizeContentView, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        panel.titlebarAppearsTransparent = true
+        panel.titleVisibility = .hidden
+        panel.level = .floating + 1
+        panel.isOpaque = false
+        panel.backgroundColor = NSColor.windowBackgroundColor
+        panel.hasShadow = true
+        panel.contentView = hostingView
+        panel.isMovableByWindowBackground = false
+        panel.collectionBehavior = [.canJoinAllSpaces, .stationary]
+        panel.isReleasedWhenClosed = false
+        // Allow the panel to become key so buttons work
+        panel.becomesKeyOnlyIfNeeded = false
+        panel.isFloatingPanel = true
+
+        // Round corners
+        panel.contentView?.wantsLayer = true
+        panel.contentView?.layer?.cornerRadius = 12
+        panel.contentView?.layer?.masksToBounds = true
+
+        // Position above the mascot window
+        let mascotFrame = mascotWindow.frame
+        let x = mascotFrame.midX - fittingSize.width / 2
+        let y = mascotFrame.maxY + 8
+        panel.setFrameOrigin(NSPoint(x: x, y: y))
+
+        // Ensure popover stays on screen
+        if let screen = NSScreen.main {
+            var origin = panel.frame.origin
+            if origin.x + fittingSize.width > screen.visibleFrame.maxX {
+                origin.x = screen.visibleFrame.maxX - fittingSize.width - 8
+            }
+            if origin.x < screen.visibleFrame.minX {
+                origin.x = screen.visibleFrame.minX + 8
+            }
+            if origin.y + fittingSize.height > screen.visibleFrame.maxY {
+                origin.y = mascotFrame.minY - fittingSize.height - 8
+            }
+            panel.setFrameOrigin(origin)
+        }
+
+        // Fade in
+        panel.alphaValue = 0
+        panel.makeKeyAndOrderFront(nil)
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.2
+            panel.animator().alphaValue = 1
+        }
+
+        popoverWindow = panel
+
+        // Auto-dismiss when clicking outside
+        removeClickOutsideMonitor()
+
+        clickOutsideGlobalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            guard let self, let popover = self.popoverWindow else { return }
+            self.dismissPopover(popover)
+        }
+
+        clickOutsideMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            guard let self, let popover = self.popoverWindow else { return event }
+
+            let screenPoint = event.window?.convertPoint(toScreen: event.locationInWindow) ?? event.locationInWindow
+
+            if NSMouseInRect(screenPoint, popover.frame, false) {
+                return event
+            }
+            if let mascot = self.window, NSMouseInRect(screenPoint, mascot.frame, false) {
+                return event
+            }
+
+            self.dismissPopover(popover)
+            return event
+        }
+
+        Log.mascot.info("Mascot popover shown.")
+    }
+
+    /// Removes click-outside event monitors.
+    private func removeClickOutsideMonitor() {
+        if let monitor = clickOutsideMonitor {
+            NSEvent.removeMonitor(monitor)
+            clickOutsideMonitor = nil
+        }
+        if let monitor = clickOutsideGlobalMonitor {
+            NSEvent.removeMonitor(monitor)
+            clickOutsideGlobalMonitor = nil
+        }
+    }
+
+    /// Dismisses the popover window.
+    private func dismissPopover(_ panel: NSWindow) {
+        removeClickOutsideMonitor()
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.15
+            panel.animator().alphaValue = 0
+        }, completionHandler: { [weak self] in
+            Task { @MainActor in
+                panel.close()
+                if self?.popoverWindow === panel {
+                    self?.popoverWindow = nil
+                }
+            }
+        })
+        scheduleAutoHide()
     }
 
     /// Handles hover on the mascot — micro-float if peeking, show bubble if full.

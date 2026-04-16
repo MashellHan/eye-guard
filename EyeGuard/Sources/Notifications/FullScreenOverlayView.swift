@@ -27,8 +27,11 @@ struct FullScreenOverlayView: View {
     let healthScore: Int
     let dismissPolicy: DismissPolicy
     let postponeCount: Int
+    let exerciseSessionsToday: Int
+    let recommendedExerciseSessions: Int
     let onBreakTaken: @Sendable () -> Void
     let onPostponed: @Sendable () -> Void
+    let onStartExercises: (@Sendable () -> Void)?
 
     @State private var remainingSeconds: Int = 0
     @State private var totalDuration: Int = 0
@@ -48,6 +51,11 @@ struct FullScreenOverlayView: View {
             return String(format: "%d:%02d", minutes, seconds)
         }
         return "\(seconds)"
+    }
+
+    /// Whether to show the exercise button (macro/mandatory breaks only).
+    private var showExerciseOption: Bool {
+        (breakType == .macro || breakType == .mandatory) && onStartExercises != nil
     }
 
     /// Break-type-specific title message.
@@ -138,6 +146,11 @@ struct FullScreenOverlayView: View {
                 .background(.white.opacity(0.08))
                 .clipShape(Capsule())
 
+                // Exercise section (macro/mandatory breaks only)
+                if showExerciseOption {
+                    exerciseSection
+                }
+
                 Spacer()
 
                 // Skip button at bottom
@@ -171,6 +184,44 @@ struct FullScreenOverlayView: View {
         .onDisappear {
             stopTimer()
         }
+    }
+
+    // MARK: - Exercise Section
+
+    /// Inline exercise recommendation with badge and start button.
+    private var exerciseSection: some View {
+        VStack(spacing: 8) {
+            // Progress badge
+            HStack(spacing: 6) {
+                Image(systemName: "figure.cooldown")
+                    .font(.caption)
+                    .foregroundStyle(.teal)
+                Text("今日眼保健操: \(exerciseSessionsToday)/\(recommendedExerciseSessions)")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.white.opacity(0.7))
+            }
+
+            Button {
+                stopTimer()
+                onStartExercises?()
+            } label: {
+                Label("开始眼保健操", systemImage: "eye.trianglebadge.exclamationmark")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(
+                        LinearGradient(
+                            colors: [.teal, .cyan],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.top, 4)
     }
 
     private func startCountdownTimer() {

@@ -68,6 +68,20 @@ final class BreakScheduler {
     /// The type of break currently in progress, if any.
     private(set) var activeBreakType: BreakType?
 
+    /// Number of eye exercise sessions completed today (v2.5).
+    private(set) var exerciseSessionsToday: Int = 0
+
+    /// Recommended exercise sessions based on screen time (v2.5).
+    /// - Screen time < 2h → 1 session
+    /// - Screen time 2–4h → 2 sessions
+    /// - Screen time > 4h → 3 sessions
+    var recommendedExerciseSessions: Int {
+        let hours = totalScreenTimeToday / 3600
+        if hours < 2 { return 1 }
+        if hours < 4 { return 2 }
+        return 3
+    }
+
     // MARK: - Internal State
 
     private var sessionStartTime: Date = .now
@@ -178,6 +192,7 @@ final class BreakScheduler {
         scoreHistory = []
         isBreakInProgress = false
         activeBreakType = nil
+        exerciseSessionsToday = 0
         resetSession()
         Log.scheduler.info("Daily counters reset for new day.")
     }
@@ -215,6 +230,15 @@ final class BreakScheduler {
     /// Records that the user skipped a scheduled break.
     func skipBreak(_ type: BreakType) {
         recordBreak(type: type, wasTaken: false)
+    }
+
+    /// Records an exercise session completion (v2.5).
+    /// Called from MascotWindowController when an exercise session finishes.
+    func recordExerciseSession() {
+        exerciseSessionsToday += 1
+        Log.scheduler.info(
+            "Exercise session recorded: \(self.exerciseSessionsToday)/\(self.recommendedExerciseSessions) today."
+        )
     }
 
     /// Called when idle is detected — resets timers since user is resting (H1).
@@ -389,6 +413,20 @@ final class BreakScheduler {
         let profile = preferences.activeProfile
         let behavior = profile.behavior(for: breakType)
 
+        // Only offer exercises during macro/mandatory breaks
+        let exerciseCallback: (@Sendable () -> Void)? =
+            (breakType == .macro || breakType == .mandatory)
+                ? { @Sendable [weak self] in
+                    Task { @MainActor in
+                        self?.takeBreakNow(breakType)
+                        NotificationCenter.default.post(
+                            name: .startExercisesFromBreak,
+                            object: nil
+                        )
+                    }
+                }
+                : nil
+
         notificationSender.notify(
             breakType: breakType,
             behavior: behavior,
@@ -408,7 +446,10 @@ final class BreakScheduler {
                 Task { @MainActor in
                     self?.postponeBreak(breakType, by: delay)
                 }
-            }
+            },
+            exerciseSessionsToday: exerciseSessionsToday,
+            recommendedExerciseSessions: recommendedExerciseSessions,
+            onStartExercises: exerciseCallback
         )
     }
 
@@ -540,13 +581,15 @@ final class BreakScheduler {
         let screenTime = totalScreenTimeToday
         let longestSession = longestContinuousSession
         let history = scoreHistory
+        let exercises = exerciseSessionsToday
 
         Task {
             await persistenceManager.save(
                 breakEvents: events,
                 totalScreenTime: screenTime,
                 longestContinuousSession: longestSession,
-                scoreHistory: history
+                scoreHistory: history,
+                exerciseSessionsToday: exercises
             )
         }
     }
@@ -565,6 +608,7 @@ final class BreakScheduler {
                 let skipped = data.breakEvents.filter { !$0.wasTaken }.count
                 self.breaksTakenToday = taken
                 self.breaksSkippedToday = skipped
+                self.exerciseSessionsToday = data.exerciseSessionsToday
 
                 self.recalculateHealthScore()
                 Log.scheduler.info(

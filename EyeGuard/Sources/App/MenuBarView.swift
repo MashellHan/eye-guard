@@ -111,9 +111,16 @@ struct MenuBarView: View {
                     Text("Next: \(nextBreak.displayName)")
                         .font(.caption)
                     Spacer()
+                    // Show countdown / total interval for context (P1-2)
                     Text(TimeFormatting.formatTimerDisplay(scheduler.timeUntilNextBreak))
-                        .font(.caption)
+                        .font(.system(.caption, design: .monospaced))
                         .foregroundStyle(.orange)
+                    Text("/")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Text(TimeFormatting.formatTimerDisplay(nextBreak.interval))
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundStyle(.secondary)
                 }
             }
         }
@@ -193,6 +200,12 @@ struct MenuBarView: View {
                     icon: "xmark.circle",
                     label: "Skipped",
                     value: "\(scheduler.breaksSkippedToday)"
+                )
+                Spacer()
+                StatItem(
+                    icon: "figure.cooldown",
+                    label: "Exercises",
+                    value: "\(scheduler.exerciseSessionsToday)/\(scheduler.recommendedExerciseSessions)"
                 )
                 Spacer()
                 StatItem(

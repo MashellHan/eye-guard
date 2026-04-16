@@ -30,6 +30,9 @@ struct ExerciseSessionView: View {
     @State private var appeared: Bool = false
     @State private var mascotPupilOffset: CGSize = .zero
 
+    /// Whether TTS audio guidance is enabled (v2.4).
+    @State private var isAudioGuidanceEnabled: Bool = true
+
     /// The exercises to perform in this session.
     private let exercises = EyeExercise.allCases
 
@@ -97,6 +100,7 @@ struct ExerciseSessionView: View {
         }
         .onDisappear {
             stopCountdown()
+            SoundManager.shared.stopSpeaking()
         }
     }
 
@@ -144,6 +148,14 @@ struct ExerciseSessionView: View {
 
             // Buttons
             VStack(spacing: 10) {
+                // Audio guidance toggle (v2.4)
+                Toggle(isOn: $isAudioGuidanceEnabled) {
+                    Label("语音指导", systemImage: "speaker.wave.2")
+                        .font(.subheadline)
+                }
+                .toggleStyle(.switch)
+                .padding(.horizontal, 24)
+
                 Button(action: startSession) {
                     Label("开始练习", systemImage: "play.fill")
                         .frame(maxWidth: .infinity)
@@ -393,6 +405,13 @@ struct ExerciseSessionView: View {
         elapsedSessionSeconds = 0
         remainingSeconds = currentExercise.duration
         startCountdown()
+
+        // TTS: announce first exercise (v2.4)
+        if isAudioGuidanceEnabled {
+            let exercise = currentExercise
+            let firstInstruction = exercise.instructionsChinese.first ?? ""
+            SoundManager.shared.speakExerciseStep(exercise.chineseName, step: firstInstruction)
+        }
     }
 
     private func nextExercise() {
@@ -414,6 +433,14 @@ struct ExerciseSessionView: View {
         }
         remainingSeconds = currentExercise.duration
         startCountdown()
+
+        // TTS: announce next exercise (v2.4)
+        if isAudioGuidanceEnabled {
+            SoundManager.shared.onExerciseStepTransition()
+            let exercise = currentExercise
+            let firstInstruction = exercise.instructionsChinese.first ?? ""
+            SoundManager.shared.speakExerciseStep(exercise.chineseName, step: firstInstruction)
+        }
     }
 
     private func skipCurrentExercise() {
@@ -434,6 +461,13 @@ struct ExerciseSessionView: View {
         withAnimation(.easeInOut(duration: 0.3)) {
             sessionPhase = .completed
         }
+
+        // TTS: celebration (v2.4)
+        if isAudioGuidanceEnabled {
+            SoundManager.shared.onExerciseComplete()
+        } else {
+            SoundManager.shared.play(.breakComplete)
+        }
     }
 
     // MARK: - Countdown Timer
@@ -447,6 +481,11 @@ struct ExerciseSessionView: View {
                         remainingSeconds -= 1
                     }
                     elapsedSessionSeconds += 1
+
+                    // TTS: speak step instructions at transition points (v2.4)
+                    if isAudioGuidanceEnabled {
+                        speakStepIfNeeded()
+                    }
                 }
 
                 if remainingSeconds <= 0 {
@@ -464,6 +503,36 @@ struct ExerciseSessionView: View {
     private func stopCountdown() {
         countdownTimer?.invalidate()
         countdownTimer = nil
+    }
+
+    // MARK: - TTS Step Guidance (v2.4)
+
+    /// Speaks the current exercise step instruction at transition boundaries.
+    /// Maps elapsed time to instruction steps and speaks when entering a new step.
+    private func speakStepIfNeeded() {
+        let exercise = currentExercise
+        let instructions = exercise.instructionsChinese
+        guard !instructions.isEmpty else { return }
+
+        let exerciseDuration = exercise.duration
+        let elapsed = exerciseDuration - remainingSeconds
+
+        // Calculate step index based on elapsed time
+        let stepDuration = max(1, exerciseDuration / instructions.count)
+        let stepIndex = min(elapsed / stepDuration, instructions.count - 1)
+
+        // Speak when step index changes
+        if stepIndex != currentStep && stepIndex < instructions.count {
+            currentStep = stepIndex
+            SoundManager.shared.onExerciseStepTransition()
+            // Small delay to let chime play before speech
+            Task {
+                try? await Task.sleep(for: .milliseconds(300))
+                await MainActor.run {
+                    SoundManager.shared.speakInstruction(instructions[stepIndex])
+                }
+            }
+        }
     }
 
     // MARK: - Mascot Pupil Tracking
