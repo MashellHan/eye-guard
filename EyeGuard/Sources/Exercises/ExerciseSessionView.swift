@@ -92,6 +92,9 @@ struct ExerciseSessionView: View {
         .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
         .scaleEffect(appeared ? 1.0 : 0.95)
         .opacity(appeared ? 1.0 : 0)
+        .onExitCommand {
+            onSkip()
+        }
         .onAppear {
             calculateTotalDuration()
             withAnimation(.spring(duration: 0.4)) {

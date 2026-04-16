@@ -188,10 +188,13 @@ struct FullScreenOverlayView: View {
             }
         }
         .opacity(appeared ? 1.0 : 0.0)
-        .onKeyPress(.escape) {
-            stopTimer()
-            onPostponed()
-            return .handled
+        .onExitCommand {
+            // Mandatory breaks cannot be dismissed with ESC
+            guard case .mandatory = dismissPolicy else {
+                stopTimer()
+                onPostponed()
+                return
+            }
         }
         .onAppear {
             let duration = Int(breakType.duration)
