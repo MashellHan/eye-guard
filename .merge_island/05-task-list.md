@@ -19,7 +19,7 @@
 | 1.2 | 移植阿普到 Mascot/Apu/ （5 files） | P0 | 3h | 🔄 ApuMiniView done, 完整 MascotView 待移植 |
 | 1.3 | 创建 ApuMiniView (30pt Notch 版) | P0 | 2h | ✅ 220行，瞳孔追踪+11种表情+耳朵 |
 | 1.4 | 创建 MascotContainer 统一容器 | P0 | 2h | ✅ 含在 MascotProtocol.swift |
-| 1.5 | NotchViewModel 集成精灵切换 | P1 | 2h | ⬜ |
+| 1.5 | NotchViewModel 集成精灵切换 | P1 | 2h | ✅ Eye Guard 模式显示 ApuMiniView |
 | 1.6 | 模式切换精灵动画 | P2 | 1h | ⬜ |
 | 1.7 | 移植 SpeechBubbleView | P2 | 1h | ⬜ |
 
@@ -33,7 +33,7 @@
 | 2.4 | 移植 Protocols/ (5 files) | P0 | 1h | ✅ EyeGuardProtocols + AppModule |
 | 2.5 | 创建 EyeGuardModule.swift 模块入口 | P0 | 2h | ✅ @Observable, activate/deactivate lifecycle |
 | 2.6 | ModeManager ↔ EyeGuardModule 接入 | P0 | 1h | ✅ AppDelegate 集成，模式切换联动 |
-| 2.7 | 合并 SoundManager | P1 | 2h | ✅ EyeGuardSoundManager 独立于 MioIsland |
+| 2.7 | 合并 SoundManager | P1 | 2h | ✅ EyeGuardSoundManager 独立于 MioIsland (Phase 4 完成) |
 | 2.8 | 移植 NightModeManager | P2 | 1h | ⬜ |
 | 2.9 | 移植 Constants + TimeFormatting | P1 | 30m | ✅ EyeGuardConstants.swift |
 
@@ -46,7 +46,7 @@
 | 3.3 | 移植 OverlayWindow | P0 | 1h | ✅ OverlayWindowController + KeyableWindow |
 | 3.4 | 移植 MandatoryShakeModifier | P1 | 30m | ✅ 直接复制 |
 | 3.5 | 移植 EyeGuardOverlayManager | P0 | 1h | ✅ 替代 NotificationManager，路由 break→UI |
-| 3.6 | Notch 休息状态适配 | P1 | 2h | ⬜ |
+| 3.6 | Notch 休息状态适配 | P1 | 2h | ✅ 收起态显示 Resting + eye.slash |
 
 ## Phase 4: 眼保健操 + TTS
 
@@ -55,17 +55,17 @@
 | 4.1 | 移植 Exercises/ (3 files) | P0 | 2h | ✅ EyeExercise + ExerciseView + ExerciseSessionView |
 | 4.2 | 移植 TTS 功能到统一 SoundManager | P0 | 2h | ✅ EyeGuardSoundManager with TTS |
 | 4.3 | 移植 Tips/ (3 files) | P1 | 1h | ✅ EyeHealthTip + TipDatabase + TipBubbleView |
-| 4.4 | 全屏覆盖多显示器适配 | P1 | 1h | ⬜ |
+| 4.4 | 全屏覆盖多显示器适配 | P1 | 1h | ✅ 主屏交互+副屏 dimmed overlay |
 
 ## Phase 5: Notch 护眼面板
 
 | # | Task | Priority | Est | Status |
 |---|------|----------|-----|--------|
-| 5.1 | Eye Guard Notch 展开面板 UI | P0 | 4h | ⬜ |
-| 5.2 | 连续使用时间大字体 + 进度条 | P0 | 2h | ⬜ |
-| 5.3 | 健康评分显示 | P0 | 1h | ⬜ |
-| 5.4 | 移植 HealthScoreCalculator | P0 | 1h | ⬜ |
-| 5.5 | Notch 收起状态 — 颜色分级 | P1 | 1h | ⬜ |
+| 5.1 | Eye Guard Notch 展开面板 UI | P0 | 4h | ✅ EyeGuardNotchView + ContinuousTimeSection + HealthScoreSection |
+| 5.2 | 连续使用时间大字体 + 进度条 | P0 | 2h | ✅ 含在 ContinuousTimeSection |
+| 5.3 | 健康评分显示 | P0 | 1h | ✅ 含在 HealthScoreSection |
+| 5.4 | 移植 HealthScoreCalculator | P0 | 1h | ✅ 已在 Phase 2 完成 |
+| 5.5 | Notch 收起状态 — 颜色分级 | P1 | 1h | ✅ EyeGuardCollapsedContent + 状态点颜色分级 |
 
 ## Phase 6: Dashboard + 报告 + 设置
 
