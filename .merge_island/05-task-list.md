@@ -32,7 +32,7 @@
 | 2.3 | 移植 Models (BreakType, ReminderMode 等) | P0 | 1h | ✅ BreakType + ReminderMode + EyeGuardModels |
 | 2.4 | 移植 Protocols/ (5 files) | P0 | 1h | ✅ EyeGuardProtocols + AppModule |
 | 2.5 | 创建 EyeGuardModule.swift 模块入口 | P0 | 2h | ✅ @Observable, activate/deactivate lifecycle |
-| 2.6 | ModeManager ↔ EyeGuardModule 接入 | P0 | 1h | ⬜ |
+| 2.6 | ModeManager ↔ EyeGuardModule 接入 | P0 | 1h | ✅ AppDelegate 集成，模式切换联动 |
 | 2.7 | 合并 SoundManager | P1 | 2h | ⬜ |
 | 2.8 | 移植 NightModeManager | P2 | 1h | ⬜ |
 | 2.9 | 移植 Constants + TimeFormatting | P1 | 30m | ✅ EyeGuardConstants.swift |
