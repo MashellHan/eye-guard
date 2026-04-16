@@ -173,6 +173,24 @@ struct BreakSchedulerTests {
         #expect(scheduler.todayBreakEvents[0].wasTaken == false)
     }
 
+    @Test("Skip break resets elapsed timer to prevent re-trigger (BUG-POPUP-001)")
+    @MainActor
+    func skipBreakResetsTimer() {
+        let scheduler = BreakScheduler(
+            activityMonitor: MockActivityMonitor(),
+            notificationSender: MockNotificationSender()
+        )
+
+        // Simulate elapsed time reaching break interval
+        scheduler.elapsedPerType[.micro] = 1200
+
+        // Skip the break
+        scheduler.skipBreak(.micro)
+
+        // Timer should be reset, not still at 1200
+        #expect(scheduler.elapsedPerType[.micro, default: 0] == 0)
+    }
+
     @Test("Reset session clears duration and timers")
     @MainActor
     func resetSession() {

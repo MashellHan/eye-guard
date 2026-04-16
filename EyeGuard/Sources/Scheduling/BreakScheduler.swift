@@ -244,6 +244,7 @@ final class BreakScheduler {
     /// Records that the user skipped a scheduled break.
     func skipBreak(_ type: BreakType) {
         recordBreak(type: type, wasTaken: false)
+        resetTimersAfterBreak(type)
     }
 
     /// Records an exercise session completion (v2.5).
@@ -400,6 +401,9 @@ final class BreakScheduler {
     /// only the highest-priority break fires; lower-priority timers reset silently.
     /// Internal access for `@testable import` verification.
     func checkForDueBreaks() {
+        guard !isBreakInProgress else { return }
+        guard !notificationSender.isNotificationActive else { return }
+
         var dueBreaks: [(BreakType, Int)] = []
 
         for type in BreakType.allCases {
