@@ -6,6 +6,9 @@ import Foundation
 /// Tests: Inject a mock conforming to this protocol.
 @MainActor
 protocol NotificationSending {
+    /// Whether a notification is currently being displayed.
+    var isNotificationActive: Bool { get }
+
     /// Sends a break notification using mode-aware behavior (v2.4).
     ///
     /// - Parameters:

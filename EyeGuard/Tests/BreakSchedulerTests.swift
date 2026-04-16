@@ -41,6 +41,8 @@ actor MockActivityMonitor: ActivityMonitoring {
 /// Mock notification sender for testing BreakScheduler in isolation (v2.4).
 @MainActor
 final class MockNotificationSender: NotificationSending {
+    var isNotificationActive: Bool = false
+
     struct NotifyCall {
         let breakType: BreakType
         let behavior: BreakBehavior

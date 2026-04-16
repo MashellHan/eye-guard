@@ -251,6 +251,10 @@ final class BreakScheduler {
             Log.scheduler.info("Idle detected during active break — skipping timer reset.")
             return
         }
+        guard !notificationSender.isNotificationActive else {
+            Log.scheduler.info("Idle detected during active notification — skipping timer reset.")
+            return
+        }
         // User is already resting, reset micro-break timer
         resetTimersAfterBreak(.micro)
         Log.scheduler.info("Idle detected, micro timer reset.")
@@ -262,6 +266,10 @@ final class BreakScheduler {
         guard !isPaused else { return }
         guard !isBreakInProgress else {
             Log.scheduler.info("Activity resumed during active break — skipping session reset.")
+            return
+        }
+        guard !notificationSender.isNotificationActive else {
+            Log.scheduler.info("Activity resumed during active notification — skipping session reset.")
             return
         }
         sessionStartTime = .now
@@ -335,7 +343,7 @@ final class BreakScheduler {
 
         // Poll activity monitor every 5 seconds (not every tick)
         // Skip polling during active breaks to avoid idle/resume race (BUG-POPUP-001)
-        if ticksSinceLastScoreUpdate % 5 == 0, !isBreakInProgress {
+        if ticksSinceLastScoreUpdate % 5 == 0, !isBreakInProgress, !notificationSender.isNotificationActive {
             Task {
                 let idle = await activityMonitor.isIdle
                 if idle && !wasIdle {
