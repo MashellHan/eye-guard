@@ -189,7 +189,7 @@ struct FullScreenOverlayView: View {
             }
         }
         .opacity(appeared ? 1.0 : 0.0)
-        .mandatoryShake(trigger: $shakeTrigger, hintBottomPadding: 60)
+        .mandatoryShake(trigger: $shakeTrigger, hintBottomPadding: 60, useLargeFont: true)
         .onExitCommand {
             // Mandatory breaks cannot be dismissed with ESC
             guard case .mandatory = dismissPolicy else {
