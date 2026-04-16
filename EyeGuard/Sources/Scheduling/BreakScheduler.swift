@@ -92,14 +92,16 @@ final class BreakScheduler {
     private var wasIdle: Bool = false
 
     /// Per-break-type elapsed time for independent tracking (H5/BUG-001).
-    private var elapsedPerType: [BreakType: TimeInterval] = [
+    /// Internal access for `@testable import` verification.
+    var elapsedPerType: [BreakType: TimeInterval] = [
         .micro: 0,
         .macro: 0,
         .mandatory: 0,
     ]
 
     /// Tracks the last notified cycle per break type to prevent double-fire (BUG-003).
-    private var lastNotifiedCycle: [BreakType: Int] = [
+    /// Internal access for `@testable import` verification.
+    var lastNotifiedCycle: [BreakType: Int] = [
         .micro: -1,
         .macro: -1,
         .mandatory: -1,
@@ -364,7 +366,8 @@ final class BreakScheduler {
     /// Uses `lastNotifiedCycle` per break type to prevent double-fire (BUG-003).
     /// v2.4: Break absorption — when multiple breaks are due simultaneously,
     /// only the highest-priority break fires; lower-priority timers reset silently.
-    private func checkForDueBreaks() {
+    /// Internal access for `@testable import` verification.
+    func checkForDueBreaks() {
         var dueBreaks: [(BreakType, Int)] = []
 
         for type in BreakType.allCases {
@@ -398,7 +401,6 @@ final class BreakScheduler {
             let (type, cycle) = sorted[i]
             lastNotifiedCycle[type] = cycle
             elapsedPerType[type] = 0
-            lastNotifiedCycle[type] = -1
             Log.scheduler.info(
                 "Break \(type.displayName) absorbed by \(winner.0.displayName)."
             )
@@ -467,8 +469,10 @@ final class BreakScheduler {
     }
 
     /// Checks if continuous use has reached the mandatory break threshold (120 min).
-    /// Triggers Tier 3 full-screen overlay via NotificationManager when exceeded.
-    private func checkContinuousUse() {
+    /// Logs a warning for tracking purposes; the actual break notification is handled
+    /// by `checkForDueBreaks()` via `elapsedPerType` to avoid duplicate alerts.
+    /// Internal access for `@testable import` verification.
+    func checkContinuousUse() {
         let threshold = preferences.mandatoryBreakInterval
         guard currentSessionDuration >= threshold else { return }
 
@@ -477,9 +481,8 @@ final class BreakScheduler {
         if warningCycle > continuousUseWarnings {
             continuousUseWarnings = warningCycle
             Log.scheduler.warning(
-                "Continuous use reached \(Int(self.currentSessionDuration / 60)) minutes — triggering Tier 3."
+                "Continuous use reached \(Int(self.currentSessionDuration / 60)) minutes — Tier 3 handled by checkForDueBreaks."
             )
-            triggerBreakNotification(.mandatory)
         }
     }
 
