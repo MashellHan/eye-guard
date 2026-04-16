@@ -21,7 +21,7 @@
 | 1.4 | 创建 MascotContainer 统一容器 | P0 | 2h | ✅ 含在 MascotProtocol.swift |
 | 1.5 | NotchViewModel 集成精灵切换 | P1 | 2h | ✅ Eye Guard 模式显示 ApuMiniView |
 | 1.6 | 模式切换精灵动画 | P2 | 1h | ✅ Spring scale+opacity transition on mode switch |
-| 1.7 | 移植 SpeechBubbleView | P2 | 1h | ⬜ |
+| 1.7 | 移植 SpeechBubbleView | P2 | 1h | ✅ Dark-theme adapted, auto-dismiss, spring animation |
 
 ## Phase 2: 护眼核心
 
