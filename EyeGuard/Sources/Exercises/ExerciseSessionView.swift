@@ -462,6 +462,9 @@ struct ExerciseSessionView: View {
     }
 
     private func skipCurrentExercise() {
+        // Clear any queued TTS from the skipped exercise
+        SoundManager.shared.stopSpeaking()
+
         // Count skipped exercise time as elapsed
         let exerciseDuration = currentExercise.duration
         let timeSpent = exerciseDuration - remainingSeconds
@@ -472,6 +475,7 @@ struct ExerciseSessionView: View {
 
     private func completeSession() {
         stopCountdown()
+        SoundManager.shared.stopSpeaking()
         let exerciseDuration = currentExercise.duration
         let timeSpent = exerciseDuration - remainingSeconds
         elapsedSessionSeconds += timeSpent
