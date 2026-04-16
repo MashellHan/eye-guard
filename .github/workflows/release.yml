@@ -1,0 +1,81 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build app
+        run: bash scripts/build-app.sh
+
+      - name: Sign (ad-hoc)
+        run: codesign --sign - --force --deep EyeGuard.app
+
+      - name: Create DMG
+        run: hdiutil create -volname "EyeGuard" -srcfolder EyeGuard.app -ov -format UDZO EyeGuard.dmg
+
+      - name: Create Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          SHA=$(shasum -a 256 EyeGuard.dmg | awk '{print $1}')
+          gh release create "$VERSION" EyeGuard.dmg \
+            --title "EyeGuard $VERSION" \
+            --notes "EyeGuard $VERSION
+
+          Install:
+          \`\`\`bash
+          brew tap MashellHan/tap && brew install --cask eye-guard
+          \`\`\`
+
+          SHA256: \`$SHA\`"
+
+          echo "SHA=$SHA" >> $GITHUB_ENV
+          echo "VERSION=${VERSION#v}" >> $GITHUB_ENV
+
+      - name: Update Homebrew tap
+        env:
+          GH_TOKEN: ${{ secrets.TAP_TOKEN }}
+        run: |
+          git clone https://x-access-token:${GH_TOKEN}@github.com/MashellHan/homebrew-tap.git /tmp/tap
+          cd /tmp/tap
+          cat > Casks/eye-guard.rb <<RUBY
+          cask "eye-guard" do
+            version "${VERSION}"
+            sha256 "${SHA}"
+
+            url "https://github.com/MashellHan/eye-guard/releases/download/v#{version}/EyeGuard.dmg"
+            name "EyeGuard"
+            desc "Medical-grade eye health guardian for macOS with 20-20-20 rule reminders"
+            homepage "https://github.com/MashellHan/eye-guard"
+
+            depends_on macos: ">= :sonoma"
+
+            app "EyeGuard.app"
+
+            postflight do
+              system_command "/usr/bin/xattr",
+                             args: ["-cr", "#{appdir}/EyeGuard.app"],
+                             sudo: false
+            end
+
+            zap trash: [
+              "~/Library/Preferences/com.eyeguard.app.plist",
+            ]
+          end
+          RUBY
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add -A
+          git commit -m "chore: bump eye-guard to v${VERSION}"
+          git push
