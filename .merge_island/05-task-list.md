@@ -95,7 +95,7 @@
 
 | # | Task | Priority | Est | Status |
 |---|------|----------|-----|--------|
-| 8.1 | 更新 README | P0 | 1h | ⬜ |
+| 8.1 | 更新 README | P0 | 1h | ✅ EN+ZH READMEs with Eye Guard mode docs |
 | 8.2 | 更新 Homebrew tap | P0 | 30m | ⬜ |
 | 8.3 | GitHub Release v4.0.0 | P0 | 30m | ⬜ |
 
