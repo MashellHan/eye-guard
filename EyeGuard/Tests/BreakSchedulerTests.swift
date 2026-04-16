@@ -390,4 +390,44 @@ struct BreakSchedulerTests {
             #expect(breakdown.components[3].name == "Quality")
         }
     }
+
+    @Test("Handle idle detected skips reset during active break (BUG-POPUP-001)")
+    @MainActor
+    func handleIdleDetectedDuringBreak() {
+        let scheduler = BreakScheduler(
+            activityMonitor: MockActivityMonitor(),
+            notificationSender: MockNotificationSender()
+        )
+
+        // Simulate micro break elapsed
+        scheduler.elapsedPerType[.micro] = 1200
+
+        // Start a break (sets isBreakInProgress = true)
+        scheduler.takeBreakNow(.micro)
+        #expect(scheduler.isBreakInProgress == true)
+
+        // Save state before idle
+        let elapsedBefore = scheduler.elapsedPerType[.micro, default: 0]
+
+        // Idle detected while break is in progress — should NOT reset timers
+        scheduler.handleIdleDetected()
+        #expect(scheduler.isBreakInProgress == true)
+        #expect(scheduler.elapsedPerType[.micro, default: 0] == elapsedBefore)
+    }
+
+    @Test("Handle activity resumed skips reset during active break (BUG-POPUP-001)")
+    @MainActor
+    func handleActivityResumedDuringBreak() {
+        let scheduler = BreakScheduler(
+            activityMonitor: MockActivityMonitor(),
+            notificationSender: MockNotificationSender()
+        )
+
+        scheduler.takeBreakNow(.macro)
+        #expect(scheduler.isBreakInProgress == true)
+
+        // Activity resumed during break — should NOT reset session
+        scheduler.handleActivityResumed()
+        #expect(scheduler.isBreakInProgress == true)
+    }
 }

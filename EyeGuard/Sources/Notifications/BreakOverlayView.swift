@@ -1,4 +1,5 @@
 import SwiftUI
+import os
 
 /// A beautiful floating overlay view that prompts the user to take an eye break.
 ///
@@ -85,6 +86,7 @@ struct BreakOverlayView: View {
         .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
         .scaleEffect(appeared ? 1.0 : 0.95)
         .onAppear {
+            Log.notification.info("BreakOverlay appeared: \(breakType.displayName), policy=\(String(describing: dismissPolicy))")
             withAnimation(.spring(duration: 0.4)) {
                 appeared = true
             }
@@ -94,6 +96,7 @@ struct BreakOverlayView: View {
             }
         }
         .onDisappear {
+            Log.notification.info("BreakOverlay disappeared: \(breakType.displayName), countdown=\(countdown)s")
             stopTimer()
         }
     }

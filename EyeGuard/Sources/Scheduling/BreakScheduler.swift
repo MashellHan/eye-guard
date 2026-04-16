@@ -244,16 +244,26 @@ final class BreakScheduler {
     }
 
     /// Called when idle is detected — resets timers since user is resting (H1).
+    /// Skips reset when a break notification is active to avoid dismissing the overlay (BUG-POPUP-001).
     func handleIdleDetected() {
         guard !isPaused else { return }
+        guard !isBreakInProgress else {
+            Log.scheduler.info("Idle detected during active break — skipping timer reset.")
+            return
+        }
         // User is already resting, reset micro-break timer
         resetTimersAfterBreak(.micro)
         Log.scheduler.info("Idle detected, micro timer reset.")
     }
 
     /// Called when user returns from idle (H1).
+    /// Skips reset when a break notification is active (BUG-POPUP-001).
     func handleActivityResumed() {
         guard !isPaused else { return }
+        guard !isBreakInProgress else {
+            Log.scheduler.info("Activity resumed during active break — skipping session reset.")
+            return
+        }
         sessionStartTime = .now
         currentSessionDuration = 0
         Log.scheduler.info("Activity resumed, session restarted.")
@@ -324,7 +334,8 @@ final class BreakScheduler {
         }
 
         // Poll activity monitor every 5 seconds (not every tick)
-        if ticksSinceLastScoreUpdate % 5 == 0 {
+        // Skip polling during active breaks to avoid idle/resume race (BUG-POPUP-001)
+        if ticksSinceLastScoreUpdate % 5 == 0, !isBreakInProgress {
             Task {
                 let idle = await activityMonitor.isIdle
                 if idle && !wasIdle {

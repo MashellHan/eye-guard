@@ -1,4 +1,5 @@
 import SwiftUI
+import os
 
 /// Pool of eye care tips displayed during breaks.
 /// Sourced from ophthalmologist-recommended exercises (AAO, WHO).
@@ -191,6 +192,7 @@ struct FullScreenOverlayView: View {
             let duration = Int(breakType.duration)
             remainingSeconds = duration
             totalDuration = duration
+            Log.notification.info("FullScreenOverlay appeared: \(breakType.displayName), duration=\(duration)s")
             withAnimation(.easeIn(duration: 0.4)) {
                 appeared = true
             }
@@ -198,6 +200,7 @@ struct FullScreenOverlayView: View {
             startCountdownTimer()
         }
         .onDisappear {
+            Log.notification.info("FullScreenOverlay disappeared: \(breakType.displayName), remaining=\(remainingSeconds)s")
             stopTimer()
         }
     }

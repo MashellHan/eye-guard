@@ -176,7 +176,8 @@ final class OverlayWindowController: NSObject {
                 defer: false
             )
             fullScreenWindow.contentView = hostingView
-            fullScreenWindow.level = .screenSaver
+            fullScreenWindow.level = NSWindow.Level(rawValue: Int(CGShieldingWindowLevel()))
+            fullScreenWindow.ignoresMouseEvents = false
             fullScreenWindow.isOpaque = false
             fullScreenWindow.backgroundColor = .clear
             fullScreenWindow.hasShadow = false
