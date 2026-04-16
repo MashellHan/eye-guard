@@ -420,6 +420,7 @@ struct ExerciseSessionView: View {
 
         // TTS: announce first exercise (v2.4)
         if isAudioGuidanceEnabled {
+            SoundManager.shared.speakExerciseIntro()
             let exercise = currentExercise
             let firstInstruction = exercise.instructionsChinese.first ?? ""
             SoundManager.shared.speakExerciseStep(exercise.chineseName, step: firstInstruction)
@@ -449,6 +450,10 @@ struct ExerciseSessionView: View {
         // TTS: announce next exercise (v2.4)
         if isAudioGuidanceEnabled {
             SoundManager.shared.onExerciseStepTransition()
+            // Encouragement after exercise 3 (v3.2)
+            if currentExerciseIndex == 3 {
+                SoundManager.shared.speakEncouragement()
+            }
             let exercise = currentExercise
             let firstInstruction = exercise.instructionsChinese.first ?? ""
             SoundManager.shared.speakExerciseStep(exercise.chineseName, step: firstInstruction)

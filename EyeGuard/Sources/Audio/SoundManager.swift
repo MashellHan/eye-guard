@@ -239,6 +239,28 @@ final class SoundManager: SoundPlaying {
         speak("休息结束，继续加油")
     }
 
+    // MARK: - Encouragement (v3.2)
+
+    /// Encouragement phrases spoken during exercises.
+    private static let encouragements = [
+        "很好，继续保持",
+        "做得不错",
+        "放松，慢慢来",
+        "你的眼睛会感谢你的",
+        "保持节奏，很棒",
+    ]
+
+    /// Speaks a random encouragement phrase.
+    func speakEncouragement() {
+        let phrase = Self.encouragements.randomElement() ?? "很好"
+        speak(phrase)
+    }
+
+    /// Speaks the exercise intro greeting.
+    func speakExerciseIntro() {
+        speak("来，闭上眼睛，我们一起做眼保健操")
+    }
+
     /// Plays exercise step transition chime.
     func onExerciseStepTransition() {
         play(.exerciseStep)
