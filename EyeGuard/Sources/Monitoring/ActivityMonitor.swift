@@ -179,12 +179,17 @@ actor ActivityMonitor: ActivityMonitoring {
     /// Cleans up the CGEventTap and releases the retained reference (review-014 M1).
     private func cleanupEventTap() {
         if let tap = eventTapPort {
-            // Disable on main thread since it was added to the main run loop
+            // Disable on main thread, then release ref after disable completes (review-015 L2)
+            let ref = eventTapRef
+            eventTapPort = nil
+            eventTapRef = nil
             Task { @MainActor in
                 CGEvent.tapEnable(tap: tap, enable: false)
+                ref?.release()
             }
+        } else {
+            releaseEventTapRef()
         }
-        releaseEventTapRef()
     }
 
     private func releaseEventTapRef() {
