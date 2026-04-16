@@ -327,9 +327,12 @@ final class BreakScheduler {
         }
 
         // Update per-type elapsed times (H5)
-        for type in BreakType.allCases {
-            guard isBreakTypeEnabled(type) else { continue }
-            elapsedPerType[type, default: 0] += max(delta, 0)
+        // Don't accumulate during active notifications/breaks — user is being reminded (BUG-POPUP-001 v4)
+        if !isBreakInProgress && !notificationSender.isNotificationActive {
+            for type in BreakType.allCases {
+                guard isBreakTypeEnabled(type) else { continue }
+                elapsedPerType[type, default: 0] += max(delta, 0)
+            }
         }
 
         updateNextBreak()

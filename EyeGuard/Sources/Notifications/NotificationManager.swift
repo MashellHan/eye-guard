@@ -161,7 +161,6 @@ final class NotificationManager: NotificationSending {
         let callback = onTakenCallback
         cancelEscalation()
         dismissAllOverlays()
-        isNotificationActive = false
         clearCallbacks()
 
         // Play break complete sound (v1.6)
@@ -174,7 +173,9 @@ final class NotificationManager: NotificationSending {
         activeBreakType = nil
         activeBehavior = nil
 
+        // Execute callback BEFORE releasing guard to prevent race condition (BUG-POPUP-001 v4)
         callback?()
+        isNotificationActive = false
     }
 
     /// Postpones the current break by the configured delay (v2.4).
@@ -187,7 +188,6 @@ final class NotificationManager: NotificationSending {
         let callback = onPostponedCallback
         cancelEscalation()
         dismissAllOverlays()
-        isNotificationActive = false
 
         Log.notification.info(
             "Postponed \(breakType.displayName) (\(currentCount + 1) times)."
@@ -197,7 +197,9 @@ final class NotificationManager: NotificationSending {
         activeBreakType = nil
         activeBehavior = nil
 
+        // Execute callback BEFORE releasing guard (BUG-POPUP-001 v4)
         callback?(EyeGuardConstants.postponeDelay)
+        isNotificationActive = false
     }
 
     /// Snoozes the current notification and reschedules after snooze duration (BUG-006).
@@ -260,11 +262,12 @@ final class NotificationManager: NotificationSending {
                         let callback = self?.onSkippedCallback
                         self?.cancelEscalation()
                         self?.dismissAllOverlays()
-                        self?.isNotificationActive = false
                         self?.clearCallbacks()
                         self?.activeBreakType = nil
                         self?.activeBehavior = nil
+                        // Execute callback BEFORE releasing guard (BUG-POPUP-001 v4)
                         callback?()
+                        self?.isNotificationActive = false
                     }
                 },
                 onPostponed: { [weak self] in
@@ -285,11 +288,11 @@ final class NotificationManager: NotificationSending {
                     Task { @MainActor in
                         self?.cancelEscalation()
                         self?.dismissAllOverlays()
-                        self?.isNotificationActive = false
                         self?.clearCallbacks()
                         self?.activeBreakType = nil
                         self?.activeBehavior = nil
                         callback()
+                        self?.isNotificationActive = false
                     }
                 }
             }
@@ -326,13 +329,14 @@ final class NotificationManager: NotificationSending {
     private func handleEscalationTimeout() {
         let callback = onSkippedCallback
         dismissAllOverlays()
-        isNotificationActive = false
         clearCallbacks()
         activeBreakType = nil
         activeBehavior = nil
 
         Log.notification.info("Escalation timed out, break skipped.")
+        // Execute callback BEFORE releasing guard (BUG-POPUP-001 v4)
         callback?()
+        isNotificationActive = false
     }
 
     /// Clears stored callbacks after they've been invoked or are no longer needed.
