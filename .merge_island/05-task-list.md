@@ -27,8 +27,8 @@
 
 | # | Task | Priority | Est | Status |
 |---|------|----------|-----|--------|
-| 2.1 | 移植 BreakScheduler.swift | P0 | 2h | ⬜ |
-| 2.2 | 移植 ActivityMonitor.swift | P0 | 1h | ⬜ |
+| 2.1 | 移植 BreakScheduler.swift | P0 | 2h | ✅ 解耦回调，含 HealthScoreCalculator + DataPersistence |
+| 2.2 | 移植 ActivityMonitor.swift | P0 | 1h | ✅ CGEventTap + ScreenLockObserver + 节流 |
 | 2.3 | 移植 Models (BreakType, ReminderMode 等) | P0 | 1h | ✅ BreakType + ReminderMode + EyeGuardModels |
 | 2.4 | 移植 Protocols/ (5 files) | P0 | 1h | ✅ EyeGuardProtocols + AppModule |
 | 2.5 | 创建 EyeGuardModule.swift 模块入口 | P0 | 2h | ✅ @Observable, activate/deactivate lifecycle |
