@@ -34,7 +34,7 @@
 | 2.5 | 创建 EyeGuardModule.swift 模块入口 | P0 | 2h | ✅ @Observable, activate/deactivate lifecycle |
 | 2.6 | ModeManager ↔ EyeGuardModule 接入 | P0 | 1h | ✅ AppDelegate 集成，模式切换联动 |
 | 2.7 | 合并 SoundManager | P1 | 2h | ✅ EyeGuardSoundManager 独立于 MioIsland (Phase 4 完成) |
-| 2.8 | 移植 NightModeManager | P2 | 1h | ⬜ |
+| 2.8 | 移植 NightModeManager | P2 | 1h | ✅ @Observable, nightStartHour/EndHour, bilingual messages |
 | 2.9 | 移植 Constants + TimeFormatting | P1 | 30m | ✅ EyeGuardConstants.swift |
 
 ## Phase 3: 休息覆盖层
@@ -88,7 +88,7 @@
 | 7.4 | 性能优化 | P1 | 2h | ⬜ |
 | 7.5 | 暗色/亮色主题 | P2 | 2h | ⬜ |
 | 7.6 | 中英本地化 | P2 | 2h | ⬜ |
-| 7.7 | 清理死代码 | P1 | 2h | ⬜ |
+| 7.7 | 清理死代码 | P1 | 2h | 🔄 Removed unused protocols (NotificationSending, SoundPlaying) |
 | 7.8 | 完整测试 | P0 | 3h | ⬜ |
 
 ## Phase 8: 发布
