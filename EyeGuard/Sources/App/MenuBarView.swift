@@ -8,9 +8,9 @@ struct MenuBarView: View {
         VStack(alignment: .leading, spacing: 12) {
             headerSection
             Divider()
-            healthScoreSection
+            continuousScreenTimeSection
             Divider()
-            timerSection
+            healthScoreSection
             Divider()
             controlsSection
             Divider()
@@ -18,10 +18,12 @@ struct MenuBarView: View {
             Divider()
             insightAndReportSection
             Divider()
+            actionSection
+            Divider()
             footerSection
         }
         .padding()
-        .frame(width: 340)
+        .frame(width: 360)
     }
 
     // MARK: - Sections
@@ -90,39 +92,49 @@ struct MenuBarView: View {
         }
     }
 
-    private var timerSection: some View {
+    /// Continuous screen time display — the most prominent real-time indicator.
+    private var continuousScreenTimeSection: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Current Session")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
-            HStack {
-                Image(systemName: "clock")
-                Text(TimeFormatting.formatTimerDisplay(scheduler.currentSessionDuration))
-                    .font(.system(.title3, design: .monospaced))
+            HStack(spacing: 4) {
+                Image(systemName: "desktopcomputer")
+                    .font(.caption)
+                    .foregroundStyle(screenTimeColor)
+                Text("已连续使用屏幕")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
                 Spacer()
             }
 
+            Text(TimeFormatting.formatTimerDisplay(scheduler.currentSessionDuration))
+                .font(.system(.title, design: .monospaced))
+                .foregroundStyle(screenTimeColor)
+                .opacity(scheduler.currentSessionDuration > 3600 ? (blinkOpacity) : 1.0)
+
+            // Progress bar toward next break
             if let nextBreak = scheduler.nextScheduledBreak {
+                let progress = nextBreak.interval > 0
+                    ? min(1.0, Double(scheduler.currentSessionDuration) / nextBreak.interval)
+                    : 0.0
+
+                ProgressView(value: progress)
+                    .tint(screenTimeColor)
+
                 HStack {
                     Image(systemName: nextBreak.iconName)
-                    Text("Next: \(nextBreak.displayName)")
+                        .font(.caption2)
+                    Text("下次休息: \(nextBreak.displayName)")
                         .font(.caption)
                     Spacer()
-                    // Show countdown / total interval for context (P1-2)
-                    Text(TimeFormatting.formatTimerDisplay(scheduler.timeUntilNextBreak))
+                    Text("还剩 \(TimeFormatting.formatTimerDisplay(scheduler.timeUntilNextBreak))")
                         .font(.system(.caption, design: .monospaced))
                         .foregroundStyle(.orange)
-                    Text("/")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                    Text(TimeFormatting.formatTimerDisplay(nextBreak.interval))
-                        .font(.system(.caption, design: .monospaced))
-                        .foregroundStyle(.secondary)
                 }
             }
         }
     }
+
+    /// Blink animation opacity for prolonged screen time (>60min).
+    @State private var blinkOpacity: Double = 1.0
 
     private var controlsSection: some View {
         HStack(spacing: 8) {
@@ -251,15 +263,30 @@ struct MenuBarView: View {
         }
     }
 
+    private var actionSection: some View {
+        HStack(spacing: 8) {
+            Button {
+                DashboardWindowController.shared.showDashboard(scheduler: scheduler)
+            } label: {
+                Label("Dashboard", systemImage: "chart.bar")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+
+            Button {
+                generateReport()
+            } label: {
+                Label("Report", systemImage: "doc.text")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+    }
+
     private var footerSection: some View {
         HStack {
-            Button("Dashboard...") {
-                DashboardWindowController.shared.showDashboard(scheduler: scheduler)
-            }
-            .font(.caption)
-
-            Spacer()
-
             Button("Preferences...") {
                 PreferencesWindowController.shared.showPreferences()
             }
@@ -315,6 +342,17 @@ struct MenuBarView: View {
     }
 
     // MARK: - Helpers
+
+    /// Color based on continuous screen time duration.
+    private var screenTimeColor: Color {
+        let minutes = scheduler.currentSessionDuration / 60
+        switch minutes {
+        case ..<20:  return .green
+        case 20..<45: return .blue
+        case 45..<60: return .orange
+        default:      return .red
+        }
+    }
 
     private var trendColor: Color {
         switch scheduler.currentTrend {
