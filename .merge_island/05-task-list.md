@@ -41,11 +41,11 @@
 
 | # | Task | Priority | Est | Status |
 |---|------|----------|-----|--------|
-| 3.1 | 移植 BreakOverlayView | P0 | 2h | ⬜ |
-| 3.2 | 移植 FullScreenOverlayView | P0 | 2h | ⬜ |
-| 3.3 | 移植 OverlayWindow | P0 | 1h | ⬜ |
-| 3.4 | 移植 MandatoryShakeModifier | P1 | 30m | ⬜ |
-| 3.5 | 移植 NotificationManager | P0 | 1h | ⬜ |
+| 3.1 | 移植 BreakOverlayView | P0 | 2h | ✅ 解耦 SoundManager，英文 UI |
+| 3.2 | 移植 FullScreenOverlayView | P0 | 2h | ✅ ApuMiniView 替代 MascotView |
+| 3.3 | 移植 OverlayWindow | P0 | 1h | ✅ OverlayWindowController + KeyableWindow |
+| 3.4 | 移植 MandatoryShakeModifier | P1 | 30m | ✅ 直接复制 |
+| 3.5 | 移植 EyeGuardOverlayManager | P0 | 1h | ✅ 替代 NotificationManager，路由 break→UI |
 | 3.6 | Notch 休息状态适配 | P1 | 2h | ⬜ |
 
 ## Phase 4: 眼保健操 + TTS
