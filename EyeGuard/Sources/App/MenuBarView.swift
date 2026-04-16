@@ -24,7 +24,7 @@ struct MenuBarView: View {
         }
         .padding()
         .frame(width: 360)
-        .onChange(of: scheduler.currentSessionDuration > 3600) { _, isOver in
+        .onChange(of: elapsedSinceLastBreak > 3600) { _, isOver in
             if isOver {
                 withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
                     blinkOpacity = 0.3
@@ -110,21 +110,21 @@ struct MenuBarView: View {
                 Image(systemName: "desktopcomputer")
                     .font(.caption)
                     .foregroundStyle(screenTimeColor)
-                Text("已连续使用屏幕")
+                Text("距上次休息")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 Spacer()
             }
 
-            Text(TimeFormatting.formatTimerDisplay(scheduler.currentSessionDuration))
+            Text(TimeFormatting.formatTimerDisplay(elapsedSinceLastBreak))
                 .font(.system(.title, design: .monospaced))
                 .foregroundStyle(screenTimeColor)
-                .opacity(scheduler.currentSessionDuration > 3600 ? (blinkOpacity) : 1.0)
+                .opacity(elapsedSinceLastBreak > 3600 ? (blinkOpacity) : 1.0)
 
             // Progress bar toward next break
             if let nextBreak = scheduler.nextScheduledBreak {
                 let progress = nextBreak.interval > 0
-                    ? min(1.0, Double(scheduler.currentSessionDuration) / nextBreak.interval)
+                    ? min(1.0, elapsedSinceLastBreak / nextBreak.interval)
                     : 0.0
 
                 ProgressView(value: progress)
@@ -354,9 +354,14 @@ struct MenuBarView: View {
 
     // MARK: - Helpers
 
-    /// Color based on continuous screen time duration.
+    /// Time elapsed since the last micro break (most frequent break type).
+    private var elapsedSinceLastBreak: TimeInterval {
+        scheduler.elapsedPerType[.micro, default: 0]
+    }
+
+    /// Color based on time since last break.
     private var screenTimeColor: Color {
-        let minutes = scheduler.currentSessionDuration / 60
+        let minutes = elapsedSinceLastBreak / 60
         switch minutes {
         case ..<20:  return .green
         case 20..<45: return .blue
