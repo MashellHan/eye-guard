@@ -83,7 +83,7 @@
 | # | Task | Priority | Est | Status |
 |---|------|----------|-----|--------|
 | 7.1 | Dual Mode Notch 分区布局 | P0 | 4h | ✅ DualModeNotchView split layout + NotchContentType.dualMode |
-| 7.2 | 双精灵交互动画 | P2 | 3h | ⬜ |
+| 7.2 | 双精灵交互动画 | P2 | 3h | ✅ DualMascotStrip with look/celebrate micro-interactions |
 | 7.3 | 模式间事件联动 | P1 | 2h | ✅ AppEvent dispatch: idle, activity, modeChanged |
 | 7.4 | 性能优化 | P1 | 2h | ✅ Timer overhead fix, memory leak fix, dedup observers |
 | 7.5 | 暗色/亮色主题 | P2 | 2h | ⬜ |
