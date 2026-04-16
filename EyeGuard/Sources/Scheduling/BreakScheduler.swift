@@ -101,6 +101,7 @@ final class BreakScheduler {
     private let preferences: UserPreferences
 
     /// Tracks whether the user was idle on the previous tick (H1).
+    /// Also set immediately on screen lock/unlock to avoid 5-second poll gap (BUG-008).
     private var wasIdle: Bool = false
 
     /// Per-break-type elapsed time for independent tracking (H5/BUG-001).

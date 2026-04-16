@@ -236,8 +236,6 @@ struct ExerciseSessionView: View {
                 remainingSeconds: $remainingSeconds
             )
 
-            Spacer()
-
             // Exercise navigation
             exerciseNavigation
                 .padding(.horizontal, 20)

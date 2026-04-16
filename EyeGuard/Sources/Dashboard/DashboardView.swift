@@ -1,12 +1,11 @@
 import Charts
 import SwiftUI
 
-/// Dashboard view with tabs for Today, History, and Breakdown.
+/// Dashboard view with two tabs: Today (stats + breakdown) and History.
 ///
 /// Uses SwiftUI Charts framework (macOS 14+) for data visualization:
-/// - **Today**: Current health score gauge, break stats, active session info
+/// - **Today**: Health score gauge, break stats, active session, score breakdown
 /// - **History**: BarMark for daily screen time + LineMark for health score trend
-/// - **Breakdown**: Pie-style breakdown of score components
 struct DashboardView: View {
 
     /// The connected scheduler for live data.
@@ -45,13 +44,8 @@ struct DashboardView: View {
                 .tabItem {
                     Label("History", systemImage: "chart.bar")
                 }
-
-            breakdownTab
-                .tabItem {
-                    Label("Breakdown", systemImage: "chart.pie")
-                }
         }
-        .frame(width: 600, height: 500)
+        .frame(width: 820, height: 720)
         .task {
             await loadHistory()
         }
@@ -62,112 +56,136 @@ struct DashboardView: View {
     private var todayTab: some View {
         ScrollView {
             VStack(spacing: 20) {
-                // Health Score Gauge
-                VStack(spacing: 8) {
-                    Text("Current Eye Health Score")
-                        .font(.headline)
-                        .foregroundStyle(.secondary)
+                // Health Score Gauge + Summary
+                HStack(spacing: 32) {
+                    // Gauge on left
+                    VStack(spacing: 8) {
+                        DashboardGauge(score: scheduler.currentHealthScore)
+                            .frame(width: 180, height: 180)
 
-                    DashboardGauge(score: scheduler.currentHealthScore)
-                        .frame(height: 160)
-
-                    if let breakdown = scheduler.currentBreakdown {
-                        Text(breakdown.summaryText)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                    }
-                }
-
-                Divider()
-
-                // Today's Stats Grid
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Today's Activity")
-                        .font(.headline)
-
-                    LazyVGrid(columns: [
-                        GridItem(.flexible()),
-                        GridItem(.flexible()),
-                        GridItem(.flexible()),
-                    ], spacing: 16) {
-                        DashboardStatCard(
-                            icon: "checkmark.circle.fill",
-                            iconColor: .green,
-                            title: "Breaks Taken",
-                            value: "\(scheduler.breaksTakenToday)"
-                        )
-
-                        DashboardStatCard(
-                            icon: "xmark.circle.fill",
-                            iconColor: .red,
-                            title: "Breaks Skipped",
-                            value: "\(scheduler.breaksSkippedToday)"
-                        )
-
-                        DashboardStatCard(
-                            icon: "clock.fill",
-                            iconColor: .blue,
-                            title: "Screen Time",
-                            value: formatHoursMinutes(scheduler.totalScreenTimeToday)
-                        )
+                        if let breakdown = scheduler.currentBreakdown {
+                            Text(breakdown.summaryText)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                                .frame(maxWidth: 160)
+                        }
                     }
 
-                    LazyVGrid(columns: [
-                        GridItem(.flexible()),
-                        GridItem(.flexible()),
-                        GridItem(.flexible()),
-                    ], spacing: 16) {
-                        DashboardStatCard(
-                            icon: "arrow.up.right",
-                            iconColor: trendColor,
-                            title: "Trend",
-                            value: scheduler.currentTrend.displayName
-                        )
+                    // Stats on right
+                    VStack(spacing: 14) {
+                        LazyVGrid(columns: [
+                            GridItem(.flexible()),
+                            GridItem(.flexible()),
+                        ], spacing: 12) {
+                            DashboardStatCard(
+                                icon: "checkmark.circle.fill",
+                                iconColor: .green,
+                                title: "Breaks Taken",
+                                value: "\(scheduler.breaksTakenToday)"
+                            )
 
-                        DashboardStatCard(
-                            icon: "timer",
-                            iconColor: .orange,
-                            title: "Longest Session",
-                            value: formatHoursMinutes(scheduler.longestContinuousSession)
-                        )
+                            DashboardStatCard(
+                                icon: "xmark.circle.fill",
+                                iconColor: .red,
+                                title: "Breaks Skipped",
+                                value: "\(scheduler.breaksSkippedToday)"
+                            )
 
-                        DashboardStatCard(
-                            icon: "exclamationmark.triangle.fill",
-                            iconColor: .yellow,
-                            title: "Warnings",
-                            value: "\(scheduler.continuousUseWarnings)"
-                        )
+                            DashboardStatCard(
+                                icon: "clock.fill",
+                                iconColor: .blue,
+                                title: "Screen Time",
+                                value: formatHoursMinutes(scheduler.totalScreenTimeToday)
+                            )
+
+                            DashboardStatCard(
+                                icon: "timer",
+                                iconColor: .orange,
+                                title: "Longest Session",
+                                value: formatHoursMinutes(scheduler.longestContinuousSession)
+                            )
+
+                            DashboardStatCard(
+                                icon: "arrow.up.right",
+                                iconColor: trendColor,
+                                title: "Trend",
+                                value: scheduler.currentTrend.displayName
+                            )
+
+                            DashboardStatCard(
+                                icon: "exclamationmark.triangle.fill",
+                                iconColor: .yellow,
+                                title: "Warnings",
+                                value: "\(scheduler.continuousUseWarnings)"
+                            )
+                        }
                     }
                 }
 
                 // Active Session
                 if !scheduler.isPaused {
-                    Divider()
+                    HStack {
+                        Image(systemName: "clock")
+                            .foregroundStyle(.blue)
+                        Text("Current session: \(formatHoursMinutes(scheduler.currentSessionDuration))")
+                            .font(.subheadline)
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Active Session")
+                        Spacer()
+
+                        if let next = scheduler.nextScheduledBreak {
+                            Text("Next: \(next.displayName) in \(formatHoursMinutes(scheduler.timeUntilNextBreak))")
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                        }
+                    }
+                    .padding(10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(.blue.opacity(0.1))
+                    )
+                }
+
+                Divider()
+
+                // Score Breakdown (merged from old Breakdown tab)
+                if let breakdown = scheduler.currentBreakdown {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Score Breakdown")
                             .font(.headline)
 
-                        HStack {
-                            Image(systemName: "clock")
-                                .foregroundStyle(.blue)
-                            Text("Current session: \(formatHoursMinutes(scheduler.currentSessionDuration))")
-                                .font(.subheadline)
+                        HStack(spacing: 20) {
+                            // Component bars on left
+                            VStack(spacing: 12) {
+                                ForEach(breakdown.components, id: \.name) { component in
+                                    BreakdownComponentRow(component: component)
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
 
-                            Spacer()
+                            // Pie chart on right
+                            VStack {
+                                Chart(breakdown.components, id: \.name) { component in
+                                    SectorMark(
+                                        angle: .value("Score", component.score),
+                                        innerRadius: .ratio(0.5),
+                                        angularInset: 2
+                                    )
+                                    .foregroundStyle(componentColor(component.name))
+                                    .annotation(position: .overlay) {
+                                        Text("\(component.score)")
+                                            .font(.caption2.bold())
+                                            .foregroundStyle(.white)
+                                    }
+                                }
+                                .chartLegend(position: .bottom)
+                                .frame(width: 180, height: 180)
 
-                            if let next = scheduler.nextScheduledBreak {
-                                Text("Next: \(next.displayName) in \(formatHoursMinutes(scheduler.timeUntilNextBreak))")
-                                    .font(.caption)
-                                    .foregroundStyle(.orange)
+                                Text("\(breakdown.score.totalScore) / 100")
+                                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                                    .foregroundStyle(scoreColor(breakdown.score.totalScore))
                             }
                         }
-                        .padding()
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(.blue.opacity(0.1))
-                        )
                     }
                 }
             }
@@ -287,66 +305,6 @@ struct DashboardView: View {
                 }
             }
         }
-    }
-
-    // MARK: - Breakdown Tab
-
-    private var breakdownTab: some View {
-        VStack(spacing: 20) {
-            Text("Score Breakdown")
-                .font(.headline)
-
-            if let breakdown = scheduler.currentBreakdown {
-                // Component bars
-                VStack(spacing: 16) {
-                    ForEach(breakdown.components, id: \.name) { component in
-                        BreakdownComponentRow(component: component)
-                    }
-                }
-                .padding()
-
-                Divider()
-
-                // Pie chart visualization using SectorMark
-                Chart(breakdown.components, id: \.name) { component in
-                    SectorMark(
-                        angle: .value("Score", component.score),
-                        innerRadius: .ratio(0.5),
-                        angularInset: 2
-                    )
-                    .foregroundStyle(componentColor(component.name))
-                    .annotation(position: .overlay) {
-                        Text("\(component.score)")
-                            .font(.caption2.bold())
-                            .foregroundStyle(.white)
-                    }
-                }
-                .chartLegend(position: .bottom)
-                .frame(height: 200)
-                .padding()
-
-                // Total score
-                HStack {
-                    Spacer()
-                    VStack {
-                        Text("\(breakdown.score.totalScore)")
-                            .font(.system(size: 36, weight: .bold, design: .rounded))
-                            .foregroundStyle(scoreColor(breakdown.score.totalScore))
-                        Text("Total Score")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                }
-            } else {
-                ContentUnavailableView(
-                    "No Data Yet",
-                    systemImage: "chart.pie",
-                    description: Text("Score breakdown will appear after your first break.")
-                )
-            }
-        }
-        .padding()
     }
 
     // MARK: - Data Loading

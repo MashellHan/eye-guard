@@ -161,29 +161,60 @@ actor ActivityMonitor: ActivityMonitoring {
 
     /// Sets up a CGEventTap to listen for user input events.
     ///
-    /// - Note: This requires accessibility permissions.
-    ///   The actual CGEventTap implementation is a placeholder —
-    ///   full implementation requires running on the main thread
-    ///   with proper run loop integration.
+    /// CGEventTap runs on the main run loop and calls `recordActivity()`
+    /// when any user input is detected (mouse, keyboard, scroll).
+    /// Requires accessibility permissions (System Preferences > Privacy > Accessibility).
     private func startEventTap() {
-        // TODO: Implement CGEventTap for production use.
-        //
-        // CGEventTap requires:
-        // 1. Accessibility permissions (AXIsProcessTrusted)
-        // 2. Creating a tap with CGEvent.tapCreate()
-        // 3. Adding the tap as a run loop source on the main run loop
-        // 4. Calling recordActivity() from the callback
-        //
-        // Event mask should include:
-        //   - .mouseMoved
-        //   - .keyDown
-        //   - .scrollWheel
-        //   - .leftMouseDown, .rightMouseDown
-        //
-        // For now, the idle check loop runs independently
-        // and activity is recorded only when explicitly called.
+        // Schedule on main thread since CGEventTap needs the main run loop
+        Task { @MainActor [weak self] in
+            guard let self else { return }
 
-        Log.activity.info("CGEventTap setup skipped (placeholder). Idle detection runs via polling.")
+            let eventMask: CGEventMask = (
+                (1 << CGEventType.mouseMoved.rawValue) |
+                (1 << CGEventType.leftMouseDown.rawValue) |
+                (1 << CGEventType.rightMouseDown.rawValue) |
+                (1 << CGEventType.keyDown.rawValue) |
+                (1 << CGEventType.scrollWheel.rawValue)
+            )
+
+            // The callback must be a C function pointer — capture the actor via userInfo
+            let monitor = self
+            let unmanagedMonitor = Unmanaged.passRetained(ActivityMonitorRef(monitor: monitor))
+
+            guard let tap = CGEvent.tapCreate(
+                tap: .cgSessionEventTap,
+                place: .headInsertEventTap,
+                options: .listenOnly,
+                eventsOfInterest: eventMask,
+                callback: { _, _, _, userInfo -> Unmanaged<CGEvent>? in
+                    guard let userInfo else { return nil }
+                    let ref = Unmanaged<ActivityMonitorRef>.fromOpaque(userInfo).takeUnretainedValue()
+                    Task {
+                        await ref.monitor.recordActivity()
+                    }
+                    return nil  // listenOnly — pass event through
+                },
+                userInfo: unmanagedMonitor.toOpaque()
+            ) else {
+                Log.activity.notice("CGEventTap creation failed — accessibility permission not granted. Idle detection relies on polling only.")
+                unmanagedMonitor.release()
+                return
+            }
+
+            let runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
+            CFRunLoopAddSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
+            CGEvent.tapEnable(tap: tap, enable: true)
+
+            Log.activity.notice("CGEventTap installed — monitoring user input for idle detection.")
+        }
+    }
+}
+
+/// Reference wrapper to pass the actor through CGEventTap's void* userInfo.
+private final class ActivityMonitorRef: @unchecked Sendable {
+    let monitor: ActivityMonitor
+    init(monitor: ActivityMonitor) {
+        self.monitor = monitor
     }
 }
 
