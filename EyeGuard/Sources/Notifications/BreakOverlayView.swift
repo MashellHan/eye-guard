@@ -30,8 +30,7 @@ struct BreakOverlayView: View {
     @State private var showExercises: Bool = false
     @State private var timer: Timer?
     @State private var appeared: Bool = false
-    @State private var shakeOffset: CGFloat = 0
-    @State private var showMandatoryHint: Bool = false
+    @State private var shakeTrigger: Bool = false
 
     // MARK: - Computed
 
@@ -87,38 +86,13 @@ struct BreakOverlayView: View {
         )
         .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
         .scaleEffect(appeared ? 1.0 : 0.95)
-        .offset(x: shakeOffset)
-        .overlay(alignment: .bottom) {
-            if showMandatoryHint {
-                Text("⚠️ 强制休息期间无法关闭")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(.ultraThinMaterial)
-                    .clipShape(Capsule())
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .padding(.bottom, -30)
-            }
-        }
+        .mandatoryShake(trigger: $shakeTrigger)
         .onExitCommand {
             guard case .mandatory = dismissPolicy else {
                 skipBreak()
                 return
             }
-            // Shake feedback for mandatory breaks
-            withAnimation(.default) { shakeOffset = 12 }
-            withAnimation(.default.delay(0.08)) { shakeOffset = -10 }
-            withAnimation(.default.delay(0.16)) { shakeOffset = 6 }
-            withAnimation(.default.delay(0.24)) { shakeOffset = -4 }
-            withAnimation(.default.delay(0.32)) { shakeOffset = 0 }
-            withAnimation(.easeInOut(duration: 0.2)) { showMandatoryHint = true }
-            Task {
-                try? await Task.sleep(for: .seconds(2))
-                await MainActor.run {
-                    withAnimation(.easeInOut(duration: 0.3)) { showMandatoryHint = false }
-                }
-            }
+            shakeTrigger = true
         }
         .onAppear {
             Log.notification.info("BreakOverlay appeared: \(breakType.displayName), policy=\(String(describing: dismissPolicy))")

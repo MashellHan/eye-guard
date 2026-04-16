@@ -39,8 +39,7 @@ struct FullScreenOverlayView: View {
     @State private var timer: Timer?
     @State private var appeared: Bool = false
     @State private var currentTip: String = eyeCareTips.randomElement() ?? eyeCareTips[0]
-    @State private var shakeOffset: CGFloat = 0
-    @State private var showMandatoryHint: Bool = false
+    @State private var shakeTrigger: Bool = false
 
     private var progress: Double {
         guard totalDuration > 0 else { return 1.0 }
@@ -190,20 +189,7 @@ struct FullScreenOverlayView: View {
             }
         }
         .opacity(appeared ? 1.0 : 0.0)
-        .offset(x: shakeOffset)
-        .overlay(alignment: .bottom) {
-            if showMandatoryHint {
-                Text("⚠️ 强制休息期间无法关闭")
-                    .font(.subheadline)
-                    .foregroundStyle(.orange)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(.ultraThinMaterial)
-                    .clipShape(Capsule())
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .padding(.bottom, 60)
-            }
-        }
+        .mandatoryShake(trigger: $shakeTrigger, hintBottomPadding: 60)
         .onExitCommand {
             // Mandatory breaks cannot be dismissed with ESC
             guard case .mandatory = dismissPolicy else {
@@ -211,19 +197,7 @@ struct FullScreenOverlayView: View {
                 onPostponed()
                 return
             }
-            // Shake feedback for mandatory breaks
-            withAnimation(.default) { shakeOffset = 12 }
-            withAnimation(.default.delay(0.08)) { shakeOffset = -10 }
-            withAnimation(.default.delay(0.16)) { shakeOffset = 6 }
-            withAnimation(.default.delay(0.24)) { shakeOffset = -4 }
-            withAnimation(.default.delay(0.32)) { shakeOffset = 0 }
-            withAnimation(.easeInOut(duration: 0.2)) { showMandatoryHint = true }
-            Task {
-                try? await Task.sleep(for: .seconds(2))
-                await MainActor.run {
-                    withAnimation(.easeInOut(duration: 0.3)) { showMandatoryHint = false }
-                }
-            }
+            shakeTrigger = true
         }
         .onAppear {
             let duration = Int(breakType.duration)
