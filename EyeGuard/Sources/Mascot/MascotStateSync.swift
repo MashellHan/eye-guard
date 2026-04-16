@@ -212,12 +212,14 @@ enum MascotStateSync {
                     viewModel.showMessage("做得好！继续保持 💪")
                 }
             }
-        } else if score < 50 {
+        } else if score < 65 {
+            // Score 50-64: mascot shows concern (was < 50, raised for better UX feedback)
             if viewModel.mascotState != .concerned {
                 viewModel.transition(to: .concerned)
                 viewModel.showMessage("记得休息哦 👀")
             }
         } else {
+            // Score 65-79: idle but without sparkle — subdued appearance
             if viewModel.mascotState != .idle {
                 viewModel.isHighScore = false
                 viewModel.transition(to: .idle)
