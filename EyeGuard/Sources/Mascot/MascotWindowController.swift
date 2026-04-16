@@ -61,6 +61,9 @@ final class MascotWindowController {
     /// Global event monitor for click-outside-to-dismiss.
     private var clickOutsideGlobalMonitor: Any?
 
+    /// Event monitor for Escape key to dismiss popover.
+    private var escapeKeyMonitor: Any?
+
     /// Shows the mascot window on screen.
     ///
     /// - Parameter scheduler: The BreakScheduler to wire mascot state to.
@@ -658,6 +661,16 @@ final class MascotWindowController {
             return event
         }
 
+        // Dismiss on Escape key
+        escapeKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            if event.keyCode == 53 { // Escape key
+                guard let self, let popover = self.popoverWindow else { return event }
+                self.dismissPopover(popover)
+                return nil // consume the event
+            }
+            return event
+        }
+
         Log.mascot.info("Mascot popover shown.")
     }
 
@@ -670,6 +683,10 @@ final class MascotWindowController {
         if let monitor = clickOutsideGlobalMonitor {
             NSEvent.removeMonitor(monitor)
             clickOutsideGlobalMonitor = nil
+        }
+        if let monitor = escapeKeyMonitor {
+            NSEvent.removeMonitor(monitor)
+            escapeKeyMonitor = nil
         }
     }
 
