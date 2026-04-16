@@ -52,6 +52,15 @@ final class MascotWindowController {
     /// Observer for exercise-from-break notification.
     private var exerciseFromBreakObserver: Any?
 
+    /// Observer for pre-alert started notification.
+    private var preAlertStartedObserver: Any?
+
+    /// Observer for pre-alert countdown notification.
+    private var preAlertCountdownObserver: Any?
+
+    /// Observer for pre-alert cancelled notification.
+    private var preAlertCancelledObserver: Any?
+
     /// The popover panel that mirrors the menu bar popover.
     private var popoverWindow: NSPanel?
 
@@ -145,6 +154,111 @@ final class MascotWindowController {
         }
 
         Log.mascot.info("Mascot window shown in peek mode at bottom-right corner.")
+
+        // Listen for pre-alert notifications (v3.2)
+        setupPreAlertObservers()
+    }
+
+    // MARK: - Pre-Alert Messages (v3.2)
+
+    /// Random pre-alert messages by break type.
+    private static let preAlertMessages: [BreakType: [String]] = [
+        .micro: [
+            "👀 还有 {N} 秒，该让眼睛休息一下了~",
+            "🌿 马上进入 20 秒眼休息~",
+            "💧 准备好了吗？20 秒远眺时间~",
+        ],
+        .macro: [
+            "☕ 还有 {N} 秒，该起来活动了~",
+            "🧘 5 分钟大休息马上开始~",
+            "🚶 准备站起来走走吧~",
+        ],
+        .mandatory: [
+            "⚠️ 你已经连续工作很久了！{N} 秒后强制休息",
+            "🛑 15 分钟休息倒计时即将开始！",
+            "🔴 眼睛需要好好休息了！马上进入休息模式",
+        ],
+    ]
+
+    /// Sets up NotificationCenter observers for pre-alert events.
+    private func setupPreAlertObservers() {
+        preAlertStartedObserver = NotificationCenter.default.addObserver(
+            forName: .preAlertStarted,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            let breakType = notification.userInfo?["breakType"] as? BreakType
+            let seconds = notification.userInfo?["seconds"] as? Int
+            Task { @MainActor in
+                guard let breakType, let seconds else { return }
+                self?.handlePreAlertStarted(breakType: breakType, seconds: seconds)
+            }
+        }
+
+        preAlertCountdownObserver = NotificationCenter.default.addObserver(
+            forName: .preAlertCountdown,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            let remaining = notification.userInfo?["remaining"] as? Int
+            Task { @MainActor in
+                guard let remaining else { return }
+                self?.handlePreAlertCountdown(remaining: remaining)
+            }
+        }
+
+        preAlertCancelledObserver = NotificationCenter.default.addObserver(
+            forName: .preAlertCancelled,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.handlePreAlertCancelled()
+            }
+        }
+    }
+
+    /// Handles the start of a pre-alert countdown.
+    private func handlePreAlertStarted(breakType: BreakType, seconds: Int) {
+        // Transition to concerned state
+        viewModel?.transition(to: .concerned)
+
+        // Show message with break-specific text
+        let messages = Self.preAlertMessages[breakType] ?? ["⏰ 休息即将开始~"]
+        let message = (messages.randomElement() ?? "").replacingOccurrences(of: "{N}", with: "\(seconds)")
+        viewModel?.showMessage(message, duration: Double(seconds))
+
+        // Play alert sound
+        SoundManager.shared.play(.alert)
+
+        // Reveal from peek mode
+        if isPeeking {
+            revealMascot()
+        }
+        cancelAutoHide() // Stay visible during pre-alert
+
+        Log.mascot.info("Pre-alert started for \(breakType.displayName): \(seconds)s")
+    }
+
+    /// Handles countdown updates during pre-alert.
+    private func handlePreAlertCountdown(remaining: Int) {
+        // Last 5 seconds: show countdown numbers
+        if remaining <= 5 && remaining > 0 {
+            viewModel?.showMessage("\(remaining)...", duration: 1.5)
+        }
+
+        // Last 3 seconds: escalate to alerting state
+        if remaining == 3 {
+            viewModel?.transition(to: .alerting)
+        }
+    }
+
+    /// Handles pre-alert cancellation (idle detected, postponed, etc.).
+    private func handlePreAlertCancelled() {
+        viewModel?.transition(to: .idle)
+        viewModel?.hideBubble()
+        scheduleAutoHide(after: 3)
+        Log.mascot.info("Pre-alert cancelled — returning to idle.")
     }
 
     /// Hides the mascot window.
@@ -162,6 +276,12 @@ final class MascotWindowController {
             NotificationCenter.default.removeObserver(observer)
             exerciseFromBreakObserver = nil
         }
+        for observer in [preAlertStartedObserver, preAlertCountdownObserver, preAlertCancelledObserver].compactMap({ $0 }) {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        preAlertStartedObserver = nil
+        preAlertCountdownObserver = nil
+        preAlertCancelledObserver = nil
         stopMouseTracking()
         window?.orderOut(nil)
         window = nil

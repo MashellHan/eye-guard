@@ -89,6 +89,16 @@ enum EyeGuardConstants {
     static var dataDirectory: URL {
         baseDirectory.appendingPathComponent("data", isDirectory: true)
     }
+    // MARK: - Pre-Alert Durations (seconds)
+
+    /// Pre-alert duration before micro break.
+    static let microPreAlertDuration: TimeInterval = 10
+
+    /// Pre-alert duration before macro break.
+    static let macroPreAlertDuration: TimeInterval = 15
+
+    /// Pre-alert duration before mandatory break.
+    static let mandatoryPreAlertDuration: TimeInterval = 20
 }
 
 // MARK: - Notification Names
@@ -96,4 +106,15 @@ enum EyeGuardConstants {
 extension Notification.Name {
     /// Posted when user taps "Start Eye Exercises" from the break overlay.
     static let startExercisesFromBreak = Notification.Name("EyeGuard.startExercisesFromBreak")
+
+    /// Posted when a pre-break alert countdown starts.
+    /// userInfo: ["breakType": BreakType, "seconds": Int]
+    static let preAlertStarted = Notification.Name("EyeGuard.preAlertStarted")
+
+    /// Posted each second during pre-alert countdown.
+    /// userInfo: ["breakType": BreakType, "remaining": Int]
+    static let preAlertCountdown = Notification.Name("EyeGuard.preAlertCountdown")
+
+    /// Posted when pre-alert is cancelled (idle, postpone, etc.).
+    static let preAlertCancelled = Notification.Name("EyeGuard.preAlertCancelled")
 }

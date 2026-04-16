@@ -71,6 +71,18 @@ final class BreakScheduler {
     /// Number of eye exercise sessions completed today (v2.5).
     private(set) var exerciseSessionsToday: Int = 0
 
+    /// Whether a pre-break alert countdown is active (v3.2).
+    private(set) var isPreAlertActive: Bool = false
+
+    /// The break type for the current pre-alert, if any.
+    private(set) var preAlertBreakType: BreakType?
+
+    /// Remaining seconds in the pre-alert countdown.
+    private(set) var preAlertRemainingSeconds: Int = 0
+
+    /// Task managing the pre-alert countdown.
+    private var preAlertTask: Task<Void, Never>?
+
     /// Recommended exercise sessions based on screen time (v2.5).
     /// - Screen time < 2h → 1 session
     /// - Screen time 2–4h → 2 sessions
@@ -255,6 +267,7 @@ final class BreakScheduler {
             Log.scheduler.info("Idle detected during active notification — skipping timer reset.")
             return
         }
+        cancelPreAlert()
         // User is already resting, reset micro-break timer
         resetTimersAfterBreak(.micro)
         Log.scheduler.info("Idle detected, micro timer reset.")
@@ -397,6 +410,13 @@ final class BreakScheduler {
 
             guard interval > 0 else { continue }
 
+            // Pre-alert detection: trigger countdown before break is due
+            let preAlertDuration = self.preAlertDuration(for: type)
+            let preAlertThreshold = interval - preAlertDuration
+            if elapsed >= preAlertThreshold && elapsed < interval && !isPreAlertActive && !isBreakInProgress {
+                startPreAlert(for: type)
+            }
+
             let currentCycle = Int(elapsed / interval)
 
             // Collect all breaks that crossed into a new cycle
@@ -406,6 +426,9 @@ final class BreakScheduler {
         }
 
         guard !dueBreaks.isEmpty else { return }
+
+        // Cancel pre-alert since we're firing the actual break
+        cancelPreAlert()
 
         // Sort by priority descending — highest wins
         let sorted = dueBreaks.sorted { $0.0.priority > $1.0.priority }
@@ -424,6 +447,64 @@ final class BreakScheduler {
                 "Break \(type.displayName) absorbed by \(winner.0.displayName)."
             )
         }
+    }
+
+    // MARK: - Pre-Alert (v3.2)
+
+    /// Returns the pre-alert countdown duration for a break type.
+    private func preAlertDuration(for type: BreakType) -> TimeInterval {
+        switch type {
+        case .micro:     return EyeGuardConstants.microPreAlertDuration
+        case .macro:     return EyeGuardConstants.macroPreAlertDuration
+        case .mandatory: return EyeGuardConstants.mandatoryPreAlertDuration
+        }
+    }
+
+    /// Starts the pre-alert countdown for the given break type.
+    private func startPreAlert(for type: BreakType) {
+        isPreAlertActive = true
+        preAlertBreakType = type
+        let duration = Int(preAlertDuration(for: type))
+        preAlertRemainingSeconds = duration
+
+        NotificationCenter.default.post(
+            name: .preAlertStarted,
+            object: nil,
+            userInfo: ["breakType": type, "seconds": duration]
+        )
+
+        Log.scheduler.info("Pre-alert started for \(type.displayName): \(duration)s countdown.")
+
+        preAlertTask = Task { [weak self] in
+            for i in stride(from: duration - 1, through: 0, by: -1) {
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    self?.preAlertRemainingSeconds = i
+                    NotificationCenter.default.post(
+                        name: .preAlertCountdown,
+                        object: nil,
+                        userInfo: ["breakType": type, "remaining": i]
+                    )
+                }
+            }
+            await MainActor.run {
+                self?.isPreAlertActive = false
+                self?.preAlertBreakType = nil
+            }
+        }
+    }
+
+    /// Cancels any active pre-alert countdown.
+    func cancelPreAlert() {
+        guard isPreAlertActive else { return }
+        preAlertTask?.cancel()
+        preAlertTask = nil
+        isPreAlertActive = false
+        preAlertBreakType = nil
+        preAlertRemainingSeconds = 0
+        NotificationCenter.default.post(name: .preAlertCancelled, object: nil)
+        Log.scheduler.info("Pre-alert cancelled.")
     }
 
     /// Sends a break notification using mode-aware behavior (v2.4).
@@ -477,6 +558,7 @@ final class BreakScheduler {
     /// Postpones a break by the given delay (v2.4).
     /// Sets elapsed time back so the break re-fires after `delay` seconds.
     func postponeBreak(_ type: BreakType, by delay: TimeInterval) {
+        cancelPreAlert()
         let interval = intervalForType(type)
         // Set elapsed so the break is `delay` seconds away from re-triggering
         elapsedPerType[type] = max(0, interval - delay)
