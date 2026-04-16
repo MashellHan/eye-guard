@@ -176,6 +176,10 @@ final class BreakScheduler {
         registerScreenLockObserver()
     }
 
+    // Note (review-014 L1): Observer cleanup not needed — BreakScheduler is a
+    // singleton that lives for the app's entire lifetime. deinit cannot access
+    // @MainActor-isolated properties in Swift 6 strict concurrency.
+
     // MARK: - Screen Lock Observer (BUG-007/BUG-008)
 
     private var screenLockObserverToken: NSObjectProtocol?
@@ -314,6 +318,7 @@ final class BreakScheduler {
     /// Skips reset when a break notification is active to avoid dismissing the overlay (BUG-POPUP-001).
     func handleIdleDetected() {
         guard !isPaused else { return }
+        guard !wasIdle else { return }  // Prevent double-handling (review-014 M2)
         guard !isBreakInProgress else {
             Log.scheduler.info("Idle detected during active break — skipping timer reset.")
             return
@@ -427,7 +432,7 @@ final class BreakScheduler {
         // requires accessibility permission and may not be available.
         if ticksSinceLastScoreUpdate % 5 == 0, !isBreakInProgress, !notificationSender.isNotificationActive {
             Task {
-                let idle = await activityMonitor.isIdle
+                let _ = await activityMonitor.isIdle  // keep polling to update lastActivityTimestamp
                 let locked = await activityMonitor.isScreenLocked
                 if locked && !wasIdle {
                     // Screen lock detected via polling (backup for notification observer)

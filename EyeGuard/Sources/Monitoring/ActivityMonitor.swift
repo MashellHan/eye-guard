@@ -1,3 +1,4 @@
+@preconcurrency import CoreFoundation
 import AppKit
 import Foundation
 import os
@@ -33,6 +34,13 @@ actor ActivityMonitor: ActivityMonitoring {
 
     private var idleCheckTask: Task<Void, Never>?
 
+    /// Stored reference to the CGEventTap for cleanup on stop (review-014 M1).
+    private var eventTapPort: CFMachPort?
+    private var eventTapRef: Unmanaged<ActivityMonitorRef>?
+
+    /// Throttle: minimum interval between recordActivity calls from CGEventTap (review-014 L3).
+    private var lastEventTapRecord: Date = .distantPast
+
     /// Helper to observe DistributedNotificationCenter from within the actor.
     private var screenLockObserver: ScreenLockObserver?
 
@@ -64,6 +72,7 @@ actor ActivityMonitor: ActivityMonitoring {
         idleCheckTask?.cancel()
         idleCheckTask = nil
         unregisterScreenLockObservers()
+        cleanupEventTap()
         Log.activity.info("Monitoring stopped.")
     }
 
@@ -159,6 +168,37 @@ actor ActivityMonitor: ActivityMonitoring {
         screenLockObserver = nil
     }
 
+    /// Records activity with 1-second throttle to avoid Task flood from high-frequency events (review-014 L3).
+    func recordActivityThrottled() {
+        let now = Date.now
+        guard now.timeIntervalSince(lastEventTapRecord) >= 1.0 else { return }
+        lastEventTapRecord = now
+        recordActivity()
+    }
+
+    /// Cleans up the CGEventTap and releases the retained reference (review-014 M1).
+    private func cleanupEventTap() {
+        if let tap = eventTapPort {
+            // Disable on main thread since it was added to the main run loop
+            Task { @MainActor in
+                CGEvent.tapEnable(tap: tap, enable: false)
+            }
+        }
+        releaseEventTapRef()
+    }
+
+    private func releaseEventTapRef() {
+        eventTapRef?.release()
+        eventTapRef = nil
+        eventTapPort = nil
+    }
+
+    /// Called from main thread to store event tap references.
+    fileprivate func storeEventTapRefs(port: CFMachPort, ref: Unmanaged<ActivityMonitorRef>) {
+        eventTapPort = port
+        eventTapRef = ref
+    }
+
     /// Sets up a CGEventTap to listen for user input events.
     ///
     /// CGEventTap runs on the main run loop and calls `recordActivity()`
@@ -190,7 +230,7 @@ actor ActivityMonitor: ActivityMonitoring {
                     guard let userInfo else { return nil }
                     let ref = Unmanaged<ActivityMonitorRef>.fromOpaque(userInfo).takeUnretainedValue()
                     Task {
-                        await ref.monitor.recordActivity()
+                        await ref.monitor.recordActivityThrottled()
                     }
                     return nil  // listenOnly — pass event through
                 },
@@ -204,6 +244,9 @@ actor ActivityMonitor: ActivityMonitoring {
             let runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
             CFRunLoopAddSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
             CGEvent.tapEnable(tap: tap, enable: true)
+
+            // Store references for cleanup on stopMonitoring (review-014 M1)
+            await monitor.storeEventTapRefs(port: tap, ref: unmanagedMonitor)
 
             Log.activity.notice("CGEventTap installed — monitoring user input for idle detection.")
         }
