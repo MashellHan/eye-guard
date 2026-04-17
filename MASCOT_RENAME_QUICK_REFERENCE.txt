@@ -1,0 +1,101 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                  EYEGUARD MASCOT RENAME - QUICK REFERENCE                  ║
+║                    从 "护眼精灵" 改名为 "阿普" (Apu)                        ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+TOTAL CHANGES REQUIRED: 5
+
+═══════════════════════════════════════════════════════════════════════════
+
+1️⃣  FILE: EyeGuard/Sources/Mascot/MascotStateSync.swift
+    LINE: 23
+    PRIORITY: 🔴 HIGH (User-Visible)
+    
+    BEFORE:  viewModel.showMessage("Hi! 我是护眼精灵 👋")
+    AFTER:   viewModel.showMessage("Hi! 我是阿普 👋")
+    
+    WHY: This is shown to users when mascot first appears
+
+═══════════════════════════════════════════════════════════════════════════
+
+2️⃣  FILE: EyeGuard/Sources/Mascot/MascotState.swift
+    LINE: 3
+    PRIORITY: 🟡 MEDIUM (Code Comment)
+    
+    BEFORE:  /// Emotional states for the Eye Guard mascot (护眼精灵).
+    AFTER:   /// Emotional states for the Eye Guard mascot (阿普).
+
+═══════════════════════════════════════════════════════════════════════════
+
+3️⃣  FILE: EyeGuard/Sources/App/EyeGuardApp.swift
+    LINE: 8
+    PRIORITY: 🟡 MEDIUM (Code Comment)
+    
+    BEFORE:  /// Launches the floating mascot character (护眼精灵) on screen (v0.9).
+    AFTER:   /// Launches the floating mascot character (阿普) on screen (v0.9).
+
+═══════════════════════════════════════════════════════════════════════════
+
+4️⃣  FILE: EyeGuard/Sources/App/EyeGuardApp.swift
+    LINE: 44
+    PRIORITY: 🟡 MEDIUM (Log Message)
+    
+    BEFORE:  Log.app.info("Mascot character (护眼精灵) launched.")
+    AFTER:   Log.app.info("Mascot character (阿普) launched.")
+
+═══════════════════════════════════════════════════════════════════════════
+
+5️⃣  FILE: README.md
+    LINE: 27
+    PRIORITY: 🟡 MEDIUM (Public Documentation)
+    
+    BEFORE:  ### Mascot (护眼精灵)
+    AFTER:   ### Mascot (阿普)
+
+═══════════════════════════════════════════════════════════════════════════
+
+✓ VERIFICATION COMMANDS:
+
+    # Check no old name remains
+    grep -r "护眼精灵" EyeGuard/
+    # Expected: 0 results
+
+    # Verify new name appears (5 times)
+    grep -r "阿普" EyeGuard/
+    # Expected: 5 results
+
+    # Build test
+    swift build
+    swift test
+
+═══════════════════════════════════════════════════════════════════════════
+
+⏱️  ESTIMATED TIME: 2-5 minutes (simple search & replace)
+
+📊 IMPACT SUMMARY:
+   • 1 user-facing change (mascot greeting)
+   • 1 code comment (MascotState.swift)
+   • 2 code comment + log (EyeGuardApp.swift)
+   • 1 documentation (README.md)
+
+⚠️  RISK LEVEL: Very Low (simple string replacements, no logic changes)
+
+═══════════════════════════════════════════════════════════════════════════
+
+SPEECH BUBBLE MESSAGES: ✓ NO CHANGES NEEDED
+- These are generic messages that don't reference mascot name
+- "👁️ 跟着做眼保健操吧…", "👏 做得好", "😢 跳过休息了", etc.
+
+NIGHT MODE MESSAGES: ✓ NO CHANGES NEEDED  
+- Night reminders don't reference mascot name
+- "🌙 已经很晚了，该休息了", "⭐ 眼睛需要好好睡一觉", etc.
+
+MENU LABELS: ✓ NO CHANGES NEEDED
+- "Take Break Now", "Snooze 5 min", "Eye Exercises 眼保健操", etc.
+
+APP NAME: ✓ NO CHANGES NEEDED
+- All "EyeGuard" references are the app name, not mascot
+
+═══════════════════════════════════════════════════════════════════════════
+
+For full details, see: MASCOT_RENAME_REPORT.md

@@ -31,6 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         startMonitoring()
         setupNotifications()
         scheduleMidnightReport()
+        activateNotchModule()
 
         // Log launch time (v1.9)
         let launchDuration = Date.now.timeIntervalSince(launchStartTime)
@@ -64,6 +65,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
     }
 
     // MARK: - Private
+
+    /// Activates the Notch module (Phase 1 of island merge).
+    /// Renders a transparent overlay panel across the built-in display.
+    private func activateNotchModule() {
+        Task { @MainActor in
+            NotchModule.shared.activate()
+        }
+    }
 
     /// Verifies accessibility permissions required for CGEventTap.
     /// Only logs a warning if not trusted — does NOT prompt the user.

@@ -1,0 +1,258 @@
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                    EYEGUARD - FEATURE QUICK SUMMARY                           ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+📊 PROJECT METRICS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Total Swift Files: 49 (36 source + 13 test)
+  Core Features: 17 major systems
+  Lines of Code: ~5000+ production code
+  Architecture: Protocol-oriented with DI
+  Language: Swift 6.0 (strict concurrency)
+  Platform: macOS 14.0+
+
+🎯 CORE SYSTEMS (17 Major Features)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. ✅ BREAK SYSTEM
+   • 3 break types: Micro (20-20-20), Macro (hourly), Mandatory (2-hour)
+   • Medical guidelines: AAO, OSHA, EU Directive
+   • Features: Hierarchical reset, per-type tracking, idle detection
+   • Daily rollover, persistence every 5 min
+   • Files: BreakScheduler.swift, BreakType.swift
+
+2. ✅ NOTIFICATION SYSTEM (3-Tier Escalation)
+   • Tier 1: macOS system banner (immediate)
+   • Tier 2: Floating overlay (2 min delay, 30-sec countdown)
+   • Tier 3: Full-screen overlay (5 min delay, mandatory)
+   • Callbacks: onTaken, onSkipped, snooze support
+   • Files: NotificationManager.swift, OverlayWindow.swift
+
+3. ✅ MASCOT SYSTEM (護眼精靈)
+   • 7 emotional states: Idle, Happy, Concerned, Alerting, Sleeping, Exercising, Celebrating
+   • Interactive: Draggable, mouse-tracking pupils
+   • Animations: Bounce, wave, blink, pupil movement patterns
+   • Speech bubbles with bilingual messages
+   • Files: MascotView.swift, MascotState.swift, MascotWindowController.swift (8 files)
+
+4. ✅ EYE EXERCISES (眼保健操)
+   • 5 guided routines: Look Around, Near-Far, Circular, Palm, Rapid Blink
+   • Durations: 20-40 seconds each
+   • Bilingual instructions (English + Chinese)
+   • Mascot animation: Pupil movement patterns per exercise
+   • Files: EyeExercise.swift, ExerciseView.swift
+
+5. ✅ MEDICAL TIPS DATABASE
+   • 25 evidence-based tips from AAO, WHO, OSHA
+   • Bilingual: English title + Chinese description
+   • Categories: Tear film, ergonomics, lighting, nutrition, prevention
+   • Rotation: New tip every 30 min via speech bubble
+   • Files: TipDatabase.swift (3 files)
+
+6. ✅ HEALTH SCORE ENGINE (0-100)
+   • 4 weighted components:
+     - Break Compliance (40 pts): % of breaks taken
+     - Continuous Use Discipline (30 pts): Avoid long stretches
+     - Screen Time Score (20 pts): vs 8-hour recommendation
+     - Break Quality (10 pts): Duration compliance
+   • Trend tracking: Improving/Stable/Declining
+   • Files: HealthScoreCalculator.swift
+
+7. ✅ NIGHT MODE / LATE NIGHT GUARDIAN (深夜提醒)
+   • Auto-activates after 10 PM (configurable)
+   • Mascot state: Sleeping with "zzz"
+   • Messages: 8 night messages + 3 break messages (Chinese)
+   • Tracking: Night screen time accumulation
+   • Break multiplier: 0.5x (twice as often)
+   • Files: NightModeManager.swift
+
+8. ✅ COLOR BALANCE / SCREEN ANALYSIS (v1.5)
+   • Analysis: CGWindowListCreateImage + pixel sampling
+   • Color families: 7 types (Blue, Red, Green, Yellow, Purple, Orange, Neutral)
+   • Hue classification: 0-360° → color families
+   • Frequency: Every 5 minutes
+   • Suggestions: Complementary color recommendations (Chinese)
+   • Files: ColorAnalyzer.swift
+
+9. ✅ SOUND EFFECTS & AMBIENT AUDIO (v1.6)
+   • System sounds: Tink, Hero, Pop, Sosumi (via NSSound)
+   • Ambient presets: Rain, Ocean, Forest, Wind, Silence
+   • Generation: AVAudioEngine with procedural synthesis
+   • Integration: Break start/complete sounds
+   • Settings: Volume control, mute, preset selection (UserDefaults)
+   • Files: SoundManager.swift
+
+10. ✅ DASHBOARD & CHARTS
+    • 3 tabs: Today, History, Breakdown
+    • Charts: BarMark (screen time), LineMark (score trend), Pie (components)
+    • Data ranges: 7 days, 30 days
+    • Async loading: Scans ~/EyeGuard/data/ JSON files
+    • Gauge: Circular health score 0-100 with color coding
+    • Files: DashboardView.swift, HistoryManager.swift
+
+11. ✅ DAILY REPORTS (Markdown)
+    • Path: ~/EyeGuard/reports/YYYY-MM-DD.md
+    • Sections: 10+ (summary, breakdown, hourly table, compliance, recommendations)
+    • Visual: Progress bars, activity emojis, tables
+    • Personalized recommendations based on scores
+    • Auto-generation on quit, manual via menu bar
+    • Files: DailyReportGenerator.swift
+
+12. ✅ LLM INTEGRATION & AI INSIGHTS (v1.8)
+    • Protocol-based: LLMAnalyzing
+    • Rule-based fallback: LocalLLMService (no API needed)
+    • LLM-ready: ClaudeLLMService placeholder
+    • Insight types: Report insights, mascot insights, menu bar summary
+    • Hourly pattern analysis, day-over-day comparison
+    • Files: InsightGenerator.swift, LLMService.swift
+
+13. ✅ ACTIVITY MONITORING
+    • Idle detection: 30-sec threshold, 5-sec polling
+    • Screen lock detection: DistributedNotificationCenter
+    • CGEventTap placeholder: Keyboard/mouse events
+    • Daily rollover: Midnight state reset
+    • Actor-based: Thread-safe via actor isolation
+    • Files: ActivityMonitor.swift
+
+14. ✅ PREFERENCES & SETTINGS
+    • Customizable: Break intervals/durations (UserDefaults)
+    • Feature toggles: Micro/Macro/Mandatory/Sound/Escalation
+    • Sound settings: Volume, preset selection, mute
+    • Night mode: Start/end hours
+    • Launch at login support
+    • Files: UserPreferencesManager.swift, PreferencesView.swift
+
+15. ✅ MENU BAR & STATUS BAR
+    • Title: 👁️ MM:SS countdown (updates every second)
+    • Popover: Health gauge, controls, stats, insights
+    • Sections: Header, score, timer, controls, stats, AI insight, report, footer
+    • Always-on-top: Lives in menu bar, no dock icon
+    • Files: MenuBarView.swift, EyeGuardApp.swift
+
+16. ✅ APP LIFECYCLE & BUNDLE
+    • Entry: @main EyeGuardApp with MenuBarExtra
+    • Delegate: AppDelegate for quit-time reporting
+    • Bundle: LSUIElement=1 (no dock icon)
+    • Launch at login: SMAppService integration
+    • Permissions: UserNotifications, Accessibility, Screen Recording
+    • Files: EyeGuardApp.swift, AppDelegate.swift
+
+17. ✅ DATA PERSISTENCE
+    • Format: JSON files at ~/EyeGuard/data/YYYY-MM-DD.json
+    • Content: Break events, screen time, score history
+    • Frequency: Every 5 minutes during scheduling
+    • Async I/O: Background thread via Task
+    • Atomic writes: Prevents corruption
+    • Files: DataPersistenceManager.swift
+
+📂 DIRECTORY STRUCTURE (18 Subdirectories)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+AI/              → InsightGenerator, LLMService
+Analysis/        → ColorAnalyzer, ColorSuggestionView
+App/             → EyeGuardApp, MenuBar, Preferences, UserPreferencesManager
+Audio/           → SoundManager
+Dashboard/       → DashboardView, HistoryManager, WindowController
+Exercises/       → EyeExercise, ExerciseView, SessionView
+Mascot/          → MascotView, State, Animations, WindowController, etc. (8 files)
+Models/          → Core data models (BreakEvent, UsageSession, HealthScore)
+Monitoring/      → ActivityMonitor
+Notifications/   → NotificationManager, OverlayWindow, BreakOverlay, FullScreenOverlay
+Persistence/     → DataPersistenceManager
+Protocols/       → ActivityMonitoring, ColorAnalyzing, NotificationSending, SoundPlaying, ReportDataProviding
+Reporting/       → DailyReportGenerator, HealthScoreCalculator, ReportDataProvider
+Scheduling/      → BreakScheduler, BreakType
+Tips/            → TipDatabase, EyeHealthTip, TipBubbleView
+Utils/           → Constants, Logging, NightModeManager, TimeFormatting
+
+🧪 TEST COVERAGE (13 Test Suites)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✓ AIInsightTests
+✓ BreakSchedulerTests
+✓ ColorAnalyzerTests
+✓ DailyReportGeneratorTests
+✓ DashboardTests
+✓ DataPersistenceTests
+✓ EyeGuardTests
+✓ HealthScoreCalculatorTests
+✓ NightModeManagerTests
+✓ NotificationManagerTests
+✓ OverlayWindowTests
+✓ PreferencesTests
+✓ SoundManagerTests
+
+🏗️ ARCHITECTURE PATTERNS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Protocol-Oriented Design  → All services use protocols for testability
+Dependency Injection      → Services injected, not singletons
+Observable State          → @Observable for reactive UI updates
+Actor Pattern             → ActivityMonitor for thread safety
+Singleton Pattern         → Shared instances for core services
+Factory Pattern           → LLMServiceFactory for service creation
+Enum-Driven State         → MascotState, BreakType, ScoreTrend
+Value Types               → Codable structs with Sendable for concurrency
+Swift 6 Strict Concurrency → @MainActor, Sendable, async/await
+
+🔧 TECHNOLOGIES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SwiftUI           → UI framework
+AppKit            → Menu bar, window management
+AVFoundation      → Audio engine (procedural sounds)
+SwiftUI Charts    → Dashboard visualization
+UserNotifications → Native macOS notifications
+os.Logger         → Structured logging
+Swift Testing     → Test framework
+
+📋 MEDICAL GUIDELINES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+AAO       → American Academy of Ophthalmology (20-20-20 rule)
+OSHA      → Occupational Safety & Health Administration (hourly breaks)
+EU Directive → Screen Equipment Directive (mandatory 2-hour breaks)
+WHO       → World Health Organization (outdoor time)
+NIOSH     → National Institute for Occupational Safety & Health (eye strain)
+Research  → Computer Vision Syndrome peer-reviewed studies
+
+✨ NOTABLE FEATURES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• 3-tier notification escalation with callbacks (H4)
+• Per-break-type elapsed tracking prevents timer interference (H5)
+• Double-fire prevention via cycle tracking (BUG-003)
+• Idle detection integrates with screen lock (H1)
+• Mouse-tracking mascot pupil with exercise animations
+• Procedurally-generated ambient sounds (no audio files)
+• Health score with trend analysis (↑ improving, → stable, ↓ declining)
+• Hourly activity breakdown in daily reports
+• AI insights with rule-based fallback (no API required)
+• Bilingual support throughout (English + Chinese)
+• Data persistence survives app crashes/restarts
+• Daily rollover at midnight
+• Performance optimized: static DateFormatters, reusable calculators
+
+📄 OUTPUT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Comprehensive inventory saved to:
+→ /Users/mengxionghan/.superset/projects/Tmp/eye-guard/FEATURE_INVENTORY.md (1404 lines)
+
+The inventory includes:
+✓ Complete project structure with all 49 files
+✓ Detailed documentation for all 17 major features
+✓ Break system with medical basis
+✓ 3-tier notification escalation flow
+✓ Mascot system with 7 states and animations
+✓ Eye exercises with patterns
+✓ 25 medical tips database
+✓ Health score calculation with formulas
+✓ Night mode configuration
+✓ Color analysis engine
+✓ Sound system with ambient presets
+✓ Dashboard tabs and data visualization
+✓ Daily report sections
+✓ LLM integration architecture
+✓ Activity monitoring
+✓ Preferences and settings
+✓ Menu bar integration
+✓ App lifecycle and bundle config
+✓ Data persistence strategy
+✓ Architecture patterns
+✓ Test coverage summary
+✓ Medical guidelines references
+

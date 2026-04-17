@@ -1,0 +1,268 @@
+================================================================================
+EYEGUARD CHINESE TTS — INTEGRATION ARCHITECTURE
+================================================================================
+
+1. CURRENT STATE (No TTS)
+═══════════════════════════════════════════════════════════════════════════════
+
+    ExerciseSessionView (UI)
+    ├─ Shows: "👋 眼保健操时间到！"
+    │ └─ User sees text only
+    │
+    ├─ remainingSeconds: 30 → 29 → 28... (Timer)
+    │ └─ Triggers animation updates
+    │
+    ├─ currentExerciseIndex: 0 (lookAround)
+    │ └─ Loads EyeExercise.lookAround
+    │
+    ├─ currentStep: 0 → 1 → 2... (Instruction index)
+    │ └─ Passed to ExerciseView as @Binding
+    │
+    └─ ExerciseView (Instruction Display)
+      ├─ English: "Look up and hold for 3 seconds"
+      ├─ Chinese: "向上看，保持3秒"
+      └─ Animation: Arrow pointing up
+      
+    └─ SoundManager (Audio Effects Only)
+        ├─ play(.breakStart) → "Tink" sound
+        ├─ startAmbient() → [Disabled]
+        └─ [NO SPEECH SYNTHESIS]
+
+
+2. DESIRED STATE (With TTS)
+═══════════════════════════════════════════════════════════════════════════════
+
+    ExerciseSessionView (UI)
+    ├─ Shows: "👋 眼保健操时间到！"
+    │ ├─ User sees text
+    │ └─ 🎤 SoundManager.speak("眼保健操时间到！")
+    │
+    ├─ remainingSeconds: 30 → 29 → 28... (Timer)
+    │ ├─ Triggers animation updates
+    │ └─ onChange trigger
+    │    └─ 🎤 Speak current instruction
+    │
+    ├─ currentExerciseIndex: 0 (lookAround)
+    │ ├─ Loads EyeExercise.lookAround
+    │ └─ 🎤 Speak exercise intro: "上下左右看"
+    │
+    ├─ currentStep: 0 → 1 → 2... (Instruction index)
+    │ ├─ Passed to ExerciseView as @Binding
+    │ └─ Each step triggers:
+    │    └─ 🎤 SoundManager.speak(instructionsChinese[currentStep])
+    │
+    └─ ExerciseView (Instruction Display)
+      ├─ English: "Look up and hold for 3 seconds"
+      ├─ Chinese: "向上看，保持3秒"
+      ├─ Animation: Arrow pointing up
+      └─ 🎤 Audio: Speaker plays "向上看，保持3秒"
+      
+    └─ SoundManager (Audio Effects + TTS) ◄── MODIFIED
+        ├─ play(.breakStart) → "Tink" sound
+        ├─ startAmbient() → [Disabled]
+        ├─ speak(text, language) → ✨ NEW (TTS via AVSpeechSynthesizer)
+        ├─ stopSpeaking() → ✨ NEW (Cancel speech)
+        ├─ isTTSEnabled → ✨ NEW (UserDefaults toggle)
+        └─ isMuted also controls TTS volume
+
+
+3. FILE CHANGE SUMMARY
+═══════════════════════════════════════════════════════════════════════════════
+
+┌─ SoundManager.swift ────────────────────────────────────────────────────────┐
+│ ADD (lines ~100–170):                                                       │
+│                                                                             │
+│  1. Private property:                                                      │
+│     private var speechSynthesizer: AVSpeechSynthesizer?                    │
+│                                                                             │
+│  2. New preference property (after isMuted):                               │
+│     var isTTSEnabled: Bool {                                              │
+│         get { UserDefaults.standard.bool(forKey: "ttsEnabled") }           │
+│         set { UserDefaults.standard.set(newValue, forKey: "ttsEnabled") }  │
+│     }                                                                       │
+│                                                                             │
+│  3. New public method (in API section):                                   │
+│     func speak(_ text: String, language: String = "zh_CN") {              │
+│         // Initialize synthesizer                                         │
+│         // Create utterance                                               │
+│         // Configure voice, rate, volume, pitch                           │
+│         // Call synthesizer.speak()                                       │
+│     }                                                                       │
+│                                                                             │
+│  4. New public method:                                                     │
+│     func stopSpeaking() {                                                  │
+│         speechSynthesizer?.stopSpeaking(at: .immediate)                    │
+│     }                                                                       │
+│                                                                             │
+│  Total: ~60 lines                                                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─ SoundPlaying.swift (Protocol) ──────────────────────────────────────────────┐
+│ ADD (in protocol definition):                                               │
+│                                                                             │
+│  func speak(_ text: String, language: String)                              │
+│  func stopSpeaking()                                                       │
+│  var isTTSEnabled: Bool { get set }                                        │
+│                                                                             │
+│  Total: 3 lines                                                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─ ExerciseSessionView.swift ──────────────────────────────────────────────────┐
+│ MODIFY (around line 276, in onChange observer):                            │
+│                                                                             │
+│  .onChange(of: remainingSeconds) {                                         │
+│      updateMascotPupil()                                                   │
+│      // ADD:                                                               │
+│      let instruction = currentExercise.instructionsChinese                 │
+│      if currentStep < instruction.count {                                 │
+│          SoundManager.shared.speak(                                        │
+│              instruction[currentStep],                                     │
+│              language: "zh_CN"                                             │
+│          )                                                                 │
+│      }                                                                      │
+│  }                                                                          │
+│                                                                             │
+│  Also MODIFY (in nextExercise, skipCurrentExercise):                       │
+│      SoundManager.shared.stopSpeaking()  // Before advancing               │
+│                                                                             │
+│  Total: ~10 lines                                                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─ PreferencesView.swift ──────────────────────────────────────────────────────┐
+│ ADD (new section in preferences):                                           │
+│                                                                             │
+│  Section("Voice Guidance / 语音指导") {                                     │
+│      Toggle("Enable TTS", isOn: Binding(                                   │
+│          get: { SoundManager.shared.isTTSEnabled },                         │
+│          set: { SoundManager.shared.isTTSEnabled = $0 }                    │
+│      ))                                                                     │
+│                                                                             │
+│      Slider(value: Binding(                                                │
+│          get: { CGFloat(SoundManager.shared.volume) },                      │
+│          set: { SoundManager.shared.volume = Float($0) }                   │
+│      ), in: 0...1)                                                          │
+│      .disabled(!SoundManager.shared.isTTSEnabled)                           │
+│  }                                                                          │
+│                                                                             │
+│  Total: ~15 lines                                                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─ EyeExercise.swift ──────────────────────────────────────────────────────────┐
+│ NO CHANGES NEEDED                                                           │
+│ ✓ All Chinese text already exists                                          │
+│ ✓ Already has instructionsChinese property                                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─ Package.swift ──────────────────────────────────────────────────────────────┐
+│ NO CHANGES NEEDED                                                           │
+│ ✓ AVFoundation already available on macOS 14+                              │
+│ ✓ Minimum deployment target supports AVSpeechSynthesizer                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+4. TIMING & SEQUENCE EXAMPLE
+═══════════════════════════════════════════════════════════════════════════════
+
+TIME    EVENT                          UI STATE              TTS ACTION
+────    ─────────────────────────────  ──────────────────────────────────────
+0:00    User clicks "开始练习"          Intro → Exercising   
+        
+        First exercise starts
+        Exercise 1: lookAround (40s)   
+        
+0:01    Timer tick, Step advances      Step: 0              🎤 "向上看，保持3秒"
+        Instruction: "Look up..."      Remain: 40s
+        
+0:04    Timer tick, Step advances      Step: 1              🎤 "向下看，保持3秒"
+        Instruction: "Look down..."    Remain: 37s
+        
+0:08    Repeat...                      ...                  ...
+        
+0:40    Exercise 1 complete            Exercise done        
+        Auto-advance to Exercise 2
+        
+0:41    First instruction of Ex2       Step: 0 (Ex2)        🎤 "将拇指放在鼻子前方15厘米处"
+        (nearFar)                       Remain: 30s
+        
+2:30    All 5 exercises complete       Phase: Completed     🎤 "眼保健操已完成！"
+        Show celebration screen
+
+
+5. USER PREFERENCES STORAGE
+═══════════════════════════════════════════════════════════════════════════════
+
+UserDefaults Keys:
+├─ "soundVolume" → Float (0.0–1.0) [EXISTING]
+├─ "soundMuted" → Bool [EXISTING]
+├─ "ttsEnabled" → Bool [NEW]
+├─ "ttsSpeechRate" → Float (0.5–2.0) [FUTURE]
+├─ "ttsLanguage" → String ("zh_CN", "en_US") [FUTURE]
+└─ "ambientPreset" → String [EXISTING]
+
+Initial defaults (first launch):
+├─ soundVolume = 0.5
+├─ soundMuted = false
+├─ ttsEnabled = true ← TTS ON by default (user can toggle off)
+└─ ttsSpeechRate = 0.5 ← Normal speech rate
+
+
+6. ERROR HANDLING & EDGE CASES
+═══════════════════════════════════════════════════════════════════════════════
+
+Case 1: User rapidly skips exercises
+├─ Old TTS still speaking
+├─ Solution: Call stopSpeaking() before advancing
+└─ Result: Instruction cancelled, new one starts
+
+Case 2: User disables TTS mid-session
+├─ isTTSEnabled = false
+├─ Solution: speak() checks guard isTTSEnabled before playing
+└─ Result: No TTS output, but session continues
+
+Case 3: System mutes all audio
+├─ isMuted = true
+├─ Solution: speak() checks guard !isMuted
+└─ Result: Both sound effects AND TTS muted together
+
+Case 4: Chinese voice not available (unlikely on macOS 14+)
+├─ AVSpeechSynthesisVoice(language: "zh_CN") returns nil
+├─ Solution: Add fallback to AVSpeechSynthesizerDelegate.didFinish()
+└─ Result: Fallback to system beep or skip that utterance
+
+Case 5: User skips to next exercise during TTS
+├─ nextExercise() calls stopSpeaking()
+├─ stopSpeaking() calls synthesizer.stopSpeaking(at: .immediate)
+└─ Result: Speech cancelled immediately, new exercise starts
+
+Case 6: App backgrounded during TTS
+├─ AVSpeechSynthesizer pauses automatically
+├─ When app returns to foreground, resume not needed
+└─ Result: User returns and sees paused exercise (timer frozen)
+
+
+7. OPTIONAL: ADVANCED FEATURES (Phase 2)
+═══════════════════════════════════════════════════════════════════════════════
+
+Not required, but could add later:
+
+1. Speech Rate Control
+   └─ Slider in Preferences: 0.5x (slow) to 2.0x (fast)
+   └─ utterance.rate = UserDefaults.standard.float(forKey: "ttsSpeechRate")
+
+2. Language Selection
+   └─ Radio buttons: 中文 / English
+   └─ speak(instruction, language: selectedLanguage)
+
+3. Accessibility
+   └─ Integrate with VoiceOver
+   └─ Provide captions during TTS
+
+4. Analytics
+   └─ Track TTS usage: "Did user enable TTS?"
+   └─ Track completion rates with/without TTS
+
+5. Quality Voice Packs
+   └─ Download higher-quality synthesized voices
+   └─ Use local voice files instead of system synthesizer
+
+================================================================================
