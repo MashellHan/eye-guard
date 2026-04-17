@@ -5,54 +5,49 @@ import SwiftUI
 /// Uses `MenuBarExtra` to live exclusively in the menu bar (no dock icon).
 /// Wires up the core services and provides the menu bar UI.
 /// The menu bar title shows a countdown to the next 20-20-20 break.
-/// Launches the floating mascot character (阿普) on screen (v0.9).
-/// Starts color analysis for screen content suggestions (v1.5).
+///
+/// Phase 3: presentation layer is chosen by ModeManager — either the
+/// floating Apu mascot (default) or the Dynamic Notch overlay.
 @main
 struct EyeGuardApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     @State private var scheduler = BreakScheduler()
 
-    /// Whether the mascot has been launched.
-    @State private var mascotLaunched = false
+    /// Whether the mode coordinator has been started.
+    @State private var coordinatorStarted = false
+
+    /// Retained reference to the mode coordinator for the app lifetime.
+    @State private var coordinator: AppModeCoordinator?
 
     var body: some Scene {
         MenuBarExtra {
             MenuBarView(scheduler: scheduler)
                 .onAppear {
-                    // Register scheduler with ReportDataProvider
                     ReportDataProvider.shared.register(scheduler: scheduler)
-                    launchMascotIfNeeded()
-                    activateNotchIfNeeded()
+                    startCoordinatorIfNeeded()
                 }
         } label: {
             MenuBarLabel(scheduler: scheduler)
                 .task {
-                    // task runs once when the label appears (app startup)
-                    launchMascotIfNeeded()
-                    activateNotchIfNeeded()
+                    startCoordinatorIfNeeded()
                 }
         }
         .menuBarExtraStyle(.window)
     }
 
+    /// Start the AppModeCoordinator once, wiring ModeManager ↔ modules.
     @MainActor
-    private func activateNotchIfNeeded() {
-        guard !NotchModule.shared.isActive else { return }
-        NotchModule.shared.activate(scheduler: scheduler)
-        Log.app.info("Notch module activated with scheduler bridge.")
-    }
-
-    @MainActor
-    private func launchMascotIfNeeded() {
-        // Double-guard: check both @State flag and static controller
-        guard !mascotLaunched, AppDelegate.mascotController == nil else { return }
-        mascotLaunched = true
-
-        let controller = MascotWindowController()
-        controller.show(scheduler: scheduler)
-        AppDelegate.mascotController = controller
-        Log.app.info("Mascot character (阿普) launched.")
+    private func startCoordinatorIfNeeded() {
+        guard !coordinatorStarted else { return }
+        coordinatorStarted = true
+        let c = AppModeCoordinator(
+            modeManager: ModeManager.shared,
+            scheduler: scheduler
+        )
+        c.start()
+        coordinator = c
+        Log.app.info("AppModeCoordinator started (mode=\(ModeManager.shared.currentMode.rawValue)).")
     }
 }
 

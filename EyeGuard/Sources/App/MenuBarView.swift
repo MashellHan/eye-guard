@@ -8,6 +8,8 @@ struct MenuBarView: View {
         VStack(alignment: .leading, spacing: 12) {
             headerSection
             Divider()
+            displayModeSection
+            Divider()
             continuousScreenTimeSection
             Divider()
             healthScoreSection
@@ -315,6 +317,31 @@ struct MenuBarView: View {
                 NSApplication.shared.terminate(nil)
             }
             .font(.caption)
+        }
+    }
+
+    // MARK: - Display Mode
+
+    /// Segmented picker that switches the presentation layer between
+    /// Apu mascot and Notch island. Backed by `ModeManager.shared`.
+    @ViewBuilder
+    private var displayModeSection: some View {
+        let binding = Binding<AppMode>(
+            get: { ModeManager.shared.currentMode },
+            set: { ModeManager.shared.switchMode(to: $0) }
+        )
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Display Mode")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Picker("", selection: binding) {
+                ForEach(AppMode.allCases) { mode in
+                    Label(mode.displayName, systemImage: mode.icon)
+                        .tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
         }
     }
 
