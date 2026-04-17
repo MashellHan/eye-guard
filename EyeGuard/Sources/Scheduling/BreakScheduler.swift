@@ -813,4 +813,30 @@ final class BreakScheduler {
             resetDaily()
         }
     }
+
+    // MARK: - Debug hooks
+
+    /// Fast-forward the elapsed counters for all enabled break types by
+    /// `minutes`, used exclusively for capturing UI screenshots at each
+    /// continuous-use tier (green / yellow / red) without waiting for
+    /// real time to elapse.
+    ///
+    /// Available only in `DEBUG` builds. Production binaries do not
+    /// include this symbol so the hook cannot be exercised accidentally.
+    #if DEBUG
+    func debugFastForward(minutes: Int) {
+        let delta = TimeInterval(minutes) * 60
+        for type in BreakType.allCases where isBreakTypeEnabled(type) {
+            elapsedPerType[type, default: 0] += delta
+        }
+        updateNextBreak()
+    }
+
+    /// Force a pre-break alert to fire immediately for the given break
+    /// type. Used to capture the `NotchPopBanner` screenshot without
+    /// waiting 20 real minutes. DEBUG-only.
+    func debugForcePreBreak(_ type: BreakType = .micro) {
+        startPreAlert(for: type)
+    }
+    #endif
 }
