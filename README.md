@@ -16,6 +16,27 @@ Medical-grade eye health guardian for macOS. Smart screen time monitoring with e
 <!-- Replace with actual screenshot: menu bar popover with health score, timer, and controls -->
 ![Menu Bar](screenshots/menubar.png)
 
+## Display Modes
+
+Eye Guard ships with **two mutually-exclusive display surfaces**. Pick the one that matches your workflow — switch anytime from the menu-bar picker, and your choice persists across launches.
+
+### Apu Mascot (default)
+
+The original mint-green creature that lives in the corner of your screen, reacts to your break cadence, and floats a speech bubble with health tips. Best when you want a warm, always-visible companion.
+
+### Dynamic Notch (Island-merge, new in v4.0)
+
+Inspired by [MioIsland](https://github.com/MioMioOS/MioIsland), the Notch mode reuses the MacBook's camera-housing area as a glanceable status surface.
+
+- **Collapsed state**: a small color-coded status dot (green → yellow → red as your continuous-use time climbs past 10 / 15 / 20 minutes) next to the current `MM:SS` timer.
+- **Expanded state** (hover or click): today's health score, countdown to the next break, and a **Break Now** button.
+- **Pop banner**: pre-break alerts appear as a typewriter-animated banner sliding out of the notch instead of a separate overlay window.
+- **Preferences**: horizontal offset (±30pt), hover-activation speed (instant / fast / normal / slow), and an opt-in software notch on external monitors.
+
+All underlying business logic — `BreakScheduler`, `ActivityMonitor`, eye-exercise sessions, tips, dashboard, health score — is shared between both modes. Notch is a pure view layer, not a rewrite.
+
+See `.island_merge/phases/*.md` for the phased rewrite plan and `CHANGELOG.md` for the v4.0 entry.
+
 ## Features
 
 ### Core Protection
