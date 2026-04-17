@@ -31,9 +31,10 @@ enum NotchOpenReason: Sendable, Equatable {
 }
 
 /// Placeholder content types for Phase 1.
-/// Phase 2+ will add `.eyeGuard` and `.dualMode` cases.
+/// Phase 2 adds `.eyeGuard` for the data-driven panel.
 enum NotchContentType: Equatable, Sendable {
     case placeholder
+    case eyeGuard
 }
 
 @MainActor
@@ -44,7 +45,7 @@ final class NotchViewModel {
 
     private(set) var status: NotchStatus = .closed
     private(set) var openReason: NotchOpenReason = .unknown
-    var contentType: NotchContentType = .placeholder
+    var contentType: NotchContentType = .eyeGuard
     var isHovering: Bool = false
     var currentExpansionWidth: CGFloat = 240
 
@@ -60,10 +61,14 @@ final class NotchViewModel {
 
     // MARK: - Derived
 
-    /// Panel size when opened — Phase 1 placeholder: 400x200.
-    /// Phase 2 will vary by contentType (eyeGuard / dualMode).
+    /// Panel size when opened — varies by contentType.
     var openedSize: CGSize {
-        CGSize(width: 400, height: 200)
+        switch contentType {
+        case .eyeGuard:
+            return CGSize(width: 400, height: 280)
+        case .placeholder:
+            return CGSize(width: 400, height: 200)
+        }
     }
 
     var deviceNotchRect: CGRect { geometry.deviceNotchRect }

@@ -1,30 +1,23 @@
 //
 //  NotchHostingController.swift
-//  EyeGuard — Notch Module (Phase 1)
+//  EyeGuard — Notch Module (Phase 2)
 //
 //  Hosts the SwiftUI NotchContainerView inside the NSPanel.
-//  Uses a custom NSHostingView subclass that passes clicks through
-//  empty (transparent) regions when the notch is closed.
+//  Now accepts an optional EyeGuardDataBridge for data-driven content.
 //
 
 import AppKit
 import SwiftUI
 
-/// NSHostingView subclass that conditionally eats or passes clicks
-/// depending on whether the notch is opened.
 final class NotchPassThroughHostingView<Content: View>: NSHostingView<Content> {
     var isOpened: () -> Bool = { false }
 
-    // Explicit deinit to work around a generic NSHostingView subclass
-    // SIL optimization crash seen on Swift 6.2.x.
     deinit {}
 
     override func hitTest(_ point: NSPoint) -> NSView? {
         if isOpened() {
             return super.hitTest(point)
         }
-        // When closed, accept clicks in the top ~notch band so the
-        // NotchViewModel.handleMouseDown path can evaluate geometry.
         if point.y >= bounds.height - 44 {
             return self
         }
@@ -35,10 +28,12 @@ final class NotchPassThroughHostingView<Content: View>: NSHostingView<Content> {
 @MainActor
 final class NotchHostingController: NSViewController {
     private let viewModel: NotchViewModel
+    private let bridge: EyeGuardDataBridge?
     private var hosting: NotchPassThroughHostingView<NotchContainerView>!
 
-    init(viewModel: NotchViewModel) {
+    init(viewModel: NotchViewModel, bridge: EyeGuardDataBridge?) {
         self.viewModel = viewModel
+        self.bridge = bridge
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -47,7 +42,7 @@ final class NotchHostingController: NSViewController {
     }
 
     override func loadView() {
-        let rootView = NotchContainerView(viewModel: viewModel)
+        let rootView = NotchContainerView(viewModel: viewModel, bridge: bridge)
         let host = NotchPassThroughHostingView(rootView: rootView)
         host.isOpened = { [weak viewModel] in
             viewModel?.status == .opened

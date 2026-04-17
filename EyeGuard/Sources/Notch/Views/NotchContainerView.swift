@@ -1,15 +1,17 @@
 //
 //  NotchContainerView.swift
-//  EyeGuard — Notch Module (Phase 1)
+//  EyeGuard — Notch Module (Phase 2)
 //
-//  The SwiftUI root view hosted inside NotchPanel. Renders either
-//  the collapsed dot or the opened placeholder based on VM.status.
+//  Root SwiftUI view hosted inside NotchPanel. Dispatches on the
+//  VM.contentType for expanded content and renders the collapsed
+//  wings when closed.
 //
 
 import SwiftUI
 
 struct NotchContainerView: View {
     @Bindable var viewModel: NotchViewModel
+    let bridge: EyeGuardDataBridge?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -23,6 +25,7 @@ struct NotchContainerView: View {
                         .fill(Color.black)
                 )
                 .animation(.easeOut(duration: 0.25), value: viewModel.status)
+                .animation(.easeOut(duration: 0.25), value: viewModel.contentType)
 
             Spacer(minLength: 0)
         }
@@ -54,10 +57,23 @@ struct NotchContainerView: View {
 
     @ViewBuilder
     private var content: some View {
-        switch viewModel.status {
-        case .opened:
+        switch (viewModel.status, viewModel.contentType) {
+        case (.opened, .eyeGuard):
+            if let bridge {
+                EyeGuardExpandedView(bridge: bridge)
+            } else {
+                PlaceholderExpanded { viewModel.notchClose() }
+            }
+        case (.opened, .placeholder):
             PlaceholderExpanded { viewModel.notchClose() }
-        case .closed, .popping:
+
+        case (.closed, .eyeGuard), (.popping, .eyeGuard):
+            if let bridge {
+                EyeGuardCollapsedContent(bridge: bridge)
+            } else {
+                PlaceholderCollapsed()
+            }
+        case (.closed, .placeholder), (.popping, .placeholder):
             PlaceholderCollapsed()
         }
     }

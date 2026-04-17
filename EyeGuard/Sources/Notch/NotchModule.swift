@@ -1,9 +1,9 @@
 //
 //  NotchModule.swift
-//  EyeGuard — Notch Module (Phase 1)
+//  EyeGuard — Notch Module (Phase 2)
 //
-//  Module entry point. Creates and tears down NotchWindowController
-//  for each eligible screen (Phase 1: built-in display only).
+//  Module entry point. Now accepts a BreakScheduler so a data bridge
+//  can power the collapsed + expanded EyeGuard views.
 //
 
 import AppKit
@@ -17,16 +17,22 @@ final class NotchModule {
 
     private(set) var isActive: Bool = false
     private var controllers: [NotchWindowController] = []
+    private var bridge: EyeGuardDataBridge?
     private let log = Logger(subsystem: "com.eyeguard.app", category: "Notch")
 
     private init() {}
 
     /// Spawn notch panels on all eligible screens.
-    /// Phase 1: prefer built-in displays, but fall back to the main
-    /// screen so the shell is visible during development on setups
-    /// without a MacBook built-in display (external monitors only).
-    func activate() {
+    /// If a scheduler is supplied (Phase 2+), the data bridge is created
+    /// and passed into each window; otherwise falls back to placeholder
+    /// views (Phase 1 shell).
+    func activate(scheduler: BreakScheduler? = nil) {
         guard !isActive else { return }
+
+        if let scheduler {
+            bridge = EyeGuardDataBridge(scheduler: scheduler)
+        }
+
         let builtin = NSScreen.screens.filter { $0.isBuiltinDisplay }
         let eligible: [NSScreen]
         if !builtin.isEmpty {
@@ -39,12 +45,13 @@ final class NotchModule {
             isActive = true
             return
         }
-        controllers = eligible.map { NotchWindowController(screen: $0) }
+        controllers = eligible.map {
+            NotchWindowController(screen: $0, bridge: bridge)
+        }
         isActive = true
-        log.info("NotchModule activated on \(eligible.count) screen(s)")
+        log.info("NotchModule activated on \(eligible.count) screen(s), bridge=\(self.bridge != nil)")
     }
 
-    /// Tear down all panels and clear state.
     func deactivate() {
         guard isActive else { return }
         for controller in controllers {
@@ -52,6 +59,7 @@ final class NotchModule {
             controller.window?.close()
         }
         controllers.removeAll()
+        bridge = nil
         isActive = false
         log.info("NotchModule deactivated")
     }

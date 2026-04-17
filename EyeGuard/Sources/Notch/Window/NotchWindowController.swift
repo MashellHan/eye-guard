@@ -19,7 +19,7 @@ final class NotchWindowController: NSWindowController {
     let screenID: String
     private var observationTask: Task<Void, Never>?
 
-    init(screen: NSScreen) {
+    init(screen: NSScreen, bridge: EyeGuardDataBridge?) {
         self.screen = screen
         self.screenID = screen.persistentID
 
@@ -57,7 +57,7 @@ final class NotchWindowController: NSWindowController {
 
         super.init(window: panel)
 
-        let hosting = NotchHostingController(viewModel: viewModel)
+        let hosting = NotchHostingController(viewModel: viewModel, bridge: bridge)
         panel.contentViewController = hosting
         panel.setFrame(windowFrame, display: true)
         panel.orderFrontRegardless()

@@ -23,15 +23,24 @@ struct EyeGuardApp: App {
                     // Register scheduler with ReportDataProvider
                     ReportDataProvider.shared.register(scheduler: scheduler)
                     launchMascotIfNeeded()
+                    activateNotchIfNeeded()
                 }
         } label: {
             MenuBarLabel(scheduler: scheduler)
                 .task {
                     // task runs once when the label appears (app startup)
                     launchMascotIfNeeded()
+                    activateNotchIfNeeded()
                 }
         }
         .menuBarExtraStyle(.window)
+    }
+
+    @MainActor
+    private func activateNotchIfNeeded() {
+        guard !NotchModule.shared.isActive else { return }
+        NotchModule.shared.activate(scheduler: scheduler)
+        Log.app.info("Notch module activated with scheduler bridge.")
     }
 
     @MainActor
