@@ -49,6 +49,10 @@ final class NotchViewModel {
     var isHovering: Bool = false
     var currentExpansionWidth: CGFloat = 240
 
+    /// Active pop banner payload (nil when not popping).
+    private(set) var popKind: NotchPopKind?
+    private(set) var popMessage: String = ""
+
     /// Whether the most-recent open was user-initiated (click).
     /// Used by NotchWindowController to decide focus stealing.
     private(set) var shouldActivateOnOpen: Bool = false
@@ -206,6 +210,25 @@ final class NotchViewModel {
     func notchUnpop() {
         guard status == .popping else { return }
         status = .closed
+    }
+
+    /// Show a pop banner with a typewriter message.
+    /// Auto-dismisses after `duration` seconds.
+    func pop(kind: NotchPopKind, message: String, duration: TimeInterval = 3.0) {
+        guard status != .opened else { return }
+        popKind = kind
+        popMessage = message
+        status = .popping
+        openReason = .notification
+
+        bootTask?.cancel()
+        bootTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(duration))
+            guard let self, !Task.isCancelled, self.status == .popping else { return }
+            self.status = .closed
+            self.popKind = nil
+            self.popMessage = ""
+        }
     }
 
     /// Boot animation: open briefly at launch so the user sees the notch,

@@ -38,7 +38,13 @@ struct NotchContainerView: View {
         switch viewModel.status {
         case .opened:
             return viewModel.openedSize.width
-        case .closed, .popping:
+        case .popping:
+            // Pop banner needs room for icon + typewriter message
+            return max(
+                viewModel.geometry.deviceNotchRect.width + 240,
+                360
+            )
+        case .closed:
             return viewModel.geometry.deviceNotchRect.width
                 + viewModel.currentExpansionWidth
         }
@@ -48,7 +54,9 @@ struct NotchContainerView: View {
         switch viewModel.status {
         case .opened:
             return viewModel.openedSize.height
-        case .closed, .popping:
+        case .popping:
+            return viewModel.geometry.deviceNotchRect.height + 6
+        case .closed:
             return viewModel.geometry.deviceNotchRect.height
         }
     }
@@ -67,13 +75,22 @@ struct NotchContainerView: View {
         case (.opened, .placeholder):
             PlaceholderExpanded { viewModel.notchClose() }
 
-        case (.closed, .eyeGuard), (.popping, .eyeGuard):
+        case (.popping, _):
+            if let kind = viewModel.popKind {
+                NotchPopBanner(kind: kind, message: viewModel.popMessage)
+            } else if viewModel.contentType == .eyeGuard, let bridge {
+                EyeGuardCollapsedContent(bridge: bridge)
+            } else {
+                PlaceholderCollapsed()
+            }
+
+        case (.closed, .eyeGuard):
             if let bridge {
                 EyeGuardCollapsedContent(bridge: bridge)
             } else {
                 PlaceholderCollapsed()
             }
-        case (.closed, .placeholder), (.popping, .placeholder):
+        case (.closed, .placeholder):
             PlaceholderCollapsed()
         }
     }
