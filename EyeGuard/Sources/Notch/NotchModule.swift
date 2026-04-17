@@ -22,12 +22,20 @@ final class NotchModule {
     private init() {}
 
     /// Spawn notch panels on all eligible screens.
-    /// Phase 1: only the built-in display, regardless of hardware notch.
+    /// Phase 1: prefer built-in displays, but fall back to the main
+    /// screen so the shell is visible during development on setups
+    /// without a MacBook built-in display (external monitors only).
     func activate() {
         guard !isActive else { return }
-        let eligible = NSScreen.screens.filter { $0.isBuiltinDisplay }
-        guard !eligible.isEmpty else {
-            log.warning("NotchModule.activate: no built-in display; skipping")
+        let builtin = NSScreen.screens.filter { $0.isBuiltinDisplay }
+        let eligible: [NSScreen]
+        if !builtin.isEmpty {
+            eligible = builtin
+        } else if let main = NSScreen.main {
+            log.info("NotchModule.activate: no built-in display; using NSScreen.main as fallback")
+            eligible = [main]
+        } else {
+            log.warning("NotchModule.activate: no usable screen; skipping")
             isActive = true
             return
         }
