@@ -313,10 +313,12 @@ mio 类名与 eye-guard 现有类冲突，需要重命名:
 1. ~~扫 mio 其他位置找 ScreenGeometry/NotchPalette/NotchThemeID 的定义并补拷入 Framework/~~ ✅ 02762c7 (NotchTheme + NotchCustomization + EventMonitor + BuddyReader 拷入 Framework/State/)
 2. ~~给三个共用 enum (NotchStatus/Reason/ContentType) 加 Island 前缀~~ ✅ 2c879c6
 3. ~~删 NSScreen 扩展冲突（用 mio 版还是 eye-guard 版需选）~~ ✅ 2c879c6 (删 mio 版, 保 eye-guard 版)
-4. 删 SessionState/SessionPhase 引用（直接编辑文件，删除有该参数的方法/属性） — **下一轮**
-5. 删 NativePluginManager 引用 — **下一轮**
-6. 删 PreviewsMacros (#Preview blocks 引用已删除类型) — **下一轮**
-7. 编译, 直到 0 error
+4. ~~删 SessionState/SessionPhase 引用~~ ✅ c4b0b03 (改为 stub IslandLegacyDomainStubs.swift, 含完整 10-phase enum + sessionId)
+5. ~~删 NativePluginManager 引用~~ ✅ c4b0b03 (stub)
+6. ~~删 PreviewsMacros (#Preview blocks 引用已删除类型)~~ ✅ c4b0b03 (剥离 6 个 #Preview from 5 文件)
+7. ~~AppDelegate.shared / EyeGuardModule / AppMode.dual~~ ✅ 95e6423 (shim)
+8. 剩余 99 errors: NotchHardwareDetector.shared 并发 (~22), NotificationCenter Sendable (~8), IslandPluginDescriptor 缺成员 (~6), WyHash/TipTriangle/SystemSettingsRow/IslandNotchView 小辅助类型 (~14) — 下一轮
+9. 编译到 0 error 后接 Day 2 (写 EyeGuardNotchView)
 
 ### 自动 cron 进度日志 (00:30)
 
@@ -325,6 +327,15 @@ mio 类名与 eye-guard 现有类冲突，需要重命名:
 | 00:24 (315ea8b 拷贝完成) | 315ea8b | 1367 | 缺类型 (BuddyInfo, NotchPalette, ScreenGeometry, EventMonitor) + enum 冲突 + NSScreen 重复 |
 | 00:31 (02762c7 补 4 模型) | 02762c7 | ~1100 | enum 冲突 + NSScreen 重复主导 |
 | 00:33 (2c879c6 enum 前缀) | 2c879c6 | **799** | SessionState/Phase + AppDelegate + NativePluginManager + PreviewsMacros |
+
+### 自动 cron 进度日志 (01:00)
+
+| 时点 | HEAD | swift build errors | Δ | 备注 |
+|---|---|---|---|---|
+| 01:08 (c4b0b03 strip #Preview + stubs) | c4b0b03 | **151** | -208 (-58%) | 加 IslandLegacyDomainStubs.swift |
+| 01:10 (95e6423 AppDelegate shim) | 95e6423 | **99** | -52 (-34%) | <100 错误首达 |
+
+**累计自 Day 1 起 (1367 → 99 = -93%)**
 
 ---
 
