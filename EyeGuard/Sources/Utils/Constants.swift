@@ -107,6 +107,10 @@ extension Notification.Name {
     /// Posted when user taps "Start Eye Exercises" from the break overlay.
     static let startExercisesFromBreak = Notification.Name("EyeGuard.startExercisesFromBreak")
 
+    /// Posted when the user requests a random eye-care tip from the menu bar.
+    /// userInfo: ["tipId": Int]
+    static let showEyeTipRequested = Notification.Name("EyeGuard.showEyeTipRequested")
+
     /// Posted when a pre-break alert countdown starts.
     /// userInfo: ["breakType": BreakType, "seconds": Int]
     static let preAlertStarted = Notification.Name("EyeGuard.preAlertStarted")

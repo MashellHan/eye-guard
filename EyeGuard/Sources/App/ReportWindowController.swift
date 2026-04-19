@@ -32,7 +32,7 @@ final class ReportWindowController {
         let newWindow = NSWindow(contentViewController: hostingController)
         newWindow.title = title
         newWindow.styleMask = [.titled, .closable, .miniaturizable, .resizable]
-        newWindow.setContentSize(NSSize(width: 720, height: 720))
+        newWindow.setContentSize(NSSize(width: 1000, height: 820))
         newWindow.center()
         newWindow.isReleasedWhenClosed = false
         newWindow.level = .floating
@@ -93,7 +93,7 @@ struct ReportViewerView: View {
             }
             .padding(12)
         }
-        .frame(minWidth: 560, minHeight: 480)
+        .frame(minWidth: 800, minHeight: 600)
     }
 
     // MARK: - Block Parsing
@@ -292,11 +292,10 @@ struct ReportViewerView: View {
         isHeader: Bool,
         columnCount: Int
     ) -> some View {
-        HStack(alignment: .top, spacing: 0) {
+        HStack(alignment: .center, spacing: 0) {
             ForEach(0..<columnCount, id: \.self) { idx in
                 let value = idx < cells.count ? cells[idx] : ""
-                Text(attributed(value))
-                    .font(isHeader ? .system(size: 13, weight: .semibold) : .system(size: 13))
+                cellView(value: value, isHeader: isHeader)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, 6)
                     .padding(.horizontal, 8)
@@ -306,6 +305,47 @@ struct ReportViewerView: View {
                         .frame(width: 1)
                 }
             }
+        }
+    }
+
+    /// Renders a table cell. Unicode block-character bars (█/░) are
+    /// detected and rendered as a real graphical progress bar.
+    @ViewBuilder
+    private func cellView(value: String, isHeader: Bool) -> some View {
+        if !isHeader, let progress = barProgress(value) {
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.gray.opacity(0.2))
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(progressColor(progress))
+                        .frame(width: geo.size.width * CGFloat(progress))
+                }
+            }
+            .frame(height: 12)
+        } else {
+            Text(attributed(value))
+                .font(isHeader ? .system(size: 13, weight: .semibold) : .system(size: 13))
+        }
+    }
+
+    /// Returns 0...1 progress if the cell is a unicode block bar, else nil.
+    private func barProgress(_ value: String) -> Double? {
+        let trimmed = value.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return nil }
+        let allowed: Set<Character> = ["\u{2588}", "\u{2591}"]
+        guard trimmed.allSatisfy({ allowed.contains($0) }) else { return nil }
+        let total = trimmed.count
+        let filled = trimmed.filter { $0 == "\u{2588}" }.count
+        return total > 0 ? Double(filled) / Double(total) : 0
+    }
+
+    private func progressColor(_ progress: Double) -> Color {
+        switch progress {
+        case 0.8...: return .green
+        case 0.6..<0.8: return .yellow
+        case 0.4..<0.6: return .orange
+        default: return .red
         }
     }
 }

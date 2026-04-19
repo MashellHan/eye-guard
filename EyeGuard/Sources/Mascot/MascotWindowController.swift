@@ -52,6 +52,9 @@ final class MascotWindowController {
     /// Observer for exercise-from-break notification.
     private var exerciseFromBreakObserver: Any?
 
+    /// Observer for menu-bar "Show Tip" notification.
+    private var showTipObserver: Any?
+
     /// Observer for pre-alert started notification.
     private var preAlertStartedObserver: Any?
 
@@ -150,6 +153,17 @@ final class MascotWindowController {
         ) { [weak self] _ in
             Task { @MainActor in
                 self?.showExerciseWindow()
+            }
+        }
+
+        // Listen for "Tip" requests from the menu bar.
+        showTipObserver = NotificationCenter.default.addObserver(
+            forName: .showEyeTipRequested,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.handleShowTip()
             }
         }
 
@@ -275,6 +289,10 @@ final class MascotWindowController {
         if let observer = exerciseFromBreakObserver {
             NotificationCenter.default.removeObserver(observer)
             exerciseFromBreakObserver = nil
+        }
+        if let observer = showTipObserver {
+            NotificationCenter.default.removeObserver(observer)
+            showTipObserver = nil
         }
         for observer in [preAlertStartedObserver, preAlertCountdownObserver, preAlertCancelledObserver].compactMap({ $0 }) {
             NotificationCenter.default.removeObserver(observer)

@@ -12,9 +12,9 @@ struct MenuBarView: View {
             Divider()
             continuousScreenTimeSection
             Divider()
-            healthScoreSection
+            quickActionsSection
             Divider()
-            controlsSection
+            healthScoreSection
             Divider()
             statsSection
             Divider()
@@ -106,6 +106,7 @@ struct MenuBarView: View {
     }
 
     /// Continuous screen time display — the most prominent real-time indicator.
+    /// Pause / Reset live here because they directly control this timer.
     private var continuousScreenTimeSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 4) {
@@ -116,6 +117,20 @@ struct MenuBarView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 Spacer()
+                Button {
+                    scheduler.togglePause()
+                } label: {
+                    Image(systemName: scheduler.isPaused ? "play.fill" : "pause.fill")
+                }
+                .buttonStyle(.borderless)
+                .help(scheduler.isPaused ? "Resume" : "Pause")
+                Button {
+                    scheduler.resetSession()
+                } label: {
+                    Image(systemName: "arrow.counterclockwise")
+                }
+                .buttonStyle(.borderless)
+                .help("Reset session")
             }
 
             if elapsedSinceLastBreak < 5 {
@@ -155,25 +170,10 @@ struct MenuBarView: View {
     /// Blink animation opacity for prolonged screen time (>60min).
     @State private var blinkOpacity: Double = 1.0
 
-    private var controlsSection: some View {
+    /// Quick break-related actions grouped together: trigger a break,
+    /// start eye exercises, or surface a random eye-care tip.
+    private var quickActionsSection: some View {
         HStack(spacing: 8) {
-            Button {
-                scheduler.togglePause()
-            } label: {
-                Label(
-                    scheduler.isPaused ? "Resume" : "Pause",
-                    systemImage: scheduler.isPaused ? "play.fill" : "pause.fill"
-                )
-            }
-
-            Button {
-                scheduler.resetSession()
-            } label: {
-                Label("Reset", systemImage: "arrow.counterclockwise")
-            }
-
-            Spacer()
-
             Button {
                 let breakType: BreakType = scheduler.nextScheduledBreak ?? .micro
                 let behavior = BreakBehavior(
@@ -205,11 +205,45 @@ struct MenuBarView: View {
                     }
                 )
             } label: {
-                Label("Break Now", systemImage: "eye")
+                Label("Break", systemImage: "eye")
+                    .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.small)
+
+            Button {
+                NotificationCenter.default.post(
+                    name: .startExercisesFromBreak,
+                    object: nil
+                )
+            } label: {
+                Label("Exercise", systemImage: "figure.cooldown")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+
+            Button {
+                showRandomTip()
+            } label: {
+                Label("Tip", systemImage: "lightbulb")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
         }
+    }
+
+    /// Posts a notification consumed by `MascotWindowController` /
+    /// notch presenter to display a random `TipDatabase` tip in the
+    /// active speech bubble or banner.
+    private func showRandomTip() {
+        let tip = TipDatabase.randomTip()
+        NotificationCenter.default.post(
+            name: .showEyeTipRequested,
+            object: nil,
+            userInfo: ["tipId": tip.id]
+        )
     }
 
     private var statsSection: some View {
