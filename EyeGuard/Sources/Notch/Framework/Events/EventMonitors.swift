@@ -8,7 +8,7 @@
 import AppKit
 import Combine
 
-class IslandEventMonitors {
+class IslandEventMonitors: @unchecked Sendable {
     static let shared = IslandEventMonitors()
 
     let mouseLocation = CurrentValueSubject<CGPoint, Never>(.zero)

@@ -239,9 +239,11 @@ extension SessionPhase {
             return .needsYou
         case .waitingForInput:
             return .done
-        case .compacting:
+        case .compacting, .thinking:
             return .thinking
-        case .ended:
+        case .responding:
+            return .working
+        case .ended, .waitingForUser, .error:
             return .idle
         }
     }

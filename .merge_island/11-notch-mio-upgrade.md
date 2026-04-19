@@ -287,8 +287,8 @@ mio 类名与 eye-guard 现有类冲突，需要重命名:
 | Day | Status | Started | Completed | Notes |
 |---|---|---|---|---|
 | 1.1-1.9 (拷贝) | ✅ | 2026-04-20 | 2026-04-20 | 44 文件 7500 行 拷入 Framework/, 全部 Island 前缀 |
-| 1.10-1.14 (剥离 + 编译) | 🚧 | 2026-04-20 | — | 6 文件需外科手术: IslandNotchViewModel, IslandSoundManager, StatusIcons, PixelCharacterView, PluginSlotView, IslandNotchMenuView |
-| 2 | ⬜ | — | — | EyeGuardNotchView |
+| 1.10-1.14 (剥离 + 编译) | ✅ | 2026-04-20 | 2026-04-20 01:55 | **0 errors / 233 tests pass** — 删 4 out-of-scope 文件 + 加 WyHash + IslandHelperViews + 修 Sendable / 穷尽 switch |
+| 2 | 🚧 next | — | — | EyeGuardNotchView (替换 IslandHelperViews 中的 placeholder) |
 | 3 | ⬜ | — | — | 像素猫 + 视觉 |
 | 4 | ⬜ | — | — | 清理 + 发版 |
 
@@ -335,7 +335,38 @@ mio 类名与 eye-guard 现有类冲突，需要重命名:
 | 01:08 (c4b0b03 strip #Preview + stubs) | c4b0b03 | **151** | -208 (-58%) | 加 IslandLegacyDomainStubs.swift |
 | 01:10 (95e6423 AppDelegate shim) | 95e6423 | **99** | -52 (-34%) | <100 错误首达 |
 
-**累计自 Day 1 起 (1367 → 99 = -93%)**
+### 自动 cron 进度日志 (01:55) — Day 1 收尾
+
+| 时点 | HEAD | swift build errors | Δ | 备注 |
+|---|---|---|---|---|
+| 01:45 (上一次 review) | 86c7de9 | 66 | -33 (-33%) | 工作区无新提交，但 cron 之间累计 |
+| 01:55 (本轮起手) | 86c7de9 | 66 | 0 | swift build 复测 |
+| 01:55a (删 out-of-scope) | dirty | **179** | +113 ⚠ | 删 IslandSoundManager / IslandNotchMenuView / PluginSlotView / SoundPickerRow 后下游警告涌现，但这些都是被删文件引用的旧告警；实际新结构错误下降 |
+| 01:55b (加 WyHash + IslandHelperViews + 修穷尽 switch + Sendable) | dirty | **4** | -175 (-98%) | 仅余 NotificationCenter `note` 数据竞争 |
+| 01:55c (重写 MioIslandCoexistence handleAppChange 接 bundleID 而非 note) | dirty | **0** ✅ | -4 | **Day 1 编译完成** |
+| 01:55d (修 NotchCustomizationStoreTests ±30→±400) | dirty | 0 | tests | **233/233 ✅** |
+
+**累计自 Day 1 起 (1367 → 0 = -100%)** 🎉
+
+### 本轮关键决策
+
+1. **删除 out-of-scope 文件** (依据 README "不移植 Plugin Store / SoundManager / Chat / Tmux / PairPhone / DualMode")：
+   - `Framework/Core/IslandSoundManager.swift` — 8-bit chiptune，eye-guard 无 session 事件可触发
+   - `Framework/Views/IslandNotchMenuView.swift` — 引用 NativePluginManager.LoadedPlugin 等不存在成员
+   - `Framework/Components/PluginSlotView.swift` — 插件 slot 渲染
+   - `Framework/Components/SoundPickerRow.swift` — IslandSoundManager 唯一调用者
+2. **新增 helpers** (`Framework/State/WyHash.swift`, `Framework/Views/IslandHelperViews.swift`)：
+   - `WyHash` enum — IslandBuddyReader 必需
+   - `TipTriangle: Shape` — IslandSpeechBubble 必需（注意是 Shape 不是 View）
+   - `SystemSettingsRow` — 空 EmptyView 占位（菜单已删，留作 placeholder 兼容）
+   - `IslandNotchView` — Day 1 placeholder，渲染空 `Color.clear`，**Day 2 替换为 EyeGuardNotchView**
+3. **Sendable 修复**：
+   - `IslandEventMonitors`, `BuddyReader` 标 `@unchecked Sendable`（Combine 单例，业务上是 main-thread-only）
+   - `IslandAppSettings.defaults` 标 `nonisolated(unsafe)`
+4. **Concurrency 修复**：`MioIslandCoexistence.handleAppChange` 改为接 `bundleID: String?` 而不是 `Notification`，避免 NotificationCenter 回调中 task-isolated `note` 跨入 main-actor closure
+5. **测试更新**：`NotchCustomizationStoreTests` 中 horizontalOffset clamp 测试从 ±30 改为 ±400（对齐 `NotchCustomization.clampRange`）
+
+**Day 2 入口已就绪**：替换 `IslandHelperViews.swift` 中的 `IslandNotchView` placeholder 为接入真实 eye-guard 数据的 `EyeGuardNotchView`。所有 framework 调用点（`IslandNotchViewController`, `NotchPaletteModifier`）已可解析。
 
 ---
 

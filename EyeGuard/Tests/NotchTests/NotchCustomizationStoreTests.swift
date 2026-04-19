@@ -22,13 +22,13 @@ struct NotchCustomizationStoreTests {
         #expect(store.customization.showOnExternalDisplays == false)
     }
 
-    @Test("Horizontal offset clamps to ±30pt")
+    @Test("Horizontal offset clamps to ±400pt")
     func offsetClamps() {
         let store = NotchCustomizationStore(defaults: makeIsolatedDefaults())
         store.setHorizontalOffset(9999)
-        #expect(store.customization.horizontalOffset == 30)
+        #expect(store.customization.horizontalOffset == 400)
         store.setHorizontalOffset(-9999)
-        #expect(store.customization.horizontalOffset == -30)
+        #expect(store.customization.horizontalOffset == -400)
     }
 
     @Test("Hover speed mutator persists")

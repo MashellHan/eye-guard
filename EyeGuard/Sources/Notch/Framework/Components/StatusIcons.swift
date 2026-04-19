@@ -231,9 +231,9 @@ struct StatusIcon: View {
             WaitingForInputIcon(size: size)
         case .waitingForApproval, .waitingForQuestion:
             WaitingForApprovalIcon(size: size)
-        case .processing, .compacting:
+        case .processing, .compacting, .thinking, .responding:
             RunningIcon(size: size)
-        case .idle, .ended:
+        case .idle, .ended, .waitingForUser, .error:
             IdleIcon(size: size)
         }
     }

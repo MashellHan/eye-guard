@@ -47,8 +47,10 @@ final class MioIslandCoexistence {
                 object: nil,
                 queue: .main
             ) { [weak self] note in
+                let bundleID = (note.userInfo?[NSWorkspace.applicationUserInfoKey]
+                    as? NSRunningApplication)?.bundleIdentifier
                 Task { @MainActor in
-                    self?.handleAppChange(note: note)
+                    self?.handleAppChange(bundleID: bundleID)
                 }
             }
             terminateObserver = center.addObserver(
@@ -56,8 +58,10 @@ final class MioIslandCoexistence {
                 object: nil,
                 queue: .main
             ) { [weak self] note in
+                let bundleID = (note.userInfo?[NSWorkspace.applicationUserInfoKey]
+                    as? NSRunningApplication)?.bundleIdentifier
                 Task { @MainActor in
-                    self?.handleAppChange(note: note)
+                    self?.handleAppChange(bundleID: bundleID)
                 }
             }
         }
@@ -79,11 +83,8 @@ final class MioIslandCoexistence {
         }
     }
 
-    private func handleAppChange(note: Notification) {
-        guard
-            let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
-            app.bundleIdentifier == Self.mioBundleID
-        else { return }
+    private func handleAppChange(bundleID: String?) {
+        guard bundleID == Self.mioBundleID else { return }
         recompute()
     }
 

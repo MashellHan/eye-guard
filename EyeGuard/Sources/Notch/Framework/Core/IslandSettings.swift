@@ -32,7 +32,7 @@ enum IslandNotificationSound: String, CaseIterable {
 }
 
 enum IslandAppSettings {
-    private static let defaults = UserDefaults.standard
+    nonisolated(unsafe) private static let defaults: UserDefaults = .standard
 
     // MARK: - Keys
 

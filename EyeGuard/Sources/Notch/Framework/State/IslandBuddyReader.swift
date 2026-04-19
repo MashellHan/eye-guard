@@ -92,7 +92,7 @@ struct BuddyInfo: Sendable {
 
 // MARK: - Buddy Reader
 
-class BuddyReader: ObservableObject {
+class BuddyReader: ObservableObject, @unchecked Sendable {
     static let shared = BuddyReader()
 
     @Published var buddy: BuddyInfo?
