@@ -310,12 +310,21 @@ mio 类名与 eye-guard 现有类冲突，需要重命名:
 | `AppMode.dual` | menu | 我们没 .dual, 删该 case |
 
 下一轮工作:
-1. 扫 mio 其他位置找 ScreenGeometry/NotchPalette/NotchThemeID 的定义并补拷入 Framework/
-2. 给三个共用 enum (NotchStatus/Reason/ContentType) 加 Island 前缀
-3. 删 NSScreen 扩展冲突（用 mio 版还是 eye-guard 版需选）
-4. 删 SessionState/SessionPhase 引用（直接编辑文件，删除有该参数的方法/属性）
-5. 删 NativePluginManager 引用
-6. 编译, 直到 0 error
+1. ~~扫 mio 其他位置找 ScreenGeometry/NotchPalette/NotchThemeID 的定义并补拷入 Framework/~~ ✅ 02762c7 (NotchTheme + NotchCustomization + EventMonitor + BuddyReader 拷入 Framework/State/)
+2. ~~给三个共用 enum (NotchStatus/Reason/ContentType) 加 Island 前缀~~ ✅ 2c879c6
+3. ~~删 NSScreen 扩展冲突（用 mio 版还是 eye-guard 版需选）~~ ✅ 2c879c6 (删 mio 版, 保 eye-guard 版)
+4. 删 SessionState/SessionPhase 引用（直接编辑文件，删除有该参数的方法/属性） — **下一轮**
+5. 删 NativePluginManager 引用 — **下一轮**
+6. 删 PreviewsMacros (#Preview blocks 引用已删除类型) — **下一轮**
+7. 编译, 直到 0 error
+
+### 自动 cron 进度日志 (00:30)
+
+| 时点 | HEAD | swift build errors | 主要类别 |
+|---|---|---|---|
+| 00:24 (315ea8b 拷贝完成) | 315ea8b | 1367 | 缺类型 (BuddyInfo, NotchPalette, ScreenGeometry, EventMonitor) + enum 冲突 + NSScreen 重复 |
+| 00:31 (02762c7 补 4 模型) | 02762c7 | ~1100 | enum 冲突 + NSScreen 重复主导 |
+| 00:33 (2c879c6 enum 前缀) | 2c879c6 | **799** | SessionState/Phase + AppDelegate + NativePluginManager + PreviewsMacros |
 
 ---
 
