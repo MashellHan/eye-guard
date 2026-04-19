@@ -347,19 +347,33 @@ struct MenuBarView: View {
 
     // MARK: - Report Generation
 
-    /// Generates a daily report with current session data and opens the reports folder.
+    /// Generates a daily report with current session data and shows it in a window.
     private func generateReport() {
         Task { @MainActor in
             let data = ReportDataProvider.shared.currentData()
             let generator = DailyReportGenerator()
-            _ = await generator.generate(
+            let report = await generator.generate(
                 sessions: data.sessions,
                 breakEvents: data.breakEvents,
                 totalScreenTime: data.totalScreenTime,
                 longestContinuousSession: data.longestContinuousSession
             )
-            // Open the reports directory in Finder
-            NSWorkspace.shared.open(EyeGuardConstants.reportsDirectory)
+
+            let fileURL = EyeGuardConstants.reportsDirectory
+                .appendingPathComponent("\(report.dateString).md")
+            let markdown = (try? String(contentsOf: fileURL, encoding: .utf8))
+                ?? generator.generateMarkdownContent(
+                    sessions: data.sessions,
+                    breakEvents: data.breakEvents,
+                    totalScreenTime: data.totalScreenTime,
+                    longestContinuousSession: data.longestContinuousSession
+                )
+
+            ReportWindowController.shared.showReport(
+                markdown: markdown,
+                fileURL: fileURL,
+                title: "EyeGuard Report — \(report.dateString)"
+            )
         }
     }
 
