@@ -27,8 +27,3 @@ struct IslandProcessingSpinner: View {
     }
 }
 
-#Preview {
-    IslandProcessingSpinner()
-        .frame(width: 30, height: 30)
-        .background(.black)
-}

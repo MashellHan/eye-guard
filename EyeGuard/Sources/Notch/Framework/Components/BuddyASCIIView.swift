@@ -586,39 +586,3 @@ struct IslandBuddyASCIIView: View {
 
 // MARK: - Preview
 
-#Preview {
-    VStack(spacing: 20) {
-        IslandBuddyASCIIView(
-            buddy: BuddyInfo(
-                name: "Bloop",
-                personality: "A cheerful blob",
-                species: .blob,
-                rarity: .rare,
-                stats: BuddyStats(debugging: 5, patience: 3, chaos: 7, wisdom: 4, snark: 6),
-                eye: "\u{00B7}",
-                hat: "crown",
-                isShiny: false,
-                hatchedAt: nil
-            )
-        )
-        .frame(width: 120, height: 80)
-
-        IslandBuddyASCIIView(
-            buddy: BuddyInfo(
-                name: "Quackers",
-                personality: "A mischievous duck",
-                species: .duck,
-                rarity: .legendary,
-                stats: BuddyStats(debugging: 8, patience: 2, chaos: 9, wisdom: 3, snark: 7),
-                eye: "\u{2726}",
-                hat: "tophat",
-                isShiny: true,
-                hatchedAt: nil
-            ),
-            isPetting: true
-        )
-        .frame(width: 120, height: 100)
-    }
-    .padding()
-    .background(Color.black)
-}

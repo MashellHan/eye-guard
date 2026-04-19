@@ -114,18 +114,3 @@ struct IslandNotchShape: Shape {
     }
 }
 
-#Preview {
-    VStack(spacing: 20) {
-        // Closed state
-        IslandNotchShape(topCornerRadius: 6, bottomCornerRadius: 14)
-            .fill(.black)
-            .frame(width: 200, height: 32)
-
-        // Open state
-        IslandNotchShape(topCornerRadius: 19, bottomCornerRadius: 24)
-            .fill(.black)
-            .frame(width: 600, height: 200)
-    }
-    .padding(20)
-    .background(Color.gray.opacity(0.3))
-}

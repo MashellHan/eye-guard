@@ -350,14 +350,4 @@ struct IslandEmojiPixelView: View {
 
 // MARK: - Preview
 
-#Preview("Octopus Wave") {
-    IslandEmojiPixelView(emoji: "🐙", style: .wave)
-        .frame(width: 48, height: 48)
-        .background(Color.black)
-}
 
-#Preview("Cat Rock") {
-    IslandEmojiPixelView(emoji: "🐱", style: .rock)
-        .frame(width: 48, height: 48)
-        .background(Color.black)
-}

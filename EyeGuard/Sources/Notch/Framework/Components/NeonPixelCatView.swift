@@ -160,11 +160,3 @@ struct IslandNeonPixelCatView: View {
 
 // MARK: - Preview
 
-#Preview {
-    ZStack {
-        Color.black
-        IslandNeonPixelCatView()
-            .scaleEffect(3)
-    }
-    .frame(width: 400, height: 300)
-}
