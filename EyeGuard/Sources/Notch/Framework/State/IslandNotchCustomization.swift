@@ -22,7 +22,7 @@ struct ScreenGeometry: Codable, Equatable {
     static let `default` = ScreenGeometry()
 }
 
-struct NotchCustomization: Codable, Equatable {
+struct IslandNotchCustomization: Codable, Equatable {
     // Appearance
     var theme: NotchThemeID
     var fontScale: FontScale
@@ -57,7 +57,7 @@ struct NotchCustomization: Codable, Equatable {
         self.hoverSpeed = hoverSpeed
     }
 
-    static let `default` = NotchCustomization()
+    static let `default` = IslandNotchCustomization()
 
     // MARK: - Per-screen geometry helpers
 

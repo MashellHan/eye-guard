@@ -141,12 +141,12 @@ final class NotchViewModel {
         let inNotch = geometry.isPointInNotch(
             location,
             expansionWidth: currentExpansionWidth,
-            horizontalOffset: 0
+            horizontalOffset: MioIslandCoexistence.shared.horizontalOffset
         )
         let inOpened = status == .opened && geometry.isPointInOpenedPanel(
             location,
             size: openedSize,
-            horizontalOffset: 0
+            horizontalOffset: MioIslandCoexistence.shared.horizontalOffset
         )
 
         let newHovering = inNotch || inOpened
@@ -176,14 +176,14 @@ final class NotchViewModel {
         let location = NSEvent.mouseLocation
         switch status {
         case .opened:
-            if geometry.isPointOutsidePanel(location, size: openedSize, horizontalOffset: 0) {
+            if geometry.isPointOutsidePanel(location, size: openedSize, horizontalOffset: MioIslandCoexistence.shared.horizontalOffset) {
                 notchClose()
             }
         case .closed, .popping:
             if geometry.isPointInNotch(
                 location,
                 expansionWidth: currentExpansionWidth,
-                horizontalOffset: 0
+                horizontalOffset: MioIslandCoexistence.shared.horizontalOffset
             ) {
                 notchOpen(reason: .click)
             }

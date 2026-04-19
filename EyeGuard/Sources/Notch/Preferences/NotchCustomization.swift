@@ -45,7 +45,7 @@ public struct NotchCustomization: Equatable, Sendable, Codable {
     public var hoverSpeed: NotchHoverSpeed
     public var showOnExternalDisplays: Bool
 
-    public static let clampRange: ClosedRange<CGFloat> = -30 ... 30
+    public static let clampRange: ClosedRange<CGFloat> = -400 ... 400
 
     public init(
         horizontalOffset: CGFloat = 0,

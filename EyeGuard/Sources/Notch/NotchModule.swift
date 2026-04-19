@@ -30,6 +30,10 @@ final class NotchModule {
     func activate(scheduler: BreakScheduler? = nil) {
         guard !isActive else { return }
 
+        // Begin watching for Mio Island so we can shift our notch out of
+        // the way when both apps are running.
+        MioIslandCoexistence.shared.start()
+
         if let scheduler {
             bridge = EyeGuardDataBridge(scheduler: scheduler)
         }

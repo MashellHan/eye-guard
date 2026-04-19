@@ -8,7 +8,7 @@
 //  percentage indicators). Status colors (success / warning / error)
 //  are intentionally NOT part of the palette — they preserve
 //  semantic meaning across themes and live in Assets.xcassets
-//  under NotchStatus/.
+//  under IslandNotchStatus/.
 //
 //  Spec: docs/superpowers/specs/2026-04-08-notch-customization-design.md
 //  section 5.3.

@@ -12,6 +12,9 @@ import SwiftUI
 struct NotchContainerView: View {
     @Bindable var viewModel: NotchViewModel
     let bridge: EyeGuardDataBridge?
+    /// Coexistence shifter — observes Mio Island and reports a horizontal
+    /// offset so this notch slides out of the way.
+    @State private var coexistence = MioIslandCoexistence.shared
 
     var body: some View {
         VStack(spacing: 0) {
@@ -26,6 +29,8 @@ struct NotchContainerView: View {
                 )
                 .animation(.easeOut(duration: 0.25), value: viewModel.status)
                 .animation(.easeOut(duration: 0.25), value: viewModel.contentType)
+                .offset(x: coexistence.horizontalOffset)
+                .animation(.easeOut(duration: 0.3), value: coexistence.horizontalOffset)
 
             Spacer(minLength: 0)
         }

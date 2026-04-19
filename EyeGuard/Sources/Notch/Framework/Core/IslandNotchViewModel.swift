@@ -9,13 +9,13 @@ import AppKit
 import Combine
 import SwiftUI
 
-enum NotchStatus: Equatable {
+enum IslandNotchStatus: Equatable {
     case closed
     case opened
     case popping
 }
 
-enum NotchOpenReason {
+enum IslandNotchOpenReason {
     case click
     case hover
     case notification
@@ -23,7 +23,7 @@ enum NotchOpenReason {
     case unknown
 }
 
-enum NotchContentType: Equatable {
+enum IslandNotchContentType: Equatable {
     case instances
     case menu
     case chat(SessionState)
@@ -49,9 +49,9 @@ enum NotchContentType: Equatable {
 class IslandNotchViewModel: ObservableObject {
     // MARK: - Published State
 
-    @Published var status: NotchStatus = .closed
-    @Published var openReason: NotchOpenReason = .unknown
-    @Published var contentType: NotchContentType = .instances
+    @Published var status: IslandNotchStatus = .closed
+    @Published var openReason: IslandNotchOpenReason = .unknown
+    @Published var contentType: IslandNotchContentType = .instances
     @Published var isHovering: Bool = false
 
     /// Session counts for dynamic panel sizing
@@ -374,7 +374,7 @@ class IslandNotchViewModel: ObservableObject {
     /// Whether the current open was triggered by user action (should steal focus)
     var shouldActivateOnOpen: Bool = false
 
-    func notchOpen(reason: NotchOpenReason = .unknown) {
+    func notchOpen(reason: IslandNotchOpenReason = .unknown) {
         openReason = reason
         // Only steal focus when user explicitly clicked
         shouldActivateOnOpen = (reason == .click)

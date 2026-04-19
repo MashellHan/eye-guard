@@ -19,7 +19,17 @@ final class NotchPassThroughHostingView<Content: View>: NSHostingView<Content> {
             return super.hitTest(point)
         }
         if point.y >= bounds.height - 44 {
-            return self
+            // Mirror the SwiftUI offset applied in NotchContainerView so the
+            // collapsed-wings hover/click target follows the shifted notch.
+            let offset = MainActor.assumeIsolated {
+                MioIslandCoexistence.shared.horizontalOffset
+            }
+            let center = bounds.midX + offset
+            let halfWidth: CGFloat = 360 // generous: wings + buffer
+            if abs(point.x - center) <= halfWidth {
+                return self
+            }
+            return nil
         }
         return nil
     }
