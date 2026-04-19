@@ -286,10 +286,36 @@ mio 类名与 eye-guard 现有类冲突，需要重命名:
 
 | Day | Status | Started | Completed | Notes |
 |---|---|---|---|---|
-| 1 | 🚧 In Progress | 2026-04-20 | — | 拷贝 + 编译 |
+| 1.1-1.9 (拷贝) | ✅ | 2026-04-20 | 2026-04-20 | 44 文件 7500 行 拷入 Framework/, 全部 Island 前缀 |
+| 1.10-1.14 (剥离 + 编译) | 🚧 | 2026-04-20 | — | 6 文件需外科手术: IslandNotchViewModel, IslandSoundManager, StatusIcons, PixelCharacterView, PluginSlotView, IslandNotchMenuView |
 | 2 | ⬜ | — | — | EyeGuardNotchView |
 | 3 | ⬜ | — | — | 像素猫 + 视觉 |
 | 4 | ⬜ | — | — | 清理 + 发版 |
+
+## 当前阻塞清单 (Day 1 末)
+
+需在 Framework/ 内删除以下符号引用（业务类型，eye-guard 不需要）:
+
+| 符号 | 出现文件 | 处理 |
+|---|---|---|
+| `SessionState` | IslandNotchViewModel, StatusIcons, PixelCharacterView, IslandSoundManager | 删该字段/参数, 或改为 enum 不带 associated value |
+| `SessionPhase` | IslandNotchViewModel, StatusIcons, PixelCharacterView | 同上 |
+| `ClaudeSessionMonitor` | IslandSoundManager | 删 sessionMonitor 字段 |
+| `NativePluginManager` | PluginSlotView, IslandNotchMenuView | 协议化或删 |
+| `HookSocketServer` | (待扫) | 删 |
+| `ChatMessage` | (待扫) | 删 |
+| `NotchStatus/NotchOpenReason/NotchContentType` | eye-guard 现有同名 | 给 mio 版加 `Island` 前缀 |
+| `ScreenGeometry`, `NotchPalette`, `NotchThemeID` | 在多文件 | 检查这些类型是否在 mio 其他位置定义 |
+| `NSScreen.notchSize`, `NSScreen.persistentID` | Window | eye-guard 已有同名 ext, ambiguous |
+| `AppMode.dual` | menu | 我们没 .dual, 删该 case |
+
+下一轮工作:
+1. 扫 mio 其他位置找 ScreenGeometry/NotchPalette/NotchThemeID 的定义并补拷入 Framework/
+2. 给三个共用 enum (NotchStatus/Reason/ContentType) 加 Island 前缀
+3. 删 NSScreen 扩展冲突（用 mio 版还是 eye-guard 版需选）
+4. 删 SessionState/SessionPhase 引用（直接编辑文件，删除有该参数的方法/属性）
+5. 删 NativePluginManager 引用
+6. 编译, 直到 0 error
 
 ---
 
