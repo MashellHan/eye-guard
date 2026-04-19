@@ -229,11 +229,11 @@ mio 类名与 eye-guard 现有类冲突，需要重命名:
 
 ### Day 2 — 写 EyeGuardNotchView 并接入
 
-- [ ] 2.1 写 `EyeGuardNotchView.swift`，path 路由 + 三种 contentType 渲染
+- [x] 2.1 写 `EyeGuardNotchView.swift`，path 路由 + 三种 contentType 渲染 ✅ 02:30 — 实装在 `IslandHelperViews.swift`：根据 `IslandNotchViewModel.status` (.closed/.opened/.popping) 路由到现有 `EyeGuardCollapsedContent` / `EyeGuardExpandedView`，无 bridge 时降级到 FallbackBranding。`IslandNotchViewModel.eyeGuardBridge: EyeGuardDataBridge?` 字段已加。
 - [ ] 2.2 写 `EyeGuardNotchMenu.swift`，5-7 个菜单项
 - [ ] 2.3 写 `EyeGuardNotchHeader.swift`（如果合并到 NotchHeaderView 改造里则跳过）
 - [ ] 2.4 改造 `EyeGuardDataBridge` 把 BreakScheduler 数据接进新 ViewModel
-- [ ] 2.5 在 `NotchModule.swift` 中切换：旧 NotchWindowController → mio Framework NotchWindowController
+- [ ] 2.5 在 `NotchModule.swift` 中切换：旧 NotchWindowController → mio Framework IslandNotchWindowController
 - [ ] 2.6 `swift build` 通过 + 启动 app 跑通 .notch 模式
 
 **Day 2 验收**: `.notch` 模式启动后能看到 mio 风刘海，连续使用时间正常更新。
@@ -288,7 +288,7 @@ mio 类名与 eye-guard 现有类冲突，需要重命名:
 |---|---|---|---|---|
 | 1.1-1.9 (拷贝) | ✅ | 2026-04-20 | 2026-04-20 | 44 文件 7500 行 拷入 Framework/, 全部 Island 前缀 |
 | 1.10-1.14 (剥离 + 编译) | ✅ | 2026-04-20 | 2026-04-20 01:55 | **0 errors / 233 tests pass** — 删 4 out-of-scope 文件 + 加 WyHash + IslandHelperViews + 修 Sendable / 穷尽 switch |
-| 2 | 🚧 next | — | — | EyeGuardNotchView (替换 IslandHelperViews 中的 placeholder) |
+| 2 | 🚧 in progress | 2026-04-20 02:30 | — | 2.1 ✅ — IslandNotchView 实接 EyeGuardCollapsedContent/ExpandedView。剩 2.2-2.6 |
 | 3 | ⬜ | — | — | 像素猫 + 视觉 |
 | 4 | ⬜ | — | — | 清理 + 发版 |
 

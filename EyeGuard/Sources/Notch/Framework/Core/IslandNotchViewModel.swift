@@ -59,6 +59,13 @@ class IslandNotchViewModel: ObservableObject {
     @Published var activeSessionCount: Int = 0
     @Published var isInstancesExpanded: Bool = false
 
+    // MARK: - Eye Guard integration (Day 2)
+    //
+    // The Day 2 IslandNotchView reads `eyeGuardBridge` to render eye-guard's
+    // existing collapsed + expanded views. Optional because mio's framework
+    // is also used in preview / test contexts where no scheduler exists.
+    var eyeGuardBridge: EyeGuardDataBridge?
+
     // MARK: - Dependencies
 
     private let screenSelector = IslandScreenSelector.shared
