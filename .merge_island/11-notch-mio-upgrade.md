@@ -237,7 +237,13 @@ mio 类名与 eye-guard 现有类冲突，需要重命名:
   - [x] 2.5a — IslandNotchViewModel 加 `pop(kind:message:duration:)` parity surface (cron 12:39 commit `3d90412`)
   - [x] 2.5b — `IslandNotchModule` + `IslandNotchBreakFlowAdapter` 并排创建 (cron 13:20) — 不切 AppModeCoordinator，新模块跟旧模块 side-by-side 共存，build 4.05s/233 tests pass
   - [x] 2.5c — AppModeCoordinator `.notch` 分支切到 `IslandNotchModule.shared.activate(scheduler:)` ✅ 2026-04-20 14:18 — 2-行 swap (deactivate + activate), 旧 NotchModule 留作编译入但不再激活, build 4.20s/233 tests pass
-- [ ] 2.6 `swift build` 通过 + 启动 app 跑通 .notch 模式
+- [ ] 2.6 `swift build` 通过 + 启动 app 跑通 .notch 模式（手工 burn-in，需 Xcode GUI）
+  - 内置屏冷启动 .notch 渲染、NeonPixelCat 像素猫可见、tier 颜色点正常
+  - hover/click 展开 → 显示 EyeGuardExpandedView
+  - menu 5 项可触发；preferences 通过 `Notification.Name.eyeGuardNotchMenuOpenPreferences` 派发
+  - **外接屏 reposition (NEW)**: 接入/拔出外接显示器后，IslandNotchWindowController 通过 `NSApplication.didChangeScreenParametersNotification` 重算几何并 setFrame；无残留 / 无双 panel
+  - **多屏每屏 controller**: 接 2 内置 + 1 外接（罕见但理论），仅内置屏出现 panel
+  - .notch ↔ .apu 模式切换无窗口泄漏
 
 **Day 2 验收**: `.notch` 模式启动后能看到 mio 风刘海，连续使用时间正常更新。
 
@@ -256,6 +262,7 @@ mio 类名与 eye-guard 现有类冲突，需要重命名:
 
 - [ ] 4.1 删除旧 `EyeGuard/Sources/Notch/{Geometry,Events,Window,Preferences,NotchModule,NotchViewModel,Views/{NotchContainerView,NotchPanel,NotchPopBanner,NotchShape,PlaceholderCollapsed,PlaceholderExpanded},Views/EyeGuard/*}`（确认无引用）⏸ **blocked on 2.6 burn-in** — 删除前需要手动跑通 `.notch` 模式确认 IslandNotchModule 行为对等。
   - [x] 4.1a (parallel pre-work) — Pop banner test parity migrated to `IslandNotchPopTests` (5 tests) so deleting legacy `NotchPopTests`/`NotchViewModel` does not lose coverage. ✅ 2026-04-20 18:15
+  - [x] 4.1b (parallel pre-work) — Geometry test parity migrated to `IslandNotchGeometryTests` (10 tests) mirroring `NotchGeometryTests` against `IslandNotchGeometry` + `IslandNotchHardwareDetector`. Coverage: notch rect centering/offset, opened rect padding, hit-test (interior/miss/inverse), collapsed wings, hardware clamp (height/width/horizontalOffset). Same smart-sequencing rationale as 4.1a — contract double-covered before legacy `Notch/Geometry/` deletion. ✅ 2026-04-20 19:13
 - [x] 4.2 全工程 grep 确认旧 NotchViewModel 等已无引用 ✅ 2026-04-20 16:18 — grep audit clean: 唯一 app-layer 提及在 `AppModeCoordinator` 注释中（"Legacy NotchModule is kept compiled but no longer activated"）和 `ModeManager` 注释中。所有实际类型引用都局限在待删除的 legacy 文件本身（`NotchModule.swift`/`NotchViewModel.swift`/`Window/NotchWindowController.swift`/`Window/NotchHostingController.swift`/`Bridges/NotchBreakFlowAdapter.swift`/`Events/NotchEventMonitors.swift`）和 `NotchPopTests.swift`。
 - [x] 4.3 多屏 / 无刘海机型代码路径 review ✅ 2026-04-20 16:18 — `IslandNotchModule.activate(scheduler:)` 先 filter `isBuiltinDisplay`，空时 fallback 到 `NSScreen.main`，再空时 warn 并 isActive=true 静默跳过；每个 `IslandNotchWindowController` 用 `screen.hasPhysicalNotch` 决定 geometry。多屏每个 builtin display 都拿到自己的 controller，bridge 共享。
 - [ ] 4.4 模式切换 .apu ↔ .notch 测试，确认窗口生命周期清洁 ⏸ **needs 2.6 manual smoke**
