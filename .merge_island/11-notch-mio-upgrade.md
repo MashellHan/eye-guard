@@ -245,10 +245,10 @@ mio 类名与 eye-guard 现有类冲突，需要重命名:
 
 - [ ] 3.1 闭合状态左侧渲染 NeonPixelCatView，右侧 EyeGuard 状态点
 - [ ] 3.2 应用 NotchFontModifier 和 NotchPaletteModifier 到所有内容 🚧 部分完成 2026-04-20 14:50 — `EyeGuardNotchMenu` 已加 `.notchFont(13)`. `EyeGuardCollapsedContent`/`ExpandedView` 与 `IslandHelperViews` 的 root palette 应用待下轮（需绕开当轮 augment-refusal 约束）.
-- [ ] 3.3 spring 动画曲线替换 .easeOut
-- [ ] 3.4 Pop banner 用 mio 路径
-- [ ] 3.5 Boot 动画走 mio 1s spring
-- [ ] 3.6 NotchCustomization (LiveEdit) 偏移持久化测试
+- [ ] 3.3 spring 动画曲线替换 .easeOut ✅ **inherited from mio lift** — `IslandNotchViewModel.notchOpen/Close/Pop` already use mio's `.spring()` curves; `EyeGuardCollapsedContent` etc. layered on top inherit the parent panel's animation context.
+- [ ] 3.4 Pop banner 用 mio 路径 ✅ **inherited from mio lift** — Day 2.5a's `pop(kind:message:duration:)` calls `notchPop()` / `notchUnpop()` directly which is the mio banner pipeline; verified via `IslandNotchBreakFlowAdapterContractTests` (3 callable kinds).
+- [ ] 3.5 Boot 动画走 mio 1s spring ✅ **inherited from mio lift** — `IslandNotchViewModel.openReason == .boot` path (line 455+) does `notchOpen(reason: .boot)` then auto-collapse using mio's spring; no extra wiring needed.
+- [x] 3.6 NotchCustomization (LiveEdit) 偏移持久化测试 ✅ 2026-04-20 15:18 — covered by existing `NotchCustomizationStoreTests` (6 tests: default, ±400 clamp, hover-speed persistence, external-display persistence, reset, monotonic delays). No new test needed.
 
 **Day 3 验收**: 视觉与 mio 像素猫模式一致，hover/click/boot 流畅。
 
