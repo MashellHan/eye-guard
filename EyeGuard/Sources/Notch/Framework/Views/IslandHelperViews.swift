@@ -65,6 +65,9 @@ struct IslandNotchView: View {
             content
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // Day 3.2: apply mio palette at the root so theme changes
+        // crossfade across the entire EyeGuard notch surface.
+        .notchPalette()
     }
 
     @ViewBuilder

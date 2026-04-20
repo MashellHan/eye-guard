@@ -12,8 +12,13 @@ struct EyeGuardCollapsedContent: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            // Left wing — color tier indicator
+            // Left wing — color tier indicator + mio NeonPixelCatView
+            // (Day 3.1: pixel-cat mascot rendered alongside the EyeGuard
+            // status dot so the closed-state left wing matches mio's
+            // visual identity).
             HStack(spacing: 4) {
+                IslandNeonPixelCatView()
+                    .frame(width: 18, height: 18)
                 Image(systemName: bridge.tier.symbolName)
                     .foregroundStyle(bridge.tier.color)
                     .font(.system(size: 10))
