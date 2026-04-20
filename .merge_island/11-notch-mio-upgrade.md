@@ -230,7 +230,7 @@ mio 类名与 eye-guard 现有类冲突，需要重命名:
 ### Day 2 — 写 EyeGuardNotchView 并接入
 
 - [x] 2.1 写 `EyeGuardNotchView.swift`，path 路由 + 三种 contentType 渲染 ✅ 02:30 — 实装在 `IslandHelperViews.swift`：根据 `IslandNotchViewModel.status` (.closed/.opened/.popping) 路由到现有 `EyeGuardCollapsedContent` / `EyeGuardExpandedView`，无 bridge 时降级到 FallbackBranding。`IslandNotchViewModel.eyeGuardBridge: EyeGuardDataBridge?` 字段已加。
-- [ ] 2.2 写 `EyeGuardNotchMenu.swift`，5-7 个菜单项
+- [x] 2.2 写 `EyeGuardNotchMenu.swift`，5 个菜单项 ✅ 2026-04-20 14:25 — `Views/EyeGuard/EyeGuardNotchMenu.swift` (~120 LOC), 5 actions: Take break / Skip next / Pause-Resume / Reset session / Preferences (via `Notification.Name.eyeGuardNotchMenuOpenPreferences`). Action-agnostic `Actions` + `State` structs keep menu decoupled from BreakScheduler. Day 3.2 will apply NotchPalette/NotchFontModifier.
 - [ ] 2.3 写 `EyeGuardNotchHeader.swift`（如果合并到 NotchHeaderView 改造里则跳过）
 - [ ] 2.4 改造 `EyeGuardDataBridge` 把 BreakScheduler 数据接进新 ViewModel
 - [ ] 2.5 在 `NotchModule.swift` 中切换：旧 NotchWindowController → mio Framework IslandNotchWindowController
