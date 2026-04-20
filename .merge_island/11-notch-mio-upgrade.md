@@ -254,13 +254,13 @@ mio 类名与 eye-guard 现有类冲突，需要重命名:
 
 ### Day 4 — 清理 + 测试 + 发版准备
 
-- [ ] 4.1 删除旧 `EyeGuard/Sources/Notch/{Geometry,Events,Window,Preferences,NotchModule,NotchViewModel,Views/{NotchContainerView,NotchPanel,NotchPopBanner,NotchShape,PlaceholderCollapsed,PlaceholderExpanded},Views/EyeGuard/*}`（确认无引用）
-- [ ] 4.2 全工程 grep 确认旧 NotchViewModel 等已无引用
-- [ ] 4.3 多屏 / 无刘海机型代码路径 review
-- [ ] 4.4 模式切换 .apu ↔ .notch 测试，确认窗口生命周期清洁
-- [ ] 4.5 更新 CHANGELOG.md
-- [ ] 4.6 截图更新到 README/screenshots/
-- [ ] 4.7 git tag 准备 (但不立即发版)
+- [ ] 4.1 删除旧 `EyeGuard/Sources/Notch/{Geometry,Events,Window,Preferences,NotchModule,NotchViewModel,Views/{NotchContainerView,NotchPanel,NotchPopBanner,NotchShape,PlaceholderCollapsed,PlaceholderExpanded},Views/EyeGuard/*}`（确认无引用）⏸ **blocked on 2.6 burn-in** — 删除前需要手动跑通 `.notch` 模式确认 IslandNotchModule 行为对等。
+- [x] 4.2 全工程 grep 确认旧 NotchViewModel 等已无引用 ✅ 2026-04-20 16:18 — grep audit clean: 唯一 app-layer 提及在 `AppModeCoordinator` 注释中（"Legacy NotchModule is kept compiled but no longer activated"）和 `ModeManager` 注释中。所有实际类型引用都局限在待删除的 legacy 文件本身（`NotchModule.swift`/`NotchViewModel.swift`/`Window/NotchWindowController.swift`/`Window/NotchHostingController.swift`/`Bridges/NotchBreakFlowAdapter.swift`/`Events/NotchEventMonitors.swift`）和 `NotchPopTests.swift`。
+- [x] 4.3 多屏 / 无刘海机型代码路径 review ✅ 2026-04-20 16:18 — `IslandNotchModule.activate(scheduler:)` 先 filter `isBuiltinDisplay`，空时 fallback 到 `NSScreen.main`，再空时 warn 并 isActive=true 静默跳过；每个 `IslandNotchWindowController` 用 `screen.hasPhysicalNotch` 决定 geometry。多屏每个 builtin display 都拿到自己的 controller，bridge 共享。
+- [ ] 4.4 模式切换 .apu ↔ .notch 测试，确认窗口生命周期清洁 ⏸ **needs 2.6 manual smoke**
+- [x] 4.5 更新 CHANGELOG.md ✅ 2026-04-20 16:20 — appended "Notch mio-framework upgrade" section under [Unreleased] documenting Day 1/2/3/4 progress, test-count delta (233→243), and 4.2/4.3 audit results.
+- [ ] 4.6 截图更新到 README/screenshots/ ⏸ **needs runtime app**
+- [ ] 4.7 git tag 准备 (但不立即发版) ⏸ **needs 4.1+2.6 closure first**
 
 **Day 4 验收**: 旧 Notch 实现清理干净，新实现稳定，发版材料齐备。
 
