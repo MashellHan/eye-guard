@@ -71,7 +71,10 @@ struct DataPersistenceManagerTests {
 
     @Test("Save creates data directory if needed")
     func saveCreatesDirectory() async throws {
-        let testDate = Date(timeIntervalSince1970: 946684800) // 2000-01-01
+        // L-FLAKE-01 fix: use a distinct date from saveAndLoadRoundTrip
+        // so the two tests don't race on the same on-disk JSON file
+        // under Swift Testing's default parallel execution.
+        let testDate = Date(timeIntervalSince1970: 946771200) // 2000-01-02
 
         await manager.save(
             breakEvents: [],

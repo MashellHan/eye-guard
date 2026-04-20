@@ -78,13 +78,25 @@ struct BreakOverlayView: View {
         }
         .padding(24)
         .frame(width: 320, height: 280)
-        .background(.ultraThinMaterial)
+        .background(
+            // Solid dark surface so text stays legible regardless of the
+            // user's desktop wallpaper or system appearance. The material
+            // sits on top to keep a faint translucency.
+            ZStack {
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(red: 0.08, green: 0.09, blue: 0.13))
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(.ultraThinMaterial)
+                    .opacity(0.4)
+            }
+        )
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(
             RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(.white.opacity(0.2), lineWidth: 1)
+                .strokeBorder(.white.opacity(0.18), lineWidth: 1)
         )
-        .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
+        .shadow(color: .black.opacity(0.45), radius: 24, x: 0, y: 12)
+        .environment(\.colorScheme, .dark)
         .scaleEffect(appeared ? 1.0 : 0.95)
         .mandatoryShake(trigger: $shakeTrigger)
         .onExitCommand {

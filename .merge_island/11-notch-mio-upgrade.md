@@ -264,16 +264,7 @@ mio 类名与 eye-guard 现有类冲突，需要重命名:
 
 ## Known follow-ups (non-blocking)
 
-- **L-FLAKE-01** — `DataPersistenceTests.saveAndLoadRoundTrip` and
-  `saveCreatesDirectory` both write to the same fixed date
-  (`Date(timeIntervalSince1970: 946684800)` → `2000-01-01.json`). Under
-  parallel test execution they race on the shared file: one test writes
-  empty events while the other expects 2 → intermittent
-  `breakEvents.count == 0` failure + `Index out of range` fatal.
-  Discovered 2026-04-20 16:43 guardian heartbeat. **Fix:** give each
-  test a unique date (e.g. `946684800` + 86400 offset) or serialize
-  these two tests with `.serialized` trait. Not introduced by Notch
-  upgrade — pre-existing pattern. Filed for next maintenance window.
+- **L-FLAKE-01** ✅ RESOLVED 2026-04-20 17:20 — `DataPersistenceTests.saveCreatesDirectory` switched from shared date `946684800` to `946771200` (2000-01-02). 5 consecutive clean test runs confirm fix. The two tests no longer race on the same on-disk JSON file under Swift Testing's parallel execution.
 
 **Day 4 验收**: 旧 Notch 实现清理干净，新实现稳定，发版材料齐备。
 
