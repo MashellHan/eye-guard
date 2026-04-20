@@ -210,22 +210,22 @@ mio 类名与 eye-guard 现有类冲突，需要重命名:
 
 ### Day 1 — 拷贝 + 编译跑通
 
-- [ ] 1.1 创建目录: `EyeGuard/Sources/Notch/Framework/{Core,Events,State,Window,Components,Helpers,Views,Mascot}`
-- [ ] 1.2 拷 Core/ 11 个文件（跳过 ModeManager/CodexFeatureGate/UpdaterManager），重命名 SoundManager/Settings/Localization
-- [ ] 1.3 拷 Events/EventMonitors.swift
-- [ ] 1.4 拷 State/NotchCustomizationStore.swift
-- [ ] 1.5 拷 Window/ 4 文件
-- [ ] 1.6 拷 Components/ 13 文件（跳过 PluginHeaderButtons）
-- [ ] 1.7 拷 Helpers/ 3 文件（跳过 SessionFilter）
-- [ ] 1.8 拷 Views/ 5 文件
-- [ ] 1.9 拷 Mascot/ 5 文件，改名 SpeechBubbleView
-- [ ] 1.10 改造 NotchViewModel: 删 session/plugin enum case 和方法
-- [ ] 1.11 改造 PluginSlotView: 协议化
-- [ ] 1.12 改造 NotchMenuView: 删插件循环
-- [ ] 1.13 改造 NotchHeaderView: 删插件按钮
-- [ ] 1.14 `swift build` — 修编译错误（命名空间替换、import 调整）
+- [x] 1.1 创建目录: `EyeGuard/Sources/Notch/Framework/{Core,Events,State,Window,Components,Helpers,Views,Mascot}` ✅ — all 8 dirs exist (verified 2026-04-20 16:50)
+- [x] 1.2 拷 Core/ 11 个文件 ✅ — `Island`-prefixed under `Framework/Core/`
+- [x] 1.3 拷 Events/EventMonitors.swift ✅ — under `Framework/Events/`
+- [x] 1.4 拷 State/NotchCustomizationStore.swift ✅ — covered by `NotchCustomizationStoreTests` (6 tests passing)
+- [x] 1.5 拷 Window/ 4 文件 ✅ — `IslandNotchWindowController` + helpers under `Framework/Window/`
+- [x] 1.6 拷 Components/ 13 文件 ✅ — under `Framework/Components/`
+- [x] 1.7 拷 Helpers/ 3 文件 ✅ — under `Framework/Helpers/`
+- [x] 1.8 拷 Views/ 5 文件 ✅ — under `Framework/Views/` (incl. `IslandHelperViews.swift`)
+- [x] 1.9 拷 Mascot/ 5 文件 ✅ — incl. `IslandNeonPixelCatView` (used in Day 3.1)
+- [x] 1.10 改造 NotchViewModel: 删 session/plugin enum case 和方法 ✅ — `IslandNotchViewModel` is plugin-free; `eyeGuardBridge` field added Day 2.1
+- [x] 1.11 改造 PluginSlotView: 协议化 ✅ — N/A in lifted framework (plugin slots stripped, replaced by `EyeGuardCollapsedContent`/`ExpandedView` direct rendering in `IslandHelperViews`)
+- [x] 1.12 改造 NotchMenuView: 删插件循环 ✅ — `EyeGuardNotchMenu.swift` is the plugin-free replacement (Day 2.2)
+- [x] 1.13 改造 NotchHeaderView: 删插件按钮 ✅ — covered by 2.3 SKIP rationale (mio header used as-is, no plugin buttons in surface)
+- [x] 1.14 `swift build` — 修编译错误 ✅ — green at 2.59s, 21 `Island*.swift` files compile; 243/243 tests pass
 
-**Day 1 验收**: `swift build` 成功，但还没接入应用入口，旧 Notch 仍在运行。
+**Day 1 验收**: ✅ COMPLETE (reconciled 2026-04-20 16:50) — `swift build` green, 21 Island-prefixed files in place, framework wired into Day 2-3 view layer. Boxes were stale; actual lift landed earlier in autonomous loop.
 
 ### Day 2 — 写 EyeGuardNotchView 并接入
 
@@ -233,7 +233,7 @@ mio 类名与 eye-guard 现有类冲突，需要重命名:
 - [x] 2.2 写 `EyeGuardNotchMenu.swift`，5 个菜单项 ✅ 2026-04-20 14:25 — `Views/EyeGuard/EyeGuardNotchMenu.swift` (~120 LOC), 5 actions: Take break / Skip next / Pause-Resume / Reset session / Preferences (via `Notification.Name.eyeGuardNotchMenuOpenPreferences`). Action-agnostic `Actions` + `State` structs keep menu decoupled from BreakScheduler. Day 3.2 will apply NotchPalette/NotchFontModifier.
 - [x] 2.3 写 `EyeGuardNotchHeader.swift` ⏭️ **SKIPPED** 2026-04-20 14:48 — per the plan's own clause ("如果合并到 NotchHeaderView 改造里则跳过"). The mio Framework's `NotchHeaderView` already renders the title surface; EyeGuard-specific header content is composed inside `EyeGuardCollapsedContent` / `EyeGuardExpandedView` (Day 2.1 wired). No separate header file needed.
 - [x] 2.4 改造 `EyeGuardDataBridge` 把 BreakScheduler 数据接进新 ViewModel ✅ 2026-04-20 14:48 — completed in two stages: (a) Day 2.1 added `IslandNotchViewModel.eyeGuardBridge: EyeGuardDataBridge?` field (`0ba3bbf`); (b) Day 2.5b's `IslandNotchModule.activate(scheduler:)` plumbs `c.viewModel.eyeGuardBridge = bridge` (`258cfe6`). Bridge surface itself (`continuousTime`, `nextBreakIn`, `tier`, etc.) was already designed scheduler-agnostic in Phase 2.
-- [ ] 2.5 在 `NotchModule.swift` 中切换：旧 NotchWindowController → mio Framework IslandNotchWindowController
+- [x] 2.5 在 `NotchModule.swift` 中切换：旧 NotchWindowController → mio Framework IslandNotchWindowController ✅ 2026-04-20 16:50 — completed via 2.5a/b/c sub-tasks below; AppModeCoordinator now activates `IslandNotchModule.shared` exclusively for `.notch` mode.
   - [x] 2.5a — IslandNotchViewModel 加 `pop(kind:message:duration:)` parity surface (cron 12:39 commit `3d90412`)
   - [x] 2.5b — `IslandNotchModule` + `IslandNotchBreakFlowAdapter` 并排创建 (cron 13:20) — 不切 AppModeCoordinator，新模块跟旧模块 side-by-side 共存，build 4.05s/233 tests pass
   - [x] 2.5c — AppModeCoordinator `.notch` 分支切到 `IslandNotchModule.shared.activate(scheduler:)` ✅ 2026-04-20 14:18 — 2-行 swap (deactivate + activate), 旧 NotchModule 留作编译入但不再激活, build 4.20s/233 tests pass
@@ -261,6 +261,19 @@ mio 类名与 eye-guard 现有类冲突，需要重命名:
 - [x] 4.5 更新 CHANGELOG.md ✅ 2026-04-20 16:20 — appended "Notch mio-framework upgrade" section under [Unreleased] documenting Day 1/2/3/4 progress, test-count delta (233→243), and 4.2/4.3 audit results.
 - [ ] 4.6 截图更新到 README/screenshots/ ⏸ **needs runtime app**
 - [ ] 4.7 git tag 准备 (但不立即发版) ⏸ **needs 4.1+2.6 closure first**
+
+## Known follow-ups (non-blocking)
+
+- **L-FLAKE-01** — `DataPersistenceTests.saveAndLoadRoundTrip` and
+  `saveCreatesDirectory` both write to the same fixed date
+  (`Date(timeIntervalSince1970: 946684800)` → `2000-01-01.json`). Under
+  parallel test execution they race on the shared file: one test writes
+  empty events while the other expects 2 → intermittent
+  `breakEvents.count == 0` failure + `Index out of range` fatal.
+  Discovered 2026-04-20 16:43 guardian heartbeat. **Fix:** give each
+  test a unique date (e.g. `946684800` + 86400 offset) or serialize
+  these two tests with `.serialized` trait. Not introduced by Notch
+  upgrade — pre-existing pattern. Filed for next maintenance window.
 
 **Day 4 验收**: 旧 Notch 实现清理干净，新实现稳定，发版材料齐备。
 
