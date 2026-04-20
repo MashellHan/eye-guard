@@ -64,6 +64,9 @@ final class MascotWindowController {
     /// Observer for pre-alert cancelled notification.
     private var preAlertCancelledObserver: Any?
 
+    /// Observer for screen topology changes (connect/disconnect external display).
+    private var screenParametersObserver: Any?
+
     /// The popover panel that mirrors the menu bar popover.
     private var popoverWindow: NSPanel?
 
@@ -144,6 +147,18 @@ final class MascotWindowController {
 
         // Start bubble monitor for auto-reveal on messages (v3.1)
         startBubbleMonitor()
+
+        // Listen for screen topology changes (external display connect/disconnect).
+        screenParametersObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                guard let self, let window = self.window else { return }
+                self.positionBottomRight(window)
+            }
+        }
 
         // Listen for exercise-from-break notifications (v2.5)
         exerciseFromBreakObserver = NotificationCenter.default.addObserver(
@@ -289,6 +304,10 @@ final class MascotWindowController {
         if let observer = exerciseFromBreakObserver {
             NotificationCenter.default.removeObserver(observer)
             exerciseFromBreakObserver = nil
+        }
+        if let observer = screenParametersObserver {
+            NotificationCenter.default.removeObserver(observer)
+            screenParametersObserver = nil
         }
         if let observer = showTipObserver {
             NotificationCenter.default.removeObserver(observer)
@@ -557,30 +576,29 @@ final class MascotWindowController {
 
     // MARK: - Private
 
+    /// The screen to use for mascot positioning. Prefers the built-in display
+    /// so that connecting an external monitor as main does not move the mascot.
+    private var targetScreen: NSScreen? { NSScreen.builtin ?? NSScreen.main }
+
     /// Places the window at the bottom-right of the main screen's visible frame.
     /// In peek mode, pushes the window down so only `peekVisibleHeight` pt are visible.
     private func positionBottomRight(_ window: NSWindow) {
-        guard let screen = NSScreen.main else { return }
+        guard let screen = targetScreen else { return }
         let visibleFrame = screen.visibleFrame
-        let x = visibleFrame.maxX - window.frame.width - 20
-
-        let y: CGFloat
-        if isPeeking {
-            // Push window below screen edge so only top portion (ears+eyes) is visible
-            y = visibleFrame.minY - (window.frame.height - peekVisibleHeight)
-        } else {
-            // Full mode: window fully visible above screen bottom
-            y = visibleFrame.minY + 20
-        }
-
-        window.setFrameOrigin(NSPoint(x: x, y: y))
+        let point = MascotPositionCalculator.bottomRight(
+            in: visibleFrame,
+            windowSize: window.frame.size,
+            isPeeking: isPeeking,
+            peekVisibleHeight: peekVisibleHeight
+        )
+        window.setFrameOrigin(point)
     }
 
     // MARK: - Peek Mode Transitions (v3.1)
 
     /// Reveals the mascot from peek mode to full mode with spring animation.
     private func revealMascot() {
-        guard isPeeking, let window, let screen = NSScreen.main else { return }
+        guard isPeeking, let window, let screen = targetScreen else { return }
         isPeeking = false
         cancelAutoHide()
 
@@ -609,7 +627,7 @@ final class MascotWindowController {
 
     /// Hides the mascot back to peek mode with smooth animation.
     private func retractMascot() {
-        guard !isPeeking, let window, let screen = NSScreen.main else { return }
+        guard !isPeeking, let window, let screen = targetScreen else { return }
 
         // Don't retract if context menu is open or bubble is showing
         if viewModel?.showBubble == true { return }
@@ -677,7 +695,7 @@ final class MascotWindowController {
                 ))
             } else {
                 // Return to peek position
-                guard let screen = NSScreen.main else { return }
+                guard let screen = targetScreen else { return }
                 let visibleFrame = screen.visibleFrame
                 let peekY = visibleFrame.minY - (window.frame.height - peekVisibleHeight)
                 window.animator().setFrameOrigin(NSPoint(
@@ -783,7 +801,7 @@ final class MascotWindowController {
         panel.setFrameOrigin(NSPoint(x: x, y: y))
 
         // Ensure popover stays on screen
-        if let screen = NSScreen.main {
+        if let screen = targetScreen {
             var origin = panel.frame.origin
             if origin.x + fittingSize.width > screen.visibleFrame.maxX {
                 origin.x = screen.visibleFrame.maxX - fittingSize.width - 8

@@ -54,20 +54,50 @@ struct IslandNotchView: View {
     }
 
     var body: some View {
-        ZStack {
-            // Background — matches mio's notch surface (opaque black under
-            // the squircle, transparent elsewhere). The hosting controller
-            // already enforces the squircle clip via NotchShape.
-            Color.black
-                .opacity(viewModel.status == .closed ? 0.0 : 0.92)
-                .animation(.easeInOut(duration: 0.18), value: viewModel.status)
-
+        // Top-aligned container so the notch sits flush with the menu bar
+        // and the rest of the panel stays transparent (clicks pass through).
+        // Content is sized to the notch's logical width/height (NOT the full
+        // 750pt-tall × screen-wide panel) so the black squircle background
+        // only paints under the actual notch surface. Otherwise hover / boot /
+        // pop states flood the screen with 92% opaque black (bug fixed here).
+        VStack(spacing: 0) {
             content
+                .frame(width: currentWidth, height: currentHeight)
+                .background(
+                    NotchShape(cornerRadius: 14)
+                        .fill(Color.black.opacity(viewModel.status == .closed ? 0.0 : 0.92))
+                        .animation(.easeInOut(duration: 0.18), value: viewModel.status)
+                )
+                .clipShape(NotchShape(cornerRadius: 14))
+
+            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         // Day 3.2: apply mio palette at the root so theme changes
         // crossfade across the entire EyeGuard notch surface.
         .notchPalette()
+    }
+
+    private var currentWidth: CGFloat {
+        switch viewModel.status {
+        case .opened:
+            return viewModel.openedSize.width
+        case .popping:
+            return max(viewModel.geometry.deviceNotchRect.width + 240, 360)
+        case .closed:
+            return viewModel.geometry.deviceNotchRect.width + viewModel.currentExpansionWidth
+        }
+    }
+
+    private var currentHeight: CGFloat {
+        switch viewModel.status {
+        case .opened:
+            return viewModel.openedSize.height
+        case .popping:
+            return viewModel.geometry.deviceNotchRect.height + 6
+        case .closed:
+            return viewModel.geometry.deviceNotchRect.height
+        }
     }
 
     @ViewBuilder

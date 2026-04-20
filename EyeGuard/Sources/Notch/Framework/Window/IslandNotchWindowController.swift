@@ -21,6 +21,7 @@ class IslandNotchWindowController: NSWindowController {
     /// ever re-attached to a different store instance.
     private var customizationCancellable: AnyCancellable?
     private var editingCancellable: AnyCancellable?
+    private var screenParametersObserver: Any?
 
     /// Active live-edit overlay panel, non-nil only while
     /// store.isEditing == true.
@@ -136,6 +137,18 @@ class IslandNotchWindowController: NSWindowController {
                 self?.applyGeometryFromStore()
             }
 
+        // Subscribe to screen topology changes so geometry is reapplied
+        // when the user connects or disconnects an external display.
+        screenParametersObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.applyGeometryFromStore()
+            }
+        }
+
         // Mirror live edit lifecycle into panel creation / teardown.
         editingCancellable = store.$isEditing
             .receive(on: DispatchQueue.main)
@@ -217,12 +230,17 @@ class IslandNotchWindowController: NSWindowController {
         let baseX = (screenFrame.width - runtimeWidth) / 2
         let finalX = screenFrame.origin.x + baseX + clampedOffset
 
-        _ = (finalX, runtimeWidth)
-
+        let newFrame = IslandNotchFrameCalculator.frame(
+            screenFrame: screenFrame,
+            runtimeWidth: runtimeWidth,
+            clampedOffset: clampedOffset,
+            currentFrame: window.frame
+        )
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.35
             ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            window.animator().setFrame(window.frame, display: true)
+            window.animator().setFrame(newFrame, display: true)
         }
+        _ = finalX  // suppress unused warning; calculation preserved for clarity
     }
 }
