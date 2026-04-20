@@ -92,6 +92,9 @@ struct EyeGuardNotchMenu: View {
                 action: actions.openPreferences)
         }
         .padding(.vertical, 4)
+        // Day 3.2: apply mio-framework typography so the menu reads
+        // consistent with NotchHeaderView and the rest of the panel.
+        .notchFont(13)
     }
 
     // MARK: - Row primitive

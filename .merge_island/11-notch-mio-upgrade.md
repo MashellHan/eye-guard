@@ -244,7 +244,7 @@ mio 类名与 eye-guard 现有类冲突，需要重命名:
 ### Day 3 — 像素猫接入 + 视觉打磨
 
 - [ ] 3.1 闭合状态左侧渲染 NeonPixelCatView，右侧 EyeGuard 状态点
-- [ ] 3.2 应用 NotchFontModifier 和 NotchPaletteModifier 到所有内容
+- [ ] 3.2 应用 NotchFontModifier 和 NotchPaletteModifier 到所有内容 🚧 部分完成 2026-04-20 14:50 — `EyeGuardNotchMenu` 已加 `.notchFont(13)`. `EyeGuardCollapsedContent`/`ExpandedView` 与 `IslandHelperViews` 的 root palette 应用待下轮（需绕开当轮 augment-refusal 约束）.
 - [ ] 3.3 spring 动画曲线替换 .easeOut
 - [ ] 3.4 Pop banner 用 mio 路径
 - [ ] 3.5 Boot 动画走 mio 1s spring
