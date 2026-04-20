@@ -460,4 +460,34 @@ class IslandNotchViewModel: ObservableObject {
             self.notchClose()
         }
     }
+
+    // MARK: - EyeGuard pop banner (Day 2.5)
+    //
+    // EyeGuard's NotchBreakFlowAdapter calls `pop(kind:message:duration:)` on
+    // the legacy NotchViewModel to surface pre-break / break-start /
+    // break-end notifications. The mio framework expresses transient
+    // notifications via the existing `notchPop()` → status = .popping path,
+    // so we keep a parity surface: enter `.popping`, hold for `duration`,
+    // then return to `.closed`. We intentionally do NOT carry the message
+    // string into the framework — the EyeGuard collapsed content already
+    // surfaces the live state (continuous use timer, tier color), which is
+    // a more honest signal than an ephemeral toast string.
+    //
+    // Kind / message arguments are accepted for API parity with the legacy
+    // adapter; they're logged for observability but don't drive UI yet.
+    // Day 3 may wire them into a banner layer once the visual layer
+    // stabilizes.
+
+    enum EyeGuardPopKind {
+        case preBreak
+        case breakStarted
+        case breakCompleted
+    }
+
+    func pop(kind: EyeGuardPopKind, message: String, duration: TimeInterval) {
+        notchPop()
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self] in
+            self?.notchUnpop()
+        }
+    }
 }
