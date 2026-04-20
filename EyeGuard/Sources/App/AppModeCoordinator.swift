@@ -35,11 +35,14 @@ final class AppModeCoordinator {
     private func apply(mode: AppMode) {
         switch mode {
         case .apu:
-            NotchModule.shared.deactivate()
+            // Day 2.5c: route to mio-framework module instead of legacy.
+            // Legacy NotchModule is kept compiled but no longer activated; it
+            // can be removed in Day 4.1 once burn-in confirms parity.
+            IslandNotchModule.shared.deactivate()
             activateMascot()
         case .notch:
             deactivateMascot()
-            NotchModule.shared.activate(scheduler: scheduler)
+            IslandNotchModule.shared.activate(scheduler: scheduler)
         }
         log.info("Mode applied: \(mode.rawValue)")
     }

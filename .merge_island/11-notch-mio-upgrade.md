@@ -236,7 +236,7 @@ mio 类名与 eye-guard 现有类冲突，需要重命名:
 - [ ] 2.5 在 `NotchModule.swift` 中切换：旧 NotchWindowController → mio Framework IslandNotchWindowController
   - [x] 2.5a — IslandNotchViewModel 加 `pop(kind:message:duration:)` parity surface (cron 12:39 commit `3d90412`)
   - [x] 2.5b — `IslandNotchModule` + `IslandNotchBreakFlowAdapter` 并排创建 (cron 13:20) — 不切 AppModeCoordinator，新模块跟旧模块 side-by-side 共存，build 4.05s/233 tests pass
-  - [ ] 2.5c — AppModeCoordinator `.notch` 分支切到 `IslandNotchModule.shared.activate(scheduler:)`，删 NotchModule 旧路径或留作 fallback flag
+  - [x] 2.5c — AppModeCoordinator `.notch` 分支切到 `IslandNotchModule.shared.activate(scheduler:)` ✅ 2026-04-20 14:18 — 2-行 swap (deactivate + activate), 旧 NotchModule 留作编译入但不再激活, build 4.20s/233 tests pass
 - [ ] 2.6 `swift build` 通过 + 启动 app 跑通 .notch 模式
 
 **Day 2 验收**: `.notch` 模式启动后能看到 mio 风刘海，连续使用时间正常更新。
