@@ -56,10 +56,15 @@ struct IslandNotchView: View {
     var body: some View {
         // Top-aligned container so the notch sits flush with the menu bar
         // and the rest of the panel stays transparent (clicks pass through).
-        // Content is sized to the notch's logical width/height (NOT the full
-        // 750pt-tall × screen-wide panel) so the black squircle background
-        // only paints under the actual notch surface. Otherwise hover / boot /
-        // pop states flood the screen with 92% opaque black (bug fixed here).
+        //
+        // CRITICAL: `.notchPalette()` MUST be applied INSIDE the sized box.
+        // The palette modifier injects `.background(NotchPalette.bg)` (which
+        // is `.black` for the default Classic theme) without any clip or
+        // frame constraint. If applied to the outer full-screen frame, it
+        // floods the entire 750pt-tall × screen-wide panel with opaque black
+        // — that was the visible "half-screen black" bug. Keeping palette +
+        // background scoped to the explicitly-sized notch surface prevents
+        // any color from escaping the squircle.
         VStack(spacing: 0) {
             content
                 .frame(width: currentWidth, height: currentHeight)
@@ -69,13 +74,11 @@ struct IslandNotchView: View {
                         .animation(.easeInOut(duration: 0.18), value: viewModel.status)
                 )
                 .clipShape(NotchShape(cornerRadius: 14))
+                .notchPalette()
 
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        // Day 3.2: apply mio palette at the root so theme changes
-        // crossfade across the entire EyeGuard notch surface.
-        .notchPalette()
     }
 
     private var currentWidth: CGFloat {

@@ -1,0 +1,46 @@
+# SwiftLint config — added 2026-04-20 as part of mascot-position-bug retro
+# Goal: catch "computed but unused" patterns that hid the IslandNotchWindowController bug.
+
+included:
+  - EyeGuard/Sources
+  - EyeGuard/Tests
+
+excluded:
+  - .build
+  - DerivedData
+
+# These rules promote unused-value bugs to errors so CI fails fast.
+opt_in_rules:
+  - unused_declaration
+  - unused_import
+  - redundant_discardable_let
+  - unused_closure_parameter
+  - unused_control_flow_label
+
+# Treat the rules above as errors, not warnings.
+unused_declaration:
+  severity: error
+  include_public_and_open: false
+redundant_discardable_let:
+  severity: error
+
+# Custom rule: forbid bare `NSScreen.main`. Window code must go through
+# the project-wide `targetScreen` / `NSScreen.builtin ?? NSScreen.main` helper.
+# See retro/2026-04-20-mascot-position-bug.md.
+custom_rules:
+  no_nsscreen_main:
+    name: "No bare NSScreen.main"
+    regex: '\bNSScreen\.main\b'
+    match_kinds:
+      - identifier
+    message: "Do not use NSScreen.main directly in window code. Use targetScreen helper or NSScreen.builtin ?? NSScreen.main. See .merge_island/retro/2026-04-20-mascot-position-bug.md"
+    severity: warning
+    excluded:
+      - ".*MascotPositionCalculator.*"
+      - ".*Calculator.*"
+
+  no_discarded_locals:
+    name: "No discarded locals via `_ = (...)`"
+    regex: '_\s*=\s*\([^)]+,'
+    message: "Discarding multiple locals with `_ = (...)` hides bugs (see retro 2026-04-20). If a value is unused, remove it."
+    severity: error

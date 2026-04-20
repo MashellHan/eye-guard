@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'feat/**', 'fix/**']
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-and-lint:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show Swift version
+        run: swift --version
+
+      - name: Build
+        run: swift build
+
+      - name: Test with coverage
+        run: swift test --enable-code-coverage 2>&1 | tee test-output.txt
+
+      - name: Install SwiftLint
+        run: brew install swiftlint
+
+      # Gate added 2026-04-20 (mascot-position retro):
+      # SwiftLint must pass strict — `unused_declaration` + `no_nsscreen_main`
+      # + `no_discarded_locals` will fail the build on regression of the
+      # mascot-position-bug class of issues.
+      - name: SwiftLint (strict)
+        run: swiftlint --strict
+
+      # Coverage gate for window/positioning code — see
+      # .merge_island/testing-matrix.md.
+      - name: Mascot/Notch coverage gate (>=80%)
+        run: bash scripts/check-coverage.sh Mascot Notch
+        continue-on-error: true   # advisory until script is fully tuned

@@ -1,5 +1,9 @@
 # EyeGuard × MioIsland 合并项目
 
+> ⚠️ **教训卡 (2026-04-20 retro)**
+> 不要在 macOS 多屏窗口代码里裸用 `NSScreen.main` —— 它指向"键盘焦点所在屏"，外接显示器接管后会把内置屏的窗口算到错误坐标系。**统一用 `NSScreen.builtin ?? NSScreen.main`**，并且**算出的局部变量必须真的被 `setFrame` 使用**（禁止 `_ = (foo, bar)` 弃用模式）。
+> 详见 [retro/2026-04-20-mascot-position-bug.md](retro/2026-04-20-mascot-position-bug.md) · [MULTI_SCREEN_GUIDE.md](../MULTI_SCREEN_GUIDE.md) · [review-checklist.md](review-checklist.md)
+
 ## 愿景
 
 将 EyeGuard（护眼精灵阿普）与 MioIsland（Notch 灵动岛 AI 监控）合并为一个统一的 macOS 桌面伴侣应用。两个模式可自由切换：
@@ -22,6 +26,17 @@
 | 9 | [08-phase5-spec.md](08-phase5-spec.md) | Phase 5 Notch 护眼面板详细规格 | ✅ |
 | 10 | [09-phase3-spec.md](09-phase3-spec.md) | Phase 3 休息覆盖层详细规格 | ✅ |
 | 11 | [10-phase4-spec.md](10-phase4-spec.md) | Phase 4 眼保健操+TTS+Sound 详细规格 | ✅ |
+
+## 流程与质量
+
+| 文档 | 用途 |
+|------|------|
+| [_spec-template.md](_spec-template.md) | Spec 模板（含强制多屏章节） |
+| [review-checklist.md](review-checklist.md) | PR review checklist |
+| [testing-matrix.md](testing-matrix.md) | 标准多屏测试矩阵 |
+| [retro/](retro/) | Bug retro 归档（含 5 Whys + Prevention） |
+| [../MULTI_SCREEN_GUIDE.md](../MULTI_SCREEN_GUIDE.md) | 多屏窗口编程指南 |
+| [../.swiftlint.yml](../.swiftlint.yml) | SwiftLint 规则（`no_nsscreen_main`、`no_discarded_locals`） |
 
 ## 关键决策
 
