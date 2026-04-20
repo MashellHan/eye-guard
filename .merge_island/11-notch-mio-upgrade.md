@@ -231,8 +231,8 @@ mio 类名与 eye-guard 现有类冲突，需要重命名:
 
 - [x] 2.1 写 `EyeGuardNotchView.swift`，path 路由 + 三种 contentType 渲染 ✅ 02:30 — 实装在 `IslandHelperViews.swift`：根据 `IslandNotchViewModel.status` (.closed/.opened/.popping) 路由到现有 `EyeGuardCollapsedContent` / `EyeGuardExpandedView`，无 bridge 时降级到 FallbackBranding。`IslandNotchViewModel.eyeGuardBridge: EyeGuardDataBridge?` 字段已加。
 - [x] 2.2 写 `EyeGuardNotchMenu.swift`，5 个菜单项 ✅ 2026-04-20 14:25 — `Views/EyeGuard/EyeGuardNotchMenu.swift` (~120 LOC), 5 actions: Take break / Skip next / Pause-Resume / Reset session / Preferences (via `Notification.Name.eyeGuardNotchMenuOpenPreferences`). Action-agnostic `Actions` + `State` structs keep menu decoupled from BreakScheduler. Day 3.2 will apply NotchPalette/NotchFontModifier.
-- [ ] 2.3 写 `EyeGuardNotchHeader.swift`（如果合并到 NotchHeaderView 改造里则跳过）
-- [ ] 2.4 改造 `EyeGuardDataBridge` 把 BreakScheduler 数据接进新 ViewModel
+- [x] 2.3 写 `EyeGuardNotchHeader.swift` ⏭️ **SKIPPED** 2026-04-20 14:48 — per the plan's own clause ("如果合并到 NotchHeaderView 改造里则跳过"). The mio Framework's `NotchHeaderView` already renders the title surface; EyeGuard-specific header content is composed inside `EyeGuardCollapsedContent` / `EyeGuardExpandedView` (Day 2.1 wired). No separate header file needed.
+- [x] 2.4 改造 `EyeGuardDataBridge` 把 BreakScheduler 数据接进新 ViewModel ✅ 2026-04-20 14:48 — completed in two stages: (a) Day 2.1 added `IslandNotchViewModel.eyeGuardBridge: EyeGuardDataBridge?` field (`0ba3bbf`); (b) Day 2.5b's `IslandNotchModule.activate(scheduler:)` plumbs `c.viewModel.eyeGuardBridge = bridge` (`258cfe6`). Bridge surface itself (`continuousTime`, `nextBreakIn`, `tier`, etc.) was already designed scheduler-agnostic in Phase 2.
 - [ ] 2.5 在 `NotchModule.swift` 中切换：旧 NotchWindowController → mio Framework IslandNotchWindowController
   - [x] 2.5a — IslandNotchViewModel 加 `pop(kind:message:duration:)` parity surface (cron 12:39 commit `3d90412`)
   - [x] 2.5b — `IslandNotchModule` + `IslandNotchBreakFlowAdapter` 并排创建 (cron 13:20) — 不切 AppModeCoordinator，新模块跟旧模块 side-by-side 共存，build 4.05s/233 tests pass
