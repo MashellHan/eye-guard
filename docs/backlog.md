@@ -19,10 +19,6 @@
 
 ## P1 — 用户体验破坏
 
-### B2. Break 结束语音重复播报 2 次（bugs.md #2）
-- 订阅没去重 / SwiftUI view 重建导致重复触发
-- 加幂等保护或正确取消订阅
-
 ### B5. 调查稳态 idle CPU 超阈（新发现 2026-04-23）
 - task `20260423-1456-debugtrigger` iter3 tester 确认：30s 稳态 CPU mean 3.01%，last-10s mean 3.45%，13/30 样本 > 3%（阈值 3%）
 - 启动后 ~12s 还有 16-24% 的孤立尖峰
@@ -30,6 +26,16 @@
 - 可能位置：`ActivityMonitor.swift`（CGEventTap 高频）、menubar refresh timer (1Hz)、AppModeCoordinator init、ModeManager
 - 修复方向：用 Instruments time profile 找 hot path；考虑 menubar 倒计时改成 widget refresh + 1s timer 用 DispatchSourceTimer
 - 验收：`/perf-check` 跑出 mean < 3% / max < 10%（去除启动尾）
+
+### B6. Break overlay 弹出后倒计时 ~3s 就自动退出（用户 2026-04-23 报告）
+- 现象：break 提醒弹窗刚出来，倒计时只走了 3 秒就自己退出
+- 怀疑链路：
+  - `FullScreenOverlayView` 或 `BreakOverlayView` 的 `startCountdownTimer` 起始值不对（用了错的 duration / 已耗时间被算在内）
+  - `BreakScheduler.takeBreakNow` 立刻 `endBreak()`（计时与 overlay 解耦错位）
+  - 新加的 `hasCompleted` 守卫某种 race 误触（B2 的修改？）— **优先验证：B2 commit `0cee483` 之前是否也有此 bug**
+  - `onBreakTaken` 被某个 dismiss / Notch flow 提前触发
+- 验收：弹窗出现后倒计时跑满（micro 20s / macro 5min / mandatory 完整 duration）才 dismiss；提前退出不应发生
+- 优先级：P0（核心 break 流程被破坏）
 
 ---
 
@@ -82,3 +88,7 @@
   - 完成于 2026-04-23，commit `54c33c0`，test report `.agent_workspace/tests/20260423-1810-overlay-contrast/report.json`
   - 修复：Tier 2 加 black scrim (0.35) + 强制 white text，healthScore chip 背景换 .black.opacity(0.25)；Tier 3 不动
   - reviewer PASS (1 warn: icon 还是 .blue), tester PASS (UI 截图因 infra SKIPPED, code review 已确认)
+- **B2** Break 结束语音重复播报 2 次（task `20260423-1900-tts-dup`，2026-04-23）
+  - 完成于 2026-04-23，commit `0cee483`，test report `.agent_workspace/tests/20260423-1900-tts-dup/report.json`
+  - 修复：FullScreenOverlayView 加 `isPrimary` 标志 + `hasCompleted` 守卫；OverlayWindow 按 NSScreen.main 选 primary，secondary 屏不发声不触发 onBreakTaken
+  - reviewer & tester 全 PASS，0 critical 0 warning
