@@ -12,7 +12,16 @@ import Observation
 final class MascotViewModel {
     var mascotState: MascotState = .idle
     var restingMode: RestingMode = .sleeping
-    var showBubble: Bool = false
+    var showBubble: Bool = false {
+        didSet {
+            guard showBubble != oldValue else { return }
+            if showBubble {
+                onBubbleShow?()
+            } else {
+                onBubbleHide?()
+            }
+        }
+    }
     var bubbleText: String = ""
     var eyelidClosedness: CGFloat = 0
     var breathScale: CGFloat = 1.0
@@ -228,6 +237,23 @@ final class MascotViewModel {
     func stopHoverTracking() {
         isHoverTracking = false
     }
+
+    /// Event-driven mouse-moved handler. Called by the panel's NSTrackingArea
+    /// in `MascotWindowController` (B5: replaces the previous 10 Hz poll).
+    /// Computes the mascot center from the supplied window frame and forwards
+    /// to `updateHoverPupil`.
+    func handleMouseMoved(globalMouseLocation: CGPoint, windowFrame: CGRect) {
+        let mascotCenter = CGPoint(x: windowFrame.midX, y: windowFrame.midY)
+        updateHoverPupil(mousePosition: globalMouseLocation, mascotCenter: mascotCenter)
+    }
+
+    /// Callback invoked when `showBubble` becomes true (B5: replaces the 2 Hz
+    /// bubble-monitor poll in `MascotWindowController`). The controller sets
+    /// this from `startBubbleMonitor` and uses it to auto-reveal from peek.
+    var onBubbleShow: (@MainActor () -> Void)?
+
+    /// Callback invoked when `showBubble` becomes false (B5).
+    var onBubbleHide: (@MainActor () -> Void)?
 
     // MARK: - Breathing
 

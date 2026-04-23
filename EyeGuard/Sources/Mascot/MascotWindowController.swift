@@ -29,8 +29,10 @@ final class MascotWindowController {
     /// Mouse event monitor for hover tracking (v1.1).
     private var mouseMonitor: Any?
 
-    /// Task for polling mouse position updates.
-    private var mouseTrackTask: Task<Void, Never>?
+    /// Global mouse-moved event monitor (B5: replaces the 10 Hz polling task
+    /// with an event-driven feed). Captures cursor movement anywhere on screen
+    /// and forwards to the viewModel's pupil-follow logic.
+    private var mouseMovedMonitor: Any?
 
     // MARK: - Peek Mode (v3.1)
 
@@ -47,7 +49,14 @@ final class MascotWindowController {
     private var isHoveringPeek: Bool = false
 
     /// Task for monitoring speech bubble state to auto-reveal.
+    /// B5: kept as a vestigial slot (always nil) so external state remains
+    /// consistent if other code paths grow back into a Task-based model;
+    /// the active path is now callback-based via `viewModel.onBubbleShow`.
     private var bubbleMonitorTask: Task<Void, Never>?
+
+    /// Last observed bubble state (B5: callback-driven; tracks edges so we
+    /// don't double-reveal or double-retract).
+    private var lastBubbleState: Bool = false
 
     /// Observer for menu-bar "Show Tip" notification.
     private var showTipObserver: Any?
@@ -285,6 +294,10 @@ final class MascotWindowController {
         autoHideTask = nil
         bubbleMonitorTask?.cancel()
         bubbleMonitorTask = nil
+        // Drop bubble callbacks before viewModel goes away (B5).
+        viewModel?.onBubbleShow = nil
+        viewModel?.onBubbleHide = nil
+        lastBubbleState = false
         popoverWindow?.close()
         removeClickOutsideMonitor()
         popoverWindow = nil
@@ -411,28 +424,28 @@ final class MascotWindowController {
         viewModel?.transition(to: .idle)
     }
 
-    // MARK: - Mouse Tracking (v1.1)
+    // MARK: - Mouse Tracking (v1.1, B5: event-driven)
 
-    /// Starts a polling task that reads the global mouse position and updates
-    /// the mascot pupil to follow the cursor.
+    /// Subscribes to global mouse-moved events to drive the mascot's pupil
+    /// follow. B5 fix: replaces the prior 10 Hz polling task (~0.5% idle CPU)
+    /// with an event-driven `NSEvent.addGlobalMonitorForEvents` feed that only
+    /// fires when the cursor actually moves.
+    ///
+    /// Note: a global monitor (not local) is required because the mascot
+    /// window doesn't typically have key focus; we want to react to cursor
+    /// movement anywhere on screen.
     private func startMouseTracking() {
-        mouseTrackTask = Task {
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(0.1)) // 10 fps polling
-                guard !Task.isCancelled else { return }
-
-                guard let window = self.window, let viewModel = self.viewModel else { continue }
-
-                let mouseLocation = NSEvent.mouseLocation
-                let windowFrame = window.frame
-                let mascotCenter = CGPoint(
-                    x: windowFrame.midX,
-                    y: windowFrame.midY
-                )
-
-                viewModel.updateHoverPupil(
-                    mousePosition: mouseLocation,
-                    mascotCenter: mascotCenter
+        stopMouseTracking()
+        mouseMovedMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved]) { [weak self] _ in
+            // Global monitors fire on a background runloop in some macOS
+            // versions; hop to MainActor before touching window/viewModel.
+            Task { @MainActor in
+                guard let self,
+                      let window = self.window,
+                      let viewModel = self.viewModel else { return }
+                viewModel.handleMouseMoved(
+                    globalMouseLocation: NSEvent.mouseLocation,
+                    windowFrame: window.frame
                 )
             }
         }
@@ -440,8 +453,10 @@ final class MascotWindowController {
 
     /// Stops mouse tracking.
     private func stopMouseTracking() {
-        mouseTrackTask?.cancel()
-        mouseTrackTask = nil
+        if let monitor = mouseMovedMonitor {
+            NSEvent.removeMonitor(monitor)
+            mouseMovedMonitor = nil
+        }
         viewModel?.stopHoverTracking()
     }
 
@@ -578,32 +593,32 @@ final class MascotWindowController {
         }
     }
 
-    /// Monitors the viewModel's showBubble state to auto-reveal when a message appears.
+    /// Wires viewModel bubble callbacks for auto-reveal/retract behavior.
+    /// B5 fix: replaces a 2 Hz polling task that woke up every 0.5s purely
+    /// to compare `viewModel.showBubble` against its prior value. The
+    /// viewModel now invokes `onBubbleShow` / `onBubbleHide` from the
+    /// `showBubble` `didSet`, so we only react on actual edges.
     private func startBubbleMonitor() {
-        bubbleMonitorTask?.cancel()
-        bubbleMonitorTask = Task {
-            var lastBubbleState = false
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(0.5))
-                guard !Task.isCancelled else { return }
+        guard let viewModel else { return }
+        lastBubbleState = viewModel.showBubble
 
-                guard let viewModel = self.viewModel else { continue }
+        viewModel.onBubbleShow = { [weak self] in
+            guard let self else { return }
+            // Edge guard (defensive — didSet already filters duplicates).
+            guard !self.lastBubbleState else { return }
+            self.lastBubbleState = true
+            if self.isPeeking {
+                self.revealMascot()
+                self.scheduleAutoHide(after: 8)
+            }
+        }
 
-                let currentBubble = viewModel.showBubble
-
-                // Bubble just appeared while peeking → auto-reveal
-                if currentBubble && !lastBubbleState && isPeeking {
-                    revealMascot()
-                    // Extend auto-hide while bubble is showing
-                    scheduleAutoHide(after: 8)
-                }
-
-                // Bubble just disappeared → schedule retract
-                if !currentBubble && lastBubbleState && !isPeeking {
-                    scheduleAutoHide(after: 3)
-                }
-
-                lastBubbleState = currentBubble
+        viewModel.onBubbleHide = { [weak self] in
+            guard let self else { return }
+            guard self.lastBubbleState else { return }
+            self.lastBubbleState = false
+            if !self.isPeeking {
+                self.scheduleAutoHide(after: 3)
             }
         }
     }

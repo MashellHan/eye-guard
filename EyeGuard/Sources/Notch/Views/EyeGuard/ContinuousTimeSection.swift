@@ -22,10 +22,15 @@ struct ContinuousTimeSection: View {
             }
 
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(bridge.continuousTimeFormatted)
-                    .font(.system(size: 30, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .monospacedDigit()
+                // B5: TimelineView isolates per-second invalidation to the
+                // numeric Text only, instead of cascading a relayout to the
+                // surrounding HStack/progress section every second.
+                TimelineView(.periodic(from: .now, by: 1.0)) { _ in
+                    Text(bridge.continuousTimeFormatted)
+                        .font(.system(size: 30, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .monospacedDigit()
+                }
                 Text("/ 20:00")
                     .font(.system(size: 13))
                     .foregroundStyle(.white.opacity(0.5))

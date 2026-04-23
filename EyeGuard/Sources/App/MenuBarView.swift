@@ -151,10 +151,15 @@ struct MenuBarView: View {
                     .font(.system(.title3, design: .rounded))
                     .foregroundStyle(.green)
             } else {
-                Text(TimeFormatting.formatTimerDisplay(elapsedSinceLastBreak))
-                    .font(.system(.title, design: .monospaced))
-                    .foregroundStyle(screenTimeColor)
-                    .opacity(elapsedSinceLastBreak > 3600 ? (blinkOpacity) : 1.0)
+                // B5: TimelineView isolates per-second invalidation to just
+                // this Text node instead of cascading a relayout through the
+                // outer HStack/progress section every second.
+                TimelineView(.periodic(from: .now, by: 1.0)) { _ in
+                    Text(TimeFormatting.formatTimerDisplay(elapsedSinceLastBreak))
+                        .font(.system(.title, design: .monospaced))
+                        .foregroundStyle(screenTimeColor)
+                        .opacity(elapsedSinceLastBreak > 3600 ? (blinkOpacity) : 1.0)
+                }
             }
 
             // Progress bar toward next break
@@ -172,9 +177,13 @@ struct MenuBarView: View {
                     Text("下次休息: \(nextBreak.displayName)")
                         .font(.caption)
                     Spacer()
-                    Text("还剩 \(TimeFormatting.formatTimerDisplay(scheduler.timeUntilNextBreak))")
-                        .font(.system(.caption, design: .monospaced))
-                        .foregroundStyle(.orange)
+                    // B5: same TimelineView wrap to isolate the "still
+                    // remaining" countdown from the surrounding HStack.
+                    TimelineView(.periodic(from: .now, by: 1.0)) { _ in
+                        Text("还剩 \(TimeFormatting.formatTimerDisplay(scheduler.timeUntilNextBreak))")
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundStyle(.orange)
+                    }
                 }
             }
         }
