@@ -15,11 +15,7 @@
 
 ## P0 — 核心功能失效
 
-### B4. "开始眼保健操"按钮无响应（bugs.md #4）
-- 点击无任何反馈
-- 定位 action handler / 路由
-
----
+（已完成，见底部 ## 已完成）
 
 ## P1 — 用户体验破坏
 
@@ -85,3 +81,7 @@
   - 完成于 2026-04-23，commit `2fdcf5e`，test report `.agent_workspace/tests/20260423-1649-notch-takebreak/report.json`
   - 修复：BreakScheduler.requestManualBreak 统一 manual-break 入口（mascot/menubar/notch 三路共用），updateNextBreak 在 overdue 时把 timeUntilNextBreak clamp 到 0
   - 注：tester PASS 但 3 条 regression 单测被列为 MISSING_COVERAGE warning（dev.md/tester.md 责任分工争议，留作后续 chore）；UI 截图因 Screen Recording 权限缺失被 skip，code path 由 reviewer 验证
+- **B4** "开始眼保健操"按钮无响应（task `20260423-1730-exercise-button`，2026-04-23）
+  - 完成于 2026-04-23，commit `2f2874a`，test report `.agent_workspace/tests/20260423-1730-exercise-button/report.json`
+  - 修复：抽出共享 `ExercisePresenter` 接管全屏 exercise window；EyeGuardApp.init 注册一次 `.startExercisesFromBreak` observer（Notch 模式不再无响应）；BreakOverlayView Tier 2 按钮改 post notification（不再塞进 320pt 浮窗）
+  - reviewer & tester 全 PASS，0 critical 0 warning
