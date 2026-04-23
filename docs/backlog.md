@@ -31,9 +31,7 @@
 
 ## P3 — Nit
 
-- **N1** MenuBar `Binding.get` 里多余的 `hasDetail` 判断
-- **N2** `.help()` 移除后丢了 VoiceOver hint → 加 `.accessibilityHint`
-- **N3** `AppColors.popoverBackground` 已定义但没用 → 用上或删
+（已完成，见底部 ## 已完成）
 
 ---
 
@@ -57,6 +55,12 @@
   - 完成于 2026-04-23，commit `54c33c0`，test report `.agent_workspace/tests/20260423-1810-overlay-contrast/report.json`
   - 修复：Tier 2 加 black scrim (0.35) + 强制 white text，healthScore chip 背景换 .black.opacity(0.25)；Tier 3 不动
   - reviewer PASS (1 warn: icon 还是 .blue), tester PASS (UI 截图因 infra SKIPPED, code review 已确认)
+- **N1/N2/N3** P3 nits 一并清理（直接修，无 plan/test，2026-04-23）
+  - 完成于 2026-04-23
+  - N1：W1 重构时 `hasDetail` Binding.get 已自动消失（旧 hoveredBreakdown/clickedBreakdown state 删除时随之清掉）
+  - N2：`BreakdownRowView` 加 `.accessibilityElement(children: .combine)` + `.accessibilityLabel("name score of max")` + `.accessibilityHint("Double-tap to view detailed explanation")` + `.accessibilityAddTraits(.isButton)` —— 替代 `.help()` 给 VoiceOver 使用者
+  - N3：`MenuBarView.swift:29` 改用 `AppColors.popoverBackground` 替代 inline `Color(NSColor.windowBackgroundColor)`
+  - swift build + swift test 233/233 通过
 - **W4** `qualityExplanation` 与 `calculateBreakQuality` 漂移风险（直接修，无 plan/test，2026-04-23）
   - 完成于 2026-04-23
   - 修复：抽 `breakQualityBaseMaxPoints = 6`、`breakQualityExerciseBonusPoints = 4` 到 EyeGuardConstants（doc 强制 base+bonus = max）；新增 `averageBreakQuality(_:)` 私有 helper，两个函数共用 → 消除两份独立的 avg-quality 计算公式；顺手把 disciplineExplanation 残留的 `streak / 3` magic 也换成 `disciplineRecoveryStreakThreshold` 常量（W3 后续清理）

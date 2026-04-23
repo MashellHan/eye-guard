@@ -26,7 +26,7 @@ struct MenuBarView: View {
         }
         .padding()
         .frame(width: 360)
-        .background(Color(NSColor.windowBackgroundColor))
+        .background(AppColors.popoverBackground)
         .onChange(of: elapsedSinceLastBreak > 3600) { _, isOver in
             if isOver {
                 withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {

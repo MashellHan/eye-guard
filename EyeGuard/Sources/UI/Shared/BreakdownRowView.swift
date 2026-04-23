@@ -171,6 +171,10 @@ struct BreakdownRowView: View {
         ) {
             BreakdownPopoverContent(component: component, theme: theme)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(component.name) \(component.score) of \(component.maxScore)")
+        .accessibilityHint(hasDetail ? "Double-tap to view detailed explanation" : "")
+        .accessibilityAddTraits(hasDetail ? .isButton : [])
     }
 
     @ViewBuilder
