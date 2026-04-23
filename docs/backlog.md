@@ -25,10 +25,6 @@
 
 ## P2 — 技术债（来自 review warning）
 
-### W1. DRY: breakdown 视图重复
-- `breakdownRow` + `breakdownPopoverContent` 在 MenuBar 和 Notch 各一份
-- 抽到共享 view（注意架构 R1：业务逻辑不能反向依赖 view，新 shared view 放 `EyeGuard/Sources/UI/Shared/` 之类）
-
 ### W2. `EyeGuardExpandedView` 高度测量
 - 测量循环没有上界，可能死循环
 - `private(set)` 违规
@@ -72,6 +68,10 @@
   - 完成于 2026-04-23，commit `54c33c0`，test report `.agent_workspace/tests/20260423-1810-overlay-contrast/report.json`
   - 修复：Tier 2 加 black scrim (0.35) + 强制 white text，healthScore chip 背景换 .black.opacity(0.25)；Tier 3 不动
   - reviewer PASS (1 warn: icon 还是 .blue), tester PASS (UI 截图因 infra SKIPPED, code review 已确认)
+- **W1** DRY breakdown 视图重复（task `20260423-2130-breakdown-dry`，2026-04-23）
+  - 完成于 2026-04-23，commit `eedf647`，test report `.agent_workspace/tests/20260423-2130-breakdown-dry/report.json`
+  - 修复：抽 `EyeGuard/Sources/UI/Shared/BreakdownRowView.swift`，配 `BreakdownTheme` enum (.menubar/.notch) 注入字体/颜色/宽度差异；MenuBarView + HealthScoreSection 调用方改用共享组件，删旧 helper + state；R1 不破（共享 view 只读 ScoreComponent）
+  - 视觉 parity 验证通过；idle CPU 2.11%（B5 不退化）
 - **B5** 稳态 idle CPU 超阈（task `20260423-2030-idle-cpu`，2026-04-23）
   - 完成于 2026-04-23，commit `9975646`，test report `.agent_workspace/tests/20260423-2030-idle-cpu/report.json`
   - 修复：(1) Mascot 鼠标追踪 10Hz Task.sleep poll → global NSEvent mouse-moved 事件监听（peek-mode 面板大半时间在屏外，event monitor > NSTrackingArea）；(2) Mascot bubble monitor 2Hz poll → `showBubble` didSet 回调；(3) MenuBar + Notch 倒计时 Text 套 `TimelineView(.periodic by: 1.0)`，把每秒 invalidation 隔离在 Text 节点内
