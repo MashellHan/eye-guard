@@ -3,7 +3,7 @@
 > 合并 `docs/bugs.md` + 已知技术债。按优先级排，从上往下做。
 > 修的时候用 `/feature <描述>` 走完整流程。
 
-更新时间：2026-04-23
+更新时间：2026-04-23（B7/B8 由用户报告 P1 重新激活）
 
 ---
 
@@ -19,7 +19,31 @@
 
 ## P1 — 用户体验破坏
 
-（已完成，见底部 ## 已完成）
+### B7. Notch island hover 弹出动画 + 内容单调（用户 2026-04-23 报告）
+- 现象：
+  1. hover 上 island 后 panel 弹出"过快"，无过渡动画（缺 fade/scale-in / spring）
+  2. panel 内容比较单调，可以参考 menubar popover 的丰富信息层次（健康分 breakdown / today stats / AI insight 等），但不能照搬，避免 notch 紧凑布局崩坏
+- 优先级：P1（UX 破坏，但不影响功能）
+- 修复方向：
+  - 设计 expert pass：PM 视角决定 notch 该展示什么子集（不是 menubar 的全部），designer 视角调动画曲线（spring / .easeOut / matchedGeometryEffect）和留白
+  - 现 view 入口：`EyeGuard/Sources/Notch/Views/EyeGuard/EyeGuardExpandedView.swift`、`NotchView.swift` / `NotchViewModel.swift`
+  - 注意 W2 刚改的 height-measurement throttle，动画期间 height 会连续变 → 节流窗口可能被打满（需要适配）
+- 验收：
+  - hover 进入有 200-300ms 过渡（不是瞬间出现）
+  - panel 内容比当前丰富但不超出 notch 美学（可加 breakdown 简版 / today stats 极简版）
+  - 设计选型在 plan 阶段先输出 mock-up 方案再实现
+
+### B8. Break overlay 浅色背景下文字混淆（用户 2026-04-23 报告）
+- 现象：break 提醒页面（看截图左上角 Apu 模式的 Continuous Use / Health Score / Next Break / Take a Break Now panel）在浅色背景下文字仍看不清
+- 注意：B1 已修过 Tier 2 BreakOverlayView 的对比度，B1 加了 ultraThinMaterial + black scrim 0.35 + white text；这次问题可能在：
+  - Apu mascot 模式的 break panel（不是 Tier 2 也不是 Tier 3，是 mascot 自带的悬浮 panel）
+  - 或者 Tier 2 在某些 wallpaper / blur material 下 scrim 仍不够
+- 优先级：P1
+- 修复方向：
+  - 先识别截图中的 panel 实体：在 `EyeGuard/Sources/Mascot/` 下找 "Continuous Use / Health Score / Next Break" 的 panel view
+  - WCAG AA 4.5:1 contrast 是底线
+  - 考虑提高 scrim opacity 到 0.5+，或换更深的 material（.thick → 0.7 black gradient）
+  - 验收：在白色 / 浅灰 / 浅蓝桌面壁纸 3 种环境下截图对比度合格
 
 ---
 
