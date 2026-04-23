@@ -9,11 +9,7 @@
 
 ## P0 — 基础设施（先补，否则 tester 形同虚设）
 
-### I1. 实现 `EyeGuard/Sources/App/DebugTrigger.swift`
-- tester 截图依赖 `DEBUG_UI_STATE` env var 触发指定 UI 状态
-- 不实现 → 所有 UI 截图测试都标 `skipped`，UI bug 修了也验不了
-- 至少支持 `test-matrix.md` 里列的所有 state
-- ⚠️ 尝试于 2026-04-23 (task `20260423-1456-debugtrigger`)：dev iter3 实现完成（review PASS，build/test 全绿），但 tester iter2 截图覆盖丢失（全黑 PNG）+ 偶发 idle CPU 尖峰，**未达 PASS**。代码很可能可用，但需要新一轮跑 tester 在干净环境验证。详见 `.agent_workspace/tests/20260423-1456-debugtrigger/report.json` (iter2)、`reviews/20260423-1456-debugtrigger-r3.md`
+（已完成，见底部 ## 已完成）
 
 ---
 
@@ -42,6 +38,14 @@
 ### B2. Break 结束语音重复播报 2 次（bugs.md #2）
 - 订阅没去重 / SwiftUI view 重建导致重复触发
 - 加幂等保护或正确取消订阅
+
+### B5. 调查稳态 idle CPU 超阈（新发现 2026-04-23）
+- task `20260423-1456-debugtrigger` iter3 tester 确认：30s 稳态 CPU mean 3.01%，last-10s mean 3.45%，13/30 样本 > 3%（阈值 3%）
+- 启动后 ~12s 还有 16-24% 的孤立尖峰
+- launch_ms 96ms 完全没问题；RSS 85MB 也 OK；只有 CPU 持续超
+- 可能位置：`ActivityMonitor.swift`（CGEventTap 高频）、menubar refresh timer (1Hz)、AppModeCoordinator init、ModeManager
+- 修复方向：用 Instruments time profile 找 hot path；考虑 menubar 倒计时改成 widget refresh + 1s timer 用 DispatchSourceTimer
+- 验收：`/perf-check` 跑出 mean < 3% / max < 10%（去除启动尾）
 
 ---
 
@@ -79,3 +83,6 @@
 - popover 透明度修复（背景换 windowBackgroundColor）
 - HealthScore 可解释 breakdown + click-to-open popover
 - 多 agent harness（dev / reviewer / tester + /feature skill）
+- **I1** DebugTrigger 实现支持 test-matrix 全部 Tier A/B + Tier C 入口（task `20260423-1456-debugtrigger`，2026-04-23）
+  - 完成于 2026-04-23，commit 见 git log，test report `.agent_workspace/tests/20260423-1456-debugtrigger/report.md` (iter3)
+  - 注：tester iter3 verdict=FAIL 是因 idle CPU 超阈（已拆为 B5），DebugTrigger 自身的 mascot 5 状态可分 + menubar popover 渲染 + 全 15 state 截图都 PASS
