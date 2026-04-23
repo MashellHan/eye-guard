@@ -32,3 +32,6 @@ build/
 Packages/
 Package.resolved
 EyeGuard.app/
+
+# Agent workspace (multi-agent collaboration artifacts)
+.agent_workspace/
