@@ -73,6 +73,7 @@ git diff --name-only HEAD
 5. reviewer pass → **重跑 tester**（同 scope，iteration+=1）
 6. tester pass → COMMIT
 7. **test 循环最多 2 轮**（首次 + 1 次修复重测）。第 3 次还 FAIL → 停止，把所有报告给用户
+   - 如果 `$ARGUMENTS` 里有 `[backlog: X]` 标记：在 `docs/backlog.md` 该条目下追加一行 `⚠️ 尝试于 <date>，test FAIL，详见 <report path>`，**不要**挪到已完成。提交一个 `chore(backlog): record failed attempt for X` 单独 commit 并 push。
 
 ## 4. COMMIT + PUSH 阶段（全自动）⭐
 
@@ -103,15 +104,30 @@ Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
 > ⚠️ **永远不要** `git add .` 或 `git add -A`。明确列出本次任务相关的文件。
 > ✅ commit 后立即 `git push origin main`。push 失败先尝试 `gh auth switch --user MashellHan` 再重试一次，仍失败才停下问用户。
 
-### 4c. 输出
+### 4c. 更新 backlog（如适用）
+> 仅当 tester verdict=PASS 时执行（COMMIT 阶段本来就是 PASS 才进，此处再次确认）。
+
+从 `$ARGUMENTS` 抓 `[backlog: X1,X2,...]` 标记（X 是 backlog ID 如 `I1` / `B3` / `W2` / `N1`）。
+- 没标记 → 跳过这步（属于临时插队任务）
+- 有标记 → 对每个 ID：
+  1. 在 `docs/backlog.md` 找到该条目
+  2. 整段挪到底部 `## 已完成` 节
+  3. 在条目末尾追加一行：`- 完成于 <YYYY-MM-DD>，commit <短 hash>，test report `.agent_workspace/tests/<task_id>/report.md``
+- 这次 backlog 改动**单独一个 commit**：`chore(backlog): mark X1,X2 done`
+  - 不要 amend 进功能 commit（避免污染 hash）
+
+如果某 ID 在 backlog 里找不到 → 跳过，并在最终输出加一行 warning。
+
+### 4d. 输出
 ```
 ✅ Task <task_id> 完成（已 push）
 
 Plan:    .agent_workspace/plans/<task_id>.md
 Review:  .agent_workspace/reviews/<task_id>-r<n>.md (verdict=PASS)
 Test:    .agent_workspace/tests/<task_id>/report.md (verdict=PASS)
-Commits: <hash1>, <hash2>
+Commits: <hash1>, <hash2>, <backlog-hash>
 Pushed:  origin/main
+Backlog: 已标记完成 [X1, X2]
 ```
 
 ## 升级规则

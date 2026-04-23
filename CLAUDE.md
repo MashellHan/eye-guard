@@ -74,6 +74,22 @@
 - 切完直接 `git push`，无需改 remote / 清 keychain（gh credential helper 会用当前 active token）
 - **push 不需要用户确认** — tester pass + commit 完成后直接 push（目标：高度自动化 harness）
 
+## 恢复协议（对话 compact / 新窗口续跑）
+
+如果你是新对话或刚 compact，要继续跑 backlog：
+
+1. `git log --oneline -20` —— 真相源头，看实际跑到哪
+2. 读 `docs/backlog.md` —— 待处理节里第一项 = 下一批
+3. 抽查 `.agent_workspace/plans/` 最近 1–2 个 plan —— 了解上一批的风格 / 决策
+4. 起 `/feature [backlog: <ID>] <任务描述>`
+   - 必须带 `[backlog: <ID>]` 标记，COMMIT 阶段才会自动维护 backlog
+5. plan 写完会停下问用户确认 → 用户 OK 后全自动跑到 push
+
+backlog 自动维护规则（见 `/feature` SKILL.md §4c）：
+- tester PASS → 条目挪到"已完成"，单独 `chore(backlog)` commit
+- tester FAIL（升级停下） → 条目下加 `⚠️ 尝试于 ...` 注脚，不挪
+- 没 `[backlog:]` 标记 → 不动 backlog（临时插队任务）
+
 ## 常用命令
 ```bash
 swift build                              # 编译
