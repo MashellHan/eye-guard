@@ -27,7 +27,6 @@ struct BreakOverlayView: View {
 
     @State private var countdown: Int = 0
     @State private var isBreaking: Bool = false
-    @State private var showExercises: Bool = false
     @State private var timer: Timer?
     @State private var appeared: Bool = false
     @State private var shakeTrigger: Bool = false
@@ -68,15 +67,11 @@ struct BreakOverlayView: View {
             titleSection
             healthScoreSection
 
-            if showExercises {
-                exerciseSessionSection
-            } else if isBreaking {
+            if isBreaking {
                 countdownSection
             }
 
-            if !showExercises {
-                buttonSection
-            }
+            buttonSection
         }
         .padding(24)
         .frame(width: 320, height: 280)
@@ -245,20 +240,6 @@ struct BreakOverlayView: View {
         }
     }
 
-    // MARK: - Exercise Session
-
-    private var exerciseSessionSection: some View {
-        ExerciseSessionView(
-            onComplete: {
-                completeBreak()
-            },
-            onSkip: {
-                showExercises = false
-            }
-        )
-        .transition(.scale.combined(with: .opacity))
-    }
-
     // MARK: - Helpers
 
     /// Instruction text varies by break type.
@@ -292,10 +273,22 @@ struct BreakOverlayView: View {
         startCountdownTimer()
     }
 
+    /// Tier 2 "Start Eye Exercises" — route through the shared notification
+    /// path so all entry points (Tier 2/3 overlays, mascot menu, menu bar
+    /// quick action) trigger the same full-screen `ExercisePresenter` window.
+    /// Previously this only flipped a local `showExercises` flag, which tried
+    /// to render the exercise UI inside the 320pt floating overlay (B4).
     private func startExercises() {
-        withAnimation(.easeInOut(duration: 0.3)) {
-            showExercises = true
-        }
+        stopTimer()
+        NotificationCenter.default.post(
+            name: .startExercisesFromBreak,
+            object: nil
+        )
+        // Treat starting exercises as taking the break — clears the
+        // notification and lets the scheduler advance like the Tier 3 path
+        // does (BreakScheduler triggers `takeBreakNow` before posting).
+        onTaken()
+        onDismiss()
     }
 
     private func skipBreak() {

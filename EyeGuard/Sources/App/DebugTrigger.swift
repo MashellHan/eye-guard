@@ -416,17 +416,19 @@ enum DebugTrigger {
         PreferencesWindowController.shared.showPreferences()
     }
 
-    /// Tier C placeholder — opens the mascot's exercise overlay so the tester
-    /// can capture the entry frame. Per-exercise sub-frames are backlog.
-    /// Polls for the mascot controller (W2 fix) instead of fixed sleep.
+    /// Tier C placeholder — opens the exercise overlay so the tester can
+    /// capture the entry frame. Per-exercise sub-frames are backlog.
+    /// Still waits for the mascot to be installed so its viewModel is in the
+    /// expected pose for the screenshot, but the overlay itself is now
+    /// presented through the shared `ExercisePresenter` (B4).
     private static func renderExerciseEntry() {
         ModeManager.shared.switchMode(to: .apu)
         Task { @MainActor in
-            guard let controller = await waitForMascotController() else {
+            guard await waitForMascotController() != nil else {
                 Log.app.error("DebugTrigger: mascot controller unavailable for exercise entry.")
                 return
             }
-            controller.showExerciseWindow()
+            ExercisePresenter.shared.present()
         }
     }
 

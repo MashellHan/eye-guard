@@ -49,9 +49,6 @@ final class MascotWindowController {
     /// Task for monitoring speech bubble state to auto-reveal.
     private var bubbleMonitorTask: Task<Void, Never>?
 
-    /// Observer for exercise-from-break notification.
-    private var exerciseFromBreakObserver: Any?
-
     /// Observer for menu-bar "Show Tip" notification.
     private var showTipObserver: Any?
 
@@ -146,15 +143,19 @@ final class MascotWindowController {
         // Start bubble monitor for auto-reveal on messages (v3.1)
         startBubbleMonitor()
 
-        // Listen for exercise-from-break notifications (v2.5)
-        exerciseFromBreakObserver = NotificationCenter.default.addObserver(
-            forName: .startExercisesFromBreak,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in
-                self?.showExerciseWindow()
-            }
+        // Listen for exercise-from-break notifications (v2.5).
+        // Observation itself lives in `ExercisePresenter` (B4 — moved out of
+        // the mascot module so Notch mode also responds). The mascot only
+        // needs view-state hooks to play its resting/celebrating animation
+        // alongside the session.
+        ExercisePresenter.shared.onSessionStart = { [weak self] in
+            self?.handleExerciseSessionStart()
+        }
+        ExercisePresenter.shared.onSessionComplete = { [weak self] in
+            self?.handleExerciseSessionComplete()
+        }
+        ExercisePresenter.shared.onSessionSkipped = { [weak self] in
+            self?.handleExerciseSessionSkipped()
         }
 
         // Listen for "Tip" requests from the menu bar.
@@ -287,14 +288,15 @@ final class MascotWindowController {
         popoverWindow?.close()
         removeClickOutsideMonitor()
         popoverWindow = nil
-        if let observer = exerciseFromBreakObserver {
-            NotificationCenter.default.removeObserver(observer)
-            exerciseFromBreakObserver = nil
-        }
         if let observer = showTipObserver {
             NotificationCenter.default.removeObserver(observer)
             showTipObserver = nil
         }
+        // Drop view-state hooks so the presenter doesn't retain a stale
+        // mascot when the user switches to Notch mode mid-session.
+        ExercisePresenter.shared.onSessionStart = nil
+        ExercisePresenter.shared.onSessionComplete = nil
+        ExercisePresenter.shared.onSessionSkipped = nil
         for observer in [preAlertStartedObserver, preAlertCountdownObserver, preAlertCancelledObserver].compactMap({ $0 }) {
             NotificationCenter.default.removeObserver(observer)
         }
@@ -358,9 +360,11 @@ final class MascotWindowController {
     }
 
     /// Handles "Start Eye Exercises" from mascot context menu.
-    /// Opens a floating exercise session window.
+    /// Routes through `ExercisePresenter` so all entry points (mascot menu,
+    /// Tier 2/3 overlays, menu bar quick action) share the same presentation
+    /// path (B4).
     private func handleStartExercises() {
-        showExerciseWindow()
+        ExercisePresenter.shared.present()
         Log.mascot.info("Mascot: user started eye exercises via mascot menu.")
     }
 
@@ -380,117 +384,31 @@ final class MascotWindowController {
         Log.mascot.info("Mascot: opened dashboard via mascot menu.")
     }
 
-    /// The exercise session fullscreen overlay windows (one per screen, feature-005).
-    private var exerciseWindows: [NSWindow] = []
+    // MARK: - Exercise Session view-state hooks (B4)
+    //
+    // Window/business logic for the exercise overlay lives in
+    // `ExercisePresenter`. The mascot only animates alongside it.
 
-    /// Shows the exercise session in a fullscreen overlay covering all screens (feature-005).
-    func showExerciseWindow() {
-        // Dismiss any existing exercise windows
-        dismissExerciseWindow()
-
-        // Transition mascot to resting/exercising state
+    /// Called by `ExercisePresenter` just before the overlay appears — the
+    /// mascot transitions to its exercising-rest pose and chirps once.
+    private func handleExerciseSessionStart() {
         viewModel?.restingMode = .exercising
         viewModel?.transition(to: .resting)
         viewModel?.showMessage("👁️ 跟着做眼保健操吧！", duration: 30)
-
-        let screens = NSScreen.screens
-        guard !screens.isEmpty else { return }
-
-        for (index, screen) in screens.enumerated() {
-            let isPrimaryScreen = index == 0
-
-            // Only the primary screen gets the interactive exercise view;
-            // secondary screens show a dark overlay only (review-011 M1)
-            let fullscreenContent: AnyView
-            if isPrimaryScreen {
-                let sessionView = ExerciseSessionView(
-                    onComplete: { [weak self] in
-                        self?.dismissExerciseWindow()
-                        self?.viewModel?.transition(to: .celebrating)
-                        self?.viewModel?.showMessage("👏 眼保健操做完了！好棒！")
-                        self?.scheduler?.recordExerciseSession()
-                    },
-                    onSkip: { [weak self] in
-                        self?.dismissExerciseWindow()
-                        self?.viewModel?.transition(to: .idle)
-                    }
-                )
-
-                fullscreenContent = AnyView(
-                    ZStack {
-                        Color.black.opacity(0.65)
-                            .ignoresSafeArea()
-                        VisualEffectBlur()
-                            .ignoresSafeArea()
-                        sessionView
-                    }
-                )
-            } else {
-                // Secondary screens: dark overlay only, no timer/TTS
-                fullscreenContent = AnyView(
-                    ZStack {
-                        Color.black.opacity(0.65)
-                            .ignoresSafeArea()
-                        VisualEffectBlur()
-                            .ignoresSafeArea()
-                    }
-                )
-            }
-
-            let hostingView = NSHostingView(rootView: fullscreenContent)
-
-            let exWindow = KeyableWindow(
-                contentRect: screen.frame,
-                styleMask: [.borderless],
-                backing: .buffered,
-                defer: false
-            )
-
-            exWindow.contentView = hostingView
-            exWindow.level = NSWindow.Level(rawValue: Int(CGShieldingWindowLevel()))
-            exWindow.ignoresMouseEvents = !isPrimaryScreen  // Secondary screens are non-interactive
-            exWindow.isOpaque = false
-            exWindow.backgroundColor = .clear
-            exWindow.hasShadow = false
-            exWindow.collectionBehavior = [.canJoinAllSpaces, .stationary]
-            exWindow.isReleasedWhenClosed = false
-            exWindow.setFrame(screen.frame, display: true)
-
-            exWindow.alphaValue = 0
-            exWindow.makeKeyAndOrderFront(nil)
-
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.5
-                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-                exWindow.animator().alphaValue = 1
-            }
-
-            exerciseWindows.append(exWindow)
-
-            Log.mascot.info(
-                "Exercise fullscreen overlay shown on screen \(index + 1) of \(screens.count)"
-            )
-        }
     }
 
-    /// Dismisses all exercise session fullscreen windows.
-    private func dismissExerciseWindow() {
-        guard !exerciseWindows.isEmpty else { return }
+    /// Called by `ExercisePresenter` when the user completes the session.
+    /// Plays a celebrating animation; the scheduler call is owned by the
+    /// presenter (R1: business effect not duplicated in the view module).
+    private func handleExerciseSessionComplete() {
+        viewModel?.transition(to: .celebrating)
+        viewModel?.showMessage("👏 眼保健操做完了！好棒！")
+    }
 
-        let windows = exerciseWindows
-        exerciseWindows = []
-
-        for exWindow in windows {
-            NSAnimationContext.runAnimationGroup({ context in
-                context.duration = 0.3
-                context.timingFunction = CAMediaTimingFunction(name: .easeIn)
-                exWindow.animator().alphaValue = 0
-            }, completionHandler: {
-                Task { @MainActor in
-                    exWindow.close()
-                }
-            })
-        }
+    /// Called by `ExercisePresenter` when the user skips. Just return to idle
+    /// so the mascot doesn't keep its exercising-rest pose forever.
+    private func handleExerciseSessionSkipped() {
+        viewModel?.transition(to: .idle)
     }
 
     // MARK: - Mouse Tracking (v1.1)

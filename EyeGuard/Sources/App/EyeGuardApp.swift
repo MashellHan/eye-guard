@@ -49,6 +49,13 @@ struct EyeGuardApp: App {
         coordinator = c
         Log.app.info("AppModeCoordinator started (mode=\(ModeManager.shared.currentMode.rawValue)).")
 
+        // Wire the cross-mode exercise presenter exactly once. Both the Apu
+        // mascot path and the Notch/Tier 2 paths now route exercise launches
+        // through here, so the observer must be registered regardless of
+        // current mode (B4 fix).
+        ExercisePresenter.shared.configure(scheduler: scheduler)
+        ExercisePresenter.shared.observeStartFromBreak()
+
         // DEBUG_UI_STATE hook (no-op unless the env var is set).
         // Gate at the call site so the production launch path doesn't even
         // allocate a Task when the var is unset (W1 fix).
