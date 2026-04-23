@@ -19,13 +19,7 @@
 
 ## P1 — 用户体验破坏
 
-### B5. 调查稳态 idle CPU 超阈（新发现 2026-04-23）
-- task `20260423-1456-debugtrigger` iter3 tester 确认：30s 稳态 CPU mean 3.01%，last-10s mean 3.45%，13/30 样本 > 3%（阈值 3%）
-- 启动后 ~12s 还有 16-24% 的孤立尖峰
-- launch_ms 96ms 完全没问题；RSS 85MB 也 OK；只有 CPU 持续超
-- 可能位置：`ActivityMonitor.swift`（CGEventTap 高频）、menubar refresh timer (1Hz)、AppModeCoordinator init、ModeManager
-- 修复方向：用 Instruments time profile 找 hot path；考虑 menubar 倒计时改成 widget refresh + 1s timer 用 DispatchSourceTimer
-- 验收：`/perf-check` 跑出 mean < 3% / max < 10%（去除启动尾）
+（已完成，见底部 ## 已完成）
 
 ---
 
@@ -78,6 +72,11 @@
   - 完成于 2026-04-23，commit `54c33c0`，test report `.agent_workspace/tests/20260423-1810-overlay-contrast/report.json`
   - 修复：Tier 2 加 black scrim (0.35) + 强制 white text，healthScore chip 背景换 .black.opacity(0.25)；Tier 3 不动
   - reviewer PASS (1 warn: icon 还是 .blue), tester PASS (UI 截图因 infra SKIPPED, code review 已确认)
+- **B5** 稳态 idle CPU 超阈（task `20260423-2030-idle-cpu`，2026-04-23）
+  - 完成于 2026-04-23，commit `9975646`，test report `.agent_workspace/tests/20260423-2030-idle-cpu/report.json`
+  - 修复：(1) Mascot 鼠标追踪 10Hz Task.sleep poll → global NSEvent mouse-moved 事件监听（peek-mode 面板大半时间在屏外，event monitor > NSTrackingArea）；(2) Mascot bubble monitor 2Hz poll → `showBubble` didSet 回调；(3) MenuBar + Notch 倒计时 Text 套 `TimelineView(.periodic by: 1.0)`，把每秒 invalidation 隔离在 Text 节点内
+  - 结果：30s 稳态 mean 3.01% → **2.16%**（target <3%），last-10s mean 3.45% → 1.57%（-55%），>3% 样本 13/30 → 7/30
+  - 留 2 个 W 级 follow-up（mouse monitor 未 throttle、bubble didSet 初值同步）— tester 标 nice-to-have
 - **B6** Break overlay 弹出后倒计时 ~3s 就自动退出（task `20260423-1945-overlay-3s-dismiss`，2026-04-23）
   - 完成于 2026-04-23，commit `e8ea9a6`，test report `.agent_workspace/tests/20260423-1945-overlay-3s-dismiss/report.json`
   - 修复：FullScreenOverlayView/BreakOverlayView 的 `startCountdownTimer` 首行 `timer?.invalidate(); timer = nil` 防止 NSHostingView 重复 onAppear 叠加 N 个 Timer（N×1Hz → 20s 在 ~3s 跑完）；FullScreenOverlayView 加 onAppear re-entry guard；加 per-instance UUID 诊断日志
