@@ -13,6 +13,7 @@
 - tester 截图依赖 `DEBUG_UI_STATE` env var 触发指定 UI 状态
 - 不实现 → 所有 UI 截图测试都标 `skipped`，UI bug 修了也验不了
 - 至少支持 `test-matrix.md` 里列的所有 state
+- ⚠️ 尝试于 2026-04-23 (task `20260423-1456-debugtrigger`)：dev iter3 实现完成（review PASS，build/test 全绿），但 tester iter2 截图覆盖丢失（全黑 PNG）+ 偶发 idle CPU 尖峰，**未达 PASS**。代码很可能可用，但需要新一轮跑 tester 在干净环境验证。详见 `.agent_workspace/tests/20260423-1456-debugtrigger/report.json` (iter2)、`reviews/20260423-1456-debugtrigger-r3.md`
 
 ---
 
