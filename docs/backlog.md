@@ -15,11 +15,6 @@
 
 ## P0 — 核心功能失效
 
-### B3. Notch take-a-break 无响应 + 倒计时卡 00:00（bugs.md #3）
-- 点击 island 上 take-a-break 按钮没反应
-- 倒计时跑到 00:00 后不进入 break
-- 怀疑 `EyeGuardDataBridge` 事件没透传 / transition 被某条件挡住
-
 ### B4. "开始眼保健操"按钮无响应（bugs.md #4）
 - 点击无任何反馈
 - 定位 action handler / 路由
@@ -86,3 +81,7 @@
 - **I1** DebugTrigger 实现支持 test-matrix 全部 Tier A/B + Tier C 入口（task `20260423-1456-debugtrigger`，2026-04-23）
   - 完成于 2026-04-23，commit 见 git log，test report `.agent_workspace/tests/20260423-1456-debugtrigger/report.md` (iter3)
   - 注：tester iter3 verdict=FAIL 是因 idle CPU 超阈（已拆为 B5），DebugTrigger 自身的 mascot 5 状态可分 + menubar popover 渲染 + 全 15 state 截图都 PASS
+- **B3** Notch take-a-break 无响应 + 倒计时卡 00:00（task `20260423-1649-notch-takebreak`，2026-04-23）
+  - 完成于 2026-04-23，commit `2fdcf5e`，test report `.agent_workspace/tests/20260423-1649-notch-takebreak/report.json`
+  - 修复：BreakScheduler.requestManualBreak 统一 manual-break 入口（mascot/menubar/notch 三路共用），updateNextBreak 在 overdue 时把 timeUntilNextBreak clamp 到 0
+  - 注：tester PASS 但 3 条 regression 单测被列为 MISSING_COVERAGE warning（dev.md/tester.md 责任分工争议，留作后续 chore）；UI 截图因 Screen Recording 权限缺失被 skip，code path 由 reviewer 验证
