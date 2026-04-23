@@ -46,4 +46,7 @@ enum Log {
 
     /// Logger for AI/LLM insight subsystem.
     static let ai = Logger(subsystem: "com.eyeguard", category: "AI")
+
+    /// Logger for the Notch (Dynamic Notch panel) subsystem.
+    static let notch = Logger(subsystem: "com.eyeguard", category: "Notch")
 }

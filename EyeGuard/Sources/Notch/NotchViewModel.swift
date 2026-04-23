@@ -68,7 +68,9 @@ final class NotchViewModel {
     /// Measured intrinsic height of the eyeGuard expanded content.
     /// Reported via `MeasuredHeightPreferenceKey` from the SwiftUI tree.
     /// Falls back to a sensible default until first measurement arrives.
-    var measuredEyeGuardHeight: CGFloat = 0
+    /// Writes go through `updateMeasuredEyeGuardHeight(_:)` so the view layer
+    /// can't bypass the rate-limiter.
+    private(set) var measuredEyeGuardHeight: CGFloat = 0
 
     /// Panel size when opened — width is fixed, height adapts to content
     /// for the eyeGuard panel so newly added rows don't get clipped.
@@ -94,6 +96,11 @@ final class NotchViewModel {
     private var clickObserverID: UUID?
     private var lastMoveTimestamp: TimeInterval = 0
     private let moveThrottle: TimeInterval = 0.05 // 50 ms
+
+    // Sliding-window rate limiter for measured-height updates.
+    // Caps SwiftUI feedback loops at 10 writes per 500 ms.
+    private var measuredHeightUpdates: Int = 0
+    private var measuredHeightWindowStart: Date = .distantPast
 
     // MARK: - Init
 
@@ -261,5 +268,30 @@ final class NotchViewModel {
             // mistake a manual open for boot.
             openReason = .unknown
         }
+    }
+
+    /// Apply a new measured intrinsic height for the eyeGuard panel.
+    ///
+    /// - Ignores changes <= 0.5pt (sub-pixel jitter).
+    /// - Rate-limited to 10 writes per 500 ms sliding window. If the SwiftUI
+    ///   layout enters a feedback loop, further writes in the window are
+    ///   dropped and a warning is logged — preventing runaway re-layout.
+    func updateMeasuredEyeGuardHeight(_ snapped: CGFloat) {
+        guard abs(measuredEyeGuardHeight - snapped) > 0.5 else { return }
+
+        let now = Date()
+        if now.timeIntervalSince(measuredHeightWindowStart) > 0.5 {
+            measuredHeightWindowStart = now
+            measuredHeightUpdates = 0
+        }
+        measuredHeightUpdates += 1
+        guard measuredHeightUpdates <= 10 else {
+            Log.notch.warning(
+                "measuredEyeGuardHeight update rate-limited at \(snapped, privacy: .public)pt (>10 updates in 500ms window)"
+            )
+            return
+        }
+
+        measuredEyeGuardHeight = snapped
     }
 }

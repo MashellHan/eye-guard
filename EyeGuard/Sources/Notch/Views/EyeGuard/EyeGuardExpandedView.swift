@@ -45,10 +45,8 @@ struct EyeGuardExpandedView: View {
         )
         .onPreferenceChange(MeasuredHeightPreferenceKey.self) { newHeight in
             // Round up to avoid sub-pixel jitter triggering re-layout.
-            let snapped = ceil(newHeight)
-            guard let viewModel,
-                  abs(viewModel.measuredEyeGuardHeight - snapped) > 0.5 else { return }
-            viewModel.measuredEyeGuardHeight = snapped
+            // Threshold + rate-limit live in the view-model setter.
+            viewModel?.updateMeasuredEyeGuardHeight(ceil(newHeight))
         }
     }
 }
