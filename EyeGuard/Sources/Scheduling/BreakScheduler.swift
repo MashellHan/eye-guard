@@ -287,6 +287,59 @@ final class BreakScheduler {
         }
     }
 
+    /// User-initiated "Take a break now" entrypoint shared by every display
+    /// mode (mascot context menu, menu-bar quick action, Notch island button).
+    ///
+    /// Why centralised here: previously each call site reimplemented the
+    /// `.direct` + `.fullScreen` overlay invocation. The Notch path
+    /// (B3 / 2026-04-23) skipped that and called `takeBreakNow` directly,
+    /// which set state but rendered no overlay — so the button looked dead.
+    /// Routing through `notificationSender.notify` guarantees the overlay
+    /// shows in all modes; the `onTaken` callback then drives `takeBreakNow`,
+    /// preserving the existing state-machine invariants (R8).
+    ///
+    /// - Parameter type: The break type to request. When `nil`, defaults to
+    ///   `nextScheduledBreak ?? .micro`, matching the legacy mascot/menu-bar
+    ///   behaviour so callers don't need to know what's next.
+    func requestManualBreak(_ type: BreakType? = nil) {
+        let breakType = type ?? nextScheduledBreak ?? .micro
+
+        // Manual breaks are always direct/full-screen/skippable so the user
+        // sees an immediate, dismissible overlay regardless of the active
+        // ReminderModeProfile. This mirrors the original mascot behaviour.
+        let behavior = BreakBehavior(
+            interval: 0,
+            duration: breakType.duration,
+            isEnabled: true,
+            entryTier: .fullScreen,
+            dismissPolicy: .skippable
+        )
+
+        Log.scheduler.info("Manual break requested: \(breakType.displayName)")
+
+        notificationSender.notify(
+            breakType: breakType,
+            behavior: behavior,
+            escalation: .direct,
+            healthScore: currentHealthScore,
+            onTaken: { [weak self] in
+                Task { @MainActor in
+                    self?.takeBreakNow(breakType)
+                }
+            },
+            onSkipped: { [weak self] in
+                Task { @MainActor in
+                    self?.skipBreak(breakType)
+                }
+            },
+            onPostponed: { [weak self] delay in
+                Task { @MainActor in
+                    self?.postponeBreak(breakType, by: delay)
+                }
+            }
+        )
+    }
+
     /// Ends the current break-in-progress state.
     func endBreak() {
         isBreakInProgress = false
@@ -449,26 +502,48 @@ final class BreakScheduler {
     }
 
     /// Determines which break is next and how long until it triggers.
+    ///
+    /// When a break is overdue (`elapsed >= interval`) the previous
+    /// implementation kept the last *positive* `timeUntilNextBreak`, which
+    /// made the Notch / mascot countdown freeze at the previous tick instead
+    /// of showing 00:00 (B3 / 2026-04-23). We now pick the most-overdue
+    /// type and clamp `timeUntilNextBreak` to 0 so the UI accurately
+    /// reflects "due now" while we wait for `checkForDueBreaks` to fire the
+    /// notification on the same tick.
     private func updateNextBreak() {
-        var soonest: (BreakType, TimeInterval)? = nil
+        var soonestPositive: (BreakType, TimeInterval)? = nil
+        var mostOverdue: (BreakType, TimeInterval)? = nil  // remaining is <= 0
 
         for type in BreakType.allCases {
             guard isBreakTypeEnabled(type) else { continue }
 
             let elapsed = elapsedPerType[type, default: 0]
             let interval = intervalForType(type)
+            guard interval > 0 else { continue }
             let remaining = interval - elapsed
 
             if remaining > 0 {
-                if soonest == nil || remaining < soonest!.1 {
-                    soonest = (type, remaining)
+                if soonestPositive == nil || remaining < soonestPositive!.1 {
+                    soonestPositive = (type, remaining)
+                }
+            } else {
+                // Track the most-overdue (smallest, i.e. most negative) so
+                // we report the type that's *furthest* past its interval.
+                if mostOverdue == nil || remaining < mostOverdue!.1 {
+                    mostOverdue = (type, remaining)
                 }
             }
         }
 
-        if let (type, remaining) = soonest {
-            nextScheduledBreak = type
-            timeUntilNextBreak = remaining
+        if let overdue = mostOverdue {
+            // Overdue wins: countdown reads 00:00 and `nextScheduledBreak`
+            // points at the type that should fire next (and will, via
+            // `checkForDueBreaks` on this same tick).
+            nextScheduledBreak = overdue.0
+            timeUntilNextBreak = 0
+        } else if let next = soonestPositive {
+            nextScheduledBreak = next.0
+            timeUntilNextBreak = next.1
         }
     }
 

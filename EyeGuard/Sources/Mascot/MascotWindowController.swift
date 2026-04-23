@@ -319,42 +319,13 @@ final class MascotWindowController {
     // MARK: - Break Actions
 
     /// Handles "Take Break Now" from mascot context menu.
-    /// Directly shows the break overlay (skipping tiered escalation).
+    /// Delegates to the shared `BreakScheduler.requestManualBreak()` helper
+    /// so all display modes (mascot / menu bar / Notch) take the same code
+    /// path (B3 fix). The helper builds a `.direct` + `.fullScreen` overlay
+    /// and wires the standard taken/skipped/postponed callbacks.
     private func handleTakeBreak() {
         guard let scheduler else { return }
-        let breakType = scheduler.nextScheduledBreak ?? .micro
-
-        // Manual break: use .direct escalation to show overlay immediately,
-        // with .skippable dismiss policy so user can cancel if needed.
-        let behavior = BreakBehavior(
-            interval: 0,
-            duration: breakType.duration,
-            isEnabled: true,
-            entryTier: .fullScreen,
-            dismissPolicy: .skippable
-        )
-
-        NotificationManager.shared.notify(
-            breakType: breakType,
-            behavior: behavior,
-            escalation: .direct,
-            healthScore: scheduler.currentHealthScore,
-            onTaken: {
-                Task { @MainActor in
-                    scheduler.takeBreakNow(breakType)
-                }
-            },
-            onSkipped: {
-                Task { @MainActor in
-                    scheduler.skipBreak(breakType)
-                }
-            },
-            onPostponed: { delay in
-                Task { @MainActor in
-                    scheduler.postponeBreak(breakType, by: delay)
-                }
-            }
-        )
+        scheduler.requestManualBreak()
         Log.mascot.info("Mascot: user initiated break via mascot menu.")
     }
 

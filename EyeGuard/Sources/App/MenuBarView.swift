@@ -188,35 +188,9 @@ struct MenuBarView: View {
     private var quickActionsSection: some View {
         HStack(spacing: 8) {
             Button {
-                let breakType: BreakType = scheduler.nextScheduledBreak ?? .micro
-                let behavior = BreakBehavior(
-                    interval: 0,
-                    duration: breakType.duration,
-                    isEnabled: true,
-                    entryTier: .fullScreen,
-                    dismissPolicy: .skippable
-                )
-                NotificationManager.shared.notify(
-                    breakType: breakType,
-                    behavior: behavior,
-                    escalation: .direct,
-                    healthScore: scheduler.currentHealthScore,
-                    onTaken: {
-                        Task { @MainActor in
-                            scheduler.takeBreakNow(breakType)
-                        }
-                    },
-                    onSkipped: {
-                        Task { @MainActor in
-                            scheduler.skipBreak(breakType)
-                        }
-                    },
-                    onPostponed: { delay in
-                        Task { @MainActor in
-                            scheduler.postponeBreak(breakType, by: delay)
-                        }
-                    }
-                )
+                // Shared "manual break now" path — see BreakScheduler.requestManualBreak.
+                // Centralised in B3 so menu bar / mascot / Notch can't drift.
+                scheduler.requestManualBreak()
             } label: {
                 Label("Break", systemImage: "eye")
                     .frame(maxWidth: .infinity)

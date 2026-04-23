@@ -131,9 +131,15 @@ final class EyeGuardDataBridge {
 
     // MARK: - Actions
 
-    /// Immediately trigger a micro break.
+    /// Immediately request a manual break.
+    ///
+    /// Routes through the shared `BreakScheduler.requestManualBreak()` helper
+    /// (B3 fix): previously this called `scheduler.takeBreakNow(.micro)`
+    /// directly, which set `isBreakInProgress = true` but never showed the
+    /// break overlay — so clicking the button looked like nothing happened
+    /// and the button immediately disabled itself via `isInBreak`.
     func triggerBreakNow() {
-        scheduler.takeBreakNow(.micro)
+        scheduler.requestManualBreak()
     }
 
     // MARK: - Init
