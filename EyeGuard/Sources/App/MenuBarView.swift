@@ -68,31 +68,42 @@ struct MenuBarView: View {
                 // Circular gauge
                 HealthScoreGauge(score: scheduler.currentHealthScore)
 
-                // Component breakdown
+                // Component breakdown — uses shared `BreakdownRowView` (DRY W1).
+                // Pre-breakdown placeholder: synthesise a ScoreComponent with an
+                // empty explanation; BreakdownRowView treats empty explanation
+                // as "no detail" → no hover tint, no popover (matches old behavior).
                 VStack(alignment: .leading, spacing: 3) {
-                    breakdownRow(
-                        label: "Breaks",
-                        component: scheduler.currentBreakdown?.components.first { $0.name == "Breaks" },
-                        fallbackScore: scheduler.currentHealthScore * 40 / 100,
-                        maxScore: 40
+                    BreakdownRowView(
+                        component: breakdownComponent(
+                            label: "Breaks",
+                            fallbackScore: scheduler.currentHealthScore * 40 / 100,
+                            maxScore: 40
+                        ),
+                        theme: .menubar
                     )
-                    breakdownRow(
-                        label: "Discipline",
-                        component: scheduler.currentBreakdown?.components.first { $0.name == "Discipline" },
-                        fallbackScore: scheduler.currentHealthScore * 30 / 100,
-                        maxScore: 30
+                    BreakdownRowView(
+                        component: breakdownComponent(
+                            label: "Discipline",
+                            fallbackScore: scheduler.currentHealthScore * 30 / 100,
+                            maxScore: 30
+                        ),
+                        theme: .menubar
                     )
-                    breakdownRow(
-                        label: "Time",
-                        component: scheduler.currentBreakdown?.components.first { $0.name == "Time" },
-                        fallbackScore: scheduler.currentHealthScore * 20 / 100,
-                        maxScore: 20
+                    BreakdownRowView(
+                        component: breakdownComponent(
+                            label: "Time",
+                            fallbackScore: scheduler.currentHealthScore * 20 / 100,
+                            maxScore: 20
+                        ),
+                        theme: .menubar
                     )
-                    breakdownRow(
-                        label: "Quality",
-                        component: scheduler.currentBreakdown?.components.first { $0.name == "Quality" },
-                        fallbackScore: scheduler.currentHealthScore * 10 / 100,
-                        maxScore: 10
+                    BreakdownRowView(
+                        component: breakdownComponent(
+                            label: "Quality",
+                            fallbackScore: scheduler.currentHealthScore * 10 / 100,
+                            maxScore: 10
+                        ),
+                        theme: .menubar
                     )
                 }
             }
@@ -455,120 +466,23 @@ struct MenuBarView: View {
         }
     }
 
-    /// Tracks which breakdown row is currently hovered, used for background tint only.
-    @State private var hoveredBreakdown: String?
-
-    /// Tracks which breakdown row is currently clicked-open. Click toggles the popover;
-    /// clicking outside (or the same row again) closes it. Hover is intentionally NOT
-    /// the trigger — see r1 C1: SwiftUI `.popover` on hover steals focus and races with
-    /// the Notch panel's auto-close logic. r2 over-corrected by collapsing the rich
-    /// popover into a single-line `.help()` tooltip; r3 restores the rich content but
-    /// gates it behind an explicit click.
-    @State private var clickedBreakdown: String?
-
-    private func breakdownRow(
+    /// Resolves a row's data: prefers the live `currentBreakdown` component,
+    /// falls back to a synthetic placeholder (empty explanation → no popover)
+    /// before the first breakdown is computed.
+    private func breakdownComponent(
         label: String,
-        component: ScoreComponent?,
         fallbackScore: Int,
         maxScore: Int
-    ) -> some View {
-        let score = component?.score ?? fallbackScore
-        let isPerfect = score >= maxScore
-        let hasDetail = component != nil
-
-        return HStack(spacing: 4) {
-            Text(label)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .frame(width: 58, alignment: .leading)
-            Text("\(score)/\(maxScore)")
-                .font(.system(.caption2, design: .monospaced))
-                .bold()
-            GeometryReader { geometry in
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(.quaternary)
-                        .frame(height: 4)
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(barColor(score: score, maxScore: maxScore))
-                        .frame(
-                            width: geometry.size.width * CGFloat(score) / CGFloat(max(maxScore, 1)),
-                            height: 4
-                        )
-                }
-            }
-            .frame(height: 4)
+    ) -> ScoreComponent {
+        if let real = scheduler.currentBreakdown?.components.first(where: { $0.name == label }) {
+            return real
         }
-        .padding(.vertical, 2)
-        .contentShape(Rectangle())
-        .background(
-            RoundedRectangle(cornerRadius: 4)
-                .fill(hoveredBreakdown == label ? Color.primary.opacity(0.06) : .clear)
+        return ScoreComponent(
+            name: label,
+            score: fallbackScore,
+            maxScore: maxScore,
+            explanation: ""
         )
-        .onHover { inside in
-            // Hover state drives the background tint only — explicitly NOT the popover
-            // trigger (r1 C1 / r3 fix).
-            guard hasDetail else { return }
-            if inside {
-                hoveredBreakdown = label
-            } else if hoveredBreakdown == label {
-                hoveredBreakdown = nil
-            }
-        }
-        .onTapGesture {
-            guard hasDetail else { return }
-            clickedBreakdown = (clickedBreakdown == label) ? nil : label
-        }
-        .popover(
-            isPresented: Binding(
-                get: { clickedBreakdown == label && hasDetail },
-                set: { if !$0 { clickedBreakdown = nil } }
-            ),
-            arrowEdge: .leading
-        ) {
-            if let component {
-                breakdownPopoverContent(component: component, isPerfect: isPerfect)
-            }
-        }
-    }
-
-    /// Rich popover body for a breakdown row — restored in r3 after r2 incorrectly
-    /// downgraded it to a `.help()` single-line tooltip. Shows: SF Symbol header
-    /// (perfect ✓ vs info ⓘ), label + score, and the full multi-line explanation
-    /// from `ScoreComponent.explanation`.
-    @ViewBuilder
-    private func breakdownPopoverContent(component: ScoreComponent, isPerfect: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                Image(systemName: isPerfect ? "checkmark.seal.fill" : "info.circle.fill")
-                    .foregroundStyle(isPerfect ? .green : .blue)
-                    .font(.system(size: 13))
-                Text(component.name)
-                    .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                Spacer()
-                Text("\(component.score) / \(component.maxScore)")
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundStyle(.secondary)
-            }
-            Divider()
-            Text(isPerfect ? "满分 — 保持现状" : "还能拿满分")
-                .font(.caption2)
-                .foregroundStyle(isPerfect ? .green : .blue)
-            Text(component.explanation)
-                .font(.caption)
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(12)
-        .frame(width: 260)
-    }
-
-    private func barColor(score: Int, maxScore: Int) -> Color {
-        let ratio = Double(score) / Double(max(maxScore, 1))
-        if ratio >= 0.8 { return .green }
-        if ratio >= 0.5 { return .yellow }
-        if ratio >= 0.3 { return .orange }
-        return .red
     }
 }
 
