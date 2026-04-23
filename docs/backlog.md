@@ -25,9 +25,7 @@
 
 ## P2 — 技术债（来自 review warning）
 
-### W4. `qualityExplanation` 漂移风险
-- 文案与 `calculateBreakQuality` 是两份逻辑
-- 加单测确保两边同步，或重构成单一 source of truth
+（已完成，见底部 ## 已完成）
 
 ---
 
@@ -59,6 +57,10 @@
   - 完成于 2026-04-23，commit `54c33c0`，test report `.agent_workspace/tests/20260423-1810-overlay-contrast/report.json`
   - 修复：Tier 2 加 black scrim (0.35) + 强制 white text，healthScore chip 背景换 .black.opacity(0.25)；Tier 3 不动
   - reviewer PASS (1 warn: icon 还是 .blue), tester PASS (UI 截图因 infra SKIPPED, code review 已确认)
+- **W4** `qualityExplanation` 与 `calculateBreakQuality` 漂移风险（直接修，无 plan/test，2026-04-23）
+  - 完成于 2026-04-23
+  - 修复：抽 `breakQualityBaseMaxPoints = 6`、`breakQualityExerciseBonusPoints = 4` 到 EyeGuardConstants（doc 强制 base+bonus = max）；新增 `averageBreakQuality(_:)` 私有 helper，两个函数共用 → 消除两份独立的 avg-quality 计算公式；顺手把 disciplineExplanation 残留的 `streak / 3` magic 也换成 `disciplineRecoveryStreakThreshold` 常量（W3 后续清理）
+  - swift build + swift test 233/233 通过
 - **W3** `disciplineRecoveryPoints = 3` 缺医学引用（直接修，无 plan/test，2026-04-23）
   - 完成于 2026-04-23
   - 修复：抽 magic `3` 到 `EyeGuardConstants.disciplineRecoveryStreakThreshold`，doc 明确标注**非医学常量**（AAO/OSHA/NIOSH 不规定 streak 奖励，仅规定休息频率/时长），是 gamification 启发；HealthScoreCalculator 用具名常量；TODO 留作未来 user-tunable

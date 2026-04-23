@@ -72,6 +72,15 @@ enum EyeGuardConstants {
     /// Maximum points for break quality.
     static let breakQualityMaxPoints = 10
 
+    /// Base portion of break-quality (excluding exercise bonus).
+    /// `breakQualityBaseMaxPoints + breakQualityExerciseBonusPoints` must
+    /// equal `breakQualityMaxPoints`. Both `calculateBreakQuality` and
+    /// `qualityExplanation` share these constants — single source of truth.
+    static let breakQualityBaseMaxPoints = 6
+
+    /// Bonus points awarded when the user completes ≥1 exercise session today.
+    static let breakQualityExerciseBonusPoints = 4
+
     /// Recommended maximum daily screen time: 8 hours.
     static let recommendedMaxScreenTime: TimeInterval = 8 * 60 * 60
 

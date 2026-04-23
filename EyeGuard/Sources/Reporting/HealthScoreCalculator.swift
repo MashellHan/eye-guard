@@ -279,30 +279,35 @@ struct HealthScoreCalculator: Sendable {
         }
     }
 
-    /// Break quality: did the user actually take the full break duration?
-    /// Base score caps at 6/10 without exercises. Exercises add up to +4 bonus.
-    private func calculateBreakQuality(_ events: [BreakEvent], exerciseSessions: Int = 0) -> Int {
-        let maxPoints = EyeGuardConstants.breakQualityMaxPoints
-        let baseMax = 6 // Base quality without exercises
-        let exerciseBonus = 4 // Bonus for doing exercises
-
-        let takenBreaks = events.filter(\.wasTaken)
-        guard !takenBreaks.isEmpty else {
-            // No breaks yet — full base score + exercise bonus if applicable
-            let bonus = exerciseSessions > 0 ? exerciseBonus : 0
-            return min(baseMax + bonus, maxPoints)
-        }
-
+    /// Average per-break quality fraction (0.0–1.0). Returns `nil` when no
+    /// breaks have been taken — both `calculateBreakQuality` and
+    /// `qualityExplanation` interpret `nil` as "default to base max".
+    /// Single source of truth — see W4 in `docs/backlog.md`.
+    private func averageBreakQuality(_ takenBreaks: [BreakEvent]) -> Double? {
+        guard !takenBreaks.isEmpty else { return nil }
         var totalQuality = 0.0
         for event in takenBreaks {
-            let recommended = event.type.duration
-            let actual = event.actualDuration
-            let quality = min(actual / recommended, 1.0)
-            totalQuality += quality
+            totalQuality += min(event.actualDuration / event.type.duration, 1.0)
         }
+        return totalQuality / Double(takenBreaks.count)
+    }
 
-        let averageQuality = totalQuality / Double(takenBreaks.count)
-        let baseScore = Int(averageQuality * Double(baseMax))
+    /// Break quality: did the user actually take the full break duration?
+    /// Base score caps at `breakQualityBaseMaxPoints` without exercises;
+    /// exercises add up to `breakQualityExerciseBonusPoints` bonus.
+    private func calculateBreakQuality(_ events: [BreakEvent], exerciseSessions: Int = 0) -> Int {
+        let maxPoints = EyeGuardConstants.breakQualityMaxPoints
+        let baseMax = EyeGuardConstants.breakQualityBaseMaxPoints
+        let exerciseBonus = EyeGuardConstants.breakQualityExerciseBonusPoints
+
+        let takenBreaks = events.filter(\.wasTaken)
+        let baseScore: Int
+        if let avg = averageBreakQuality(takenBreaks) {
+            baseScore = Int(avg * Double(baseMax))
+        } else {
+            // No breaks yet — default to full base score
+            baseScore = baseMax
+        }
         let bonus = exerciseSessions > 0 ? exerciseBonus : 0
         return min(baseScore + bonus, maxPoints)
     }
@@ -329,8 +334,9 @@ struct HealthScoreCalculator: Sendable {
         let mandatoryMin = Int(EyeGuardConstants.mandatoryBreakInterval / 60)
         let base = baseDisciplineScore(longestSession)
         let streak = currentTakenStreak(events: events)
-        let recovery = streak / 3
-        let untilNextRecovery = streak == 0 ? 3 : (3 - streak % 3)
+        let threshold = EyeGuardConstants.disciplineRecoveryStreakThreshold
+        let recovery = streak / threshold
+        let untilNextRecovery = streak == 0 ? threshold : (threshold - streak % threshold)
 
         let header: String
         if longestSession <= EyeGuardConstants.microBreakInterval {
@@ -367,30 +373,24 @@ struct HealthScoreCalculator: Sendable {
     }
 
     private func qualityExplanation(_ events: [BreakEvent], exerciseSessions: Int = 0) -> String {
-        let baseMax = 6
-        let exerciseBonus = 4
+        let baseMax = EyeGuardConstants.breakQualityBaseMaxPoints
+        let exerciseBonus = EyeGuardConstants.breakQualityExerciseBonusPoints
         let takenBreaks = events.filter(\.wasTaken)
         let didExercise = exerciseSessions > 0
 
-        // Base portion (休息时长是否做满) — 取所有已完成休息的平均,过去做短了的休息没法回退
-        let baseScore: Int
+        // Base portion (休息时长是否做满) — uses the same averageBreakQuality
+        // helper as `calculateBreakQuality` so the two never drift.
         let baseLine: String
-        if takenBreaks.isEmpty {
-            baseScore = baseMax
-            baseLine = "基础分 \(baseMax)/\(baseMax):还没完成休息,默认按满分计。"
-        } else {
-            var totalQuality = 0.0
-            for event in takenBreaks {
-                totalQuality += min(event.actualDuration / event.type.duration, 1.0)
-            }
-            let avg = totalQuality / Double(takenBreaks.count)
-            baseScore = Int(avg * Double(baseMax))
+        if let avg = averageBreakQuality(takenBreaks) {
+            let baseScore = Int(avg * Double(baseMax))
             let avgPercent = Int(avg * 100)
             if baseScore >= baseMax {
                 baseLine = "基础分 \(baseScore)/\(baseMax):休息时长平均 \(avgPercent)%,已拿满。"
             } else {
                 baseLine = "基础分 \(baseScore)/\(baseMax):休息时长平均只有 \(avgPercent)%,过去提前关掉的休息无法补回。\n→ 接下来:倒计时走完再回去工作,这一项的均值会逐步上升。"
             }
+        } else {
+            baseLine = "基础分 \(baseMax)/\(baseMax):还没完成休息,默认按满分计。"
         }
 
         // Bonus portion (是否做眼保健操) — 这部分今天就能补回来
