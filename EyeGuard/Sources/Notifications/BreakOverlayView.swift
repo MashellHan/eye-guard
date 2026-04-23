@@ -75,7 +75,16 @@ struct BreakOverlayView: View {
         }
         .padding(24)
         .frame(width: 320, height: 280)
-        .background(.ultraThinMaterial)
+        // B1: light wallpapers made `.ultraThinMaterial` nearly transparent,
+        // dropping text contrast below WCAG AA. Stack a translucent dark scrim
+        // on top of the material so we always have a darker substrate for
+        // white text, while preserving the frosted-glass aesthetic.
+        .background {
+            ZStack {
+                Rectangle().fill(.ultraThinMaterial)
+                Color.black.opacity(0.35)
+            }
+        }
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(
             RoundedRectangle(cornerRadius: 16)
@@ -120,11 +129,13 @@ struct BreakOverlayView: View {
         VStack(spacing: 4) {
             Text("Time for an eye break!")
                 .font(.headline)
-                .foregroundStyle(.primary)
+                // B1: scrim guarantees a dark substrate; force white instead
+                // of `.primary` so text stays readable on any wallpaper.
+                .foregroundStyle(.white)
 
             Text(instructionText)
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.white.opacity(0.75))
                 .multilineTextAlignment(.center)
         }
     }
@@ -136,17 +147,20 @@ struct BreakOverlayView: View {
                 .font(.caption)
             Text("Your eye health score: \(healthScore)/100")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.white.opacity(0.75))
             Text("—")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.white.opacity(0.75))
             Text(healthScoreMotivation)
                 .font(.caption)
                 .foregroundStyle(healthScoreColor)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .background(.quaternary.opacity(0.5))
+        // B1: `.quaternary` was nearly invisible on the new dark scrim and
+        // still didn't help on light wallpapers without it; a translucent
+        // black pill keeps the chip legible in both contexts.
+        .background(.black.opacity(0.25))
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
@@ -175,7 +189,7 @@ struct BreakOverlayView: View {
             Text("\(countdown)s")
                 .font(.system(size: 32, weight: .bold, design: .rounded))
                 .monospacedDigit()
-                .foregroundStyle(.primary)
+                .foregroundStyle(.white)
                 .contentTransition(.numericText())
 
             ProgressView(value: progress)
