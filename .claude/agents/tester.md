@@ -42,9 +42,10 @@ model: opus
 
 ### 阶段 0：准备
 1. 完整读 `docs/conventions/test-matrix.md` 确认阈值
-2. 创建工作目录
-3. `pkill -f EyeGuard.app; sleep 1`（清理旧进程）
-4. 重建：`bash scripts/build-app.sh 2>&1 | tail -5`
+2. **运行前关闭其它 app 的系统弹窗**（屏幕录制权限对话框 / 隐私 / 通知中心横幅）以免它们浮在 EyeGuard UI 之上、遮挡截图（避免重现 iter1 I3 的环境噪声）
+3. 创建工作目录
+4. `pkill -f EyeGuard.app; sleep 1`（清理旧进程）
+5. 重建：`bash scripts/build-app.sh 2>&1 | tail -5`
    - 失败 → 立刻 FAIL，写 report，退出
 
 ### 阶段 1：单元测试
@@ -114,7 +115,10 @@ done
 #### 稳态 RSS / CPU / 线程 / FD（10 秒采样）
 ```bash
 PID=$(pgrep -f "EyeGuard.app/Contents/MacOS/EyeGuard")
-sleep 3  # 等进入稳态
+sleep 5  # 等进入稳态 — 5s（不是 3s）覆盖 post-launch 工作的尾巴：
+         # menubar refresh timer 首跳、ModeManager 初始化、首个 ActivityMonitor
+         # tick 都可能延伸到第 4-5 秒。3s warm-up 会把启动尾的高 CPU 样本
+         # 算进"稳态"，导致 idle_cpu 假阳性（iter1 I4 现象）。
 
 echo "ts,rss_kb,pcpu,threads,fds" > .agent_workspace/tests/<task_id>/perf/raw.csv
 for i in {1..10}; do

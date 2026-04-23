@@ -23,7 +23,7 @@
 - 简单问答、读代码、调试 → 不走 multi-agent 流程，主 Claude 直接处理
 
 ### 流程
-1. **PLAN**：lead 拆解需求，写 plan 到 `.agent_workspace/plans/<task_id>.md`，**等用户确认**
+1. **PLAN**：lead 拆解需求，写 plan 到 `.agent_workspace/plans/<task_id>.md`，写完直接进 DEV（**不等用户确认**，质量由 tester 保证；与 `.claude/skills/feature/SKILL.md` §1 保持一致）
 2. **DEV ↔ REVIEW**（最多 3 轮）：dev 实现 → reviewer 评审 → 不过则回 dev
 3. **TEST**：lead 根据 `git diff` + `docs/conventions/test-matrix.md` 算出 `test_scope`，调 tester
    - tester 跑单测 + UI 截图 + 性能采样

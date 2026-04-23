@@ -16,8 +16,9 @@ argument-hint: <一句话需求描述>
 ## 1. PLAN（你自己干）
 分析需求 `$ARGUMENTS`，写 `.agent_workspace/plans/<task_id>.md`，含：
 - 需求理解、涉及模块、实现步骤、验收标准、风险点、不在范围内
+- 遇到决策点自己拍板，把决策 + 理由写进 plan，不要停下来问用户
 
-完整读给用户听，**等用户确认**再继续。
+写完直接进 DEV，**不要等用户确认**（质量由 tester 保证，不由 plan 评审保证）。
 
 ## 2. DEV ↔ REVIEW 循环（最多 3 轮）
 更新 handoff：`stage="dev"`, iteration+=1
