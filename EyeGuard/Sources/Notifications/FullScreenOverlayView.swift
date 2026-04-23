@@ -48,6 +48,9 @@ struct FullScreenOverlayView: View {
     /// Guard against duplicate completion when timer dispatches multiple <=0 ticks.
     /// Mirrors the same pattern in `BreakOverlayView` (Tier 2).
     @State private var hasCompleted: Bool = false
+    /// Stable identifier for this view instance — surfaces in logs so we can
+    /// correlate `onAppear` re-fires with rogue Timer ticks (B6 diagnosis).
+    @State private var instanceID: UUID = UUID()
 
     private var progress: Double {
         guard totalDuration > 0 else { return 1.0 }
@@ -209,9 +212,20 @@ struct FullScreenOverlayView: View {
         }
         .onAppear {
             let duration = Int(breakType.duration)
+            Log.notification.info("FullScreenOverlay appeared id=\(instanceID.uuidString) breakType=\(breakType.displayName) duration=\(duration)s isPrimary=\(isPrimary)")
+            // B6: NSHostingView can re-fire `.onAppear` during a layout pass
+            // or when SwiftUI rebuilds a parent subtree. Without this guard
+            // we'd reset `remainingSeconds` and (worse) call
+            // `startCountdownTimer` again — leaving multiple Timers ticking
+            // on the run loop and decrementing N×/sec → ~3s drain for a 20s
+            // micro break. The Timer-side `invalidate()` is the real fix;
+            // this guard keeps `instanceID`/`hasCompleted` state stable too.
+            guard timer == nil else {
+                Log.notification.debug("FullScreenOverlay.onAppear re-fired id=\(instanceID.uuidString); timer already running, skipping re-init")
+                return
+            }
             remainingSeconds = duration
             totalDuration = duration
-            Log.notification.info("FullScreenOverlay appeared: \(breakType.displayName), duration=\(duration)s")
             withAnimation(.easeIn(duration: 0.4)) {
                 appeared = true
             }
@@ -263,6 +277,12 @@ struct FullScreenOverlayView: View {
     }
 
     private func startCountdownTimer() {
+        // B6: defensively tear down any existing Timer before scheduling a
+        // new one. If `onAppear` ever slips past the entry guard (e.g. test
+        // harness, future refactor), the old Timer would otherwise stay on
+        // the run loop and double the decrement rate.
+        timer?.invalidate()
+        timer = nil
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
             Task { @MainActor in
                 if remainingSeconds > 0 {
@@ -276,6 +296,7 @@ struct FullScreenOverlayView: View {
                     }
                 }
                 if remainingSeconds <= 0 {
+                    Log.notification.info("FullScreenOverlay countdown reached 0 id=\(instanceID.uuidString) isPrimary=\(isPrimary) hasCompleted=\(hasCompleted)")
                     // Gate completion side-effects on primary + first-fire.
                     // Without this guard, double monitors caused 2x "休息结束" speech (B2).
                     if isPrimary && !hasCompleted {
@@ -291,6 +312,7 @@ struct FullScreenOverlayView: View {
                 }
             }
         }
+        Log.notification.debug("FullScreenOverlay timer started id=\(instanceID.uuidString); will tick every 1.0s for \(remainingSeconds)s")
     }
 
     private func stopTimer() {

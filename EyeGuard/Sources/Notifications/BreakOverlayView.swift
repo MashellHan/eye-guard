@@ -32,6 +32,9 @@ struct BreakOverlayView: View {
     @State private var shakeTrigger: Bool = false
     @State private var hasCompleted: Bool = false
     @State private var lastSpokenCountdown: Int = -1
+    /// Stable identifier for this view instance — used in B6 diagnostic
+    /// logging to detect repeated `onAppear` / Timer scheduling.
+    @State private var instanceID: UUID = UUID()
 
     // MARK: - Computed
 
@@ -101,7 +104,7 @@ struct BreakOverlayView: View {
             shakeTrigger = true
         }
         .onAppear {
-            Log.notification.info("BreakOverlay appeared: \(breakType.displayName), policy=\(String(describing: dismissPolicy))")
+            Log.notification.info("BreakOverlay appeared id=\(instanceID.uuidString) breakType=\(breakType.displayName) duration=\(breakDurationSeconds)s policy=\(String(describing: dismissPolicy))")
             withAnimation(.spring(duration: 0.4)) {
                 appeared = true
             }
@@ -318,6 +321,15 @@ struct BreakOverlayView: View {
     }
 
     private func startCountdownTimer() {
+        // B6: defensively invalidate any prior Timer before scheduling a new
+        // one. Both code paths into `startCountdownTimer` (mandatory
+        // `.onAppear` auto-start and the manual "Take Break" button) can
+        // re-fire if SwiftUI rebuilds the subtree, leaving multiple Timers
+        // ticking on the run loop and draining `countdown` N×/sec. The
+        // entry-side guard lives here (not in `.onAppear`) so the user-
+        // initiated button path also benefits.
+        timer?.invalidate()
+        timer = nil
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
             Task { @MainActor in
                 guard !hasCompleted else { return }
@@ -333,6 +345,7 @@ struct BreakOverlayView: View {
                 }
 
                 if countdown <= 0 && !hasCompleted {
+                    Log.notification.info("BreakOverlay countdown reached 0 id=\(instanceID.uuidString)")
                     hasCompleted = true
                     stopTimer()
                     SoundManager.shared.speakBreakComplete()
@@ -340,6 +353,7 @@ struct BreakOverlayView: View {
                 }
             }
         }
+        Log.notification.debug("BreakOverlay timer started id=\(instanceID.uuidString); will tick every 1.0s for \(countdown)s")
     }
 
     private func completeBreak() {
