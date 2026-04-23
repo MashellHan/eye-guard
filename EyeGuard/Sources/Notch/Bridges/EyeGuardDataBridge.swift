@@ -129,6 +129,29 @@ final class EyeGuardDataBridge {
         return min(1.0, continuousTime / target)
     }
 
+    // MARK: - Today's Stats (B7)
+    //
+    // Mirrors `MenuBarView.statsSection` source-of-truth. Kept as
+    // read-only computed properties so the bridge stays a thin adapter
+    // (R1: business logic lives on `BreakScheduler`, not here).
+
+    /// Number of breaks taken today (compliance numerator).
+    var breaksTakenToday: Int {
+        scheduler.breaksTakenToday
+    }
+
+    /// Number of breaks skipped today (compliance denominator partner).
+    var breaksSkippedToday: Int {
+        scheduler.breaksSkippedToday
+    }
+
+    /// Today's accumulated screen time in a compact "Xh Ym" / "Ym" form.
+    /// Reuses `TimeFormatting.formatDuration` so it stays in lockstep with
+    /// MenuBar / Dashboard renderings of the same value.
+    var screenTimeFormattedShort: String {
+        TimeFormatting.formatDuration(scheduler.totalScreenTimeToday)
+    }
+
     // MARK: - Actions
 
     /// Immediately request a manual break.

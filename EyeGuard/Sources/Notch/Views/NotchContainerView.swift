@@ -24,8 +24,10 @@ struct NotchContainerView: View {
                     NotchShape(cornerRadius: 14)
                         .fill(Color.black)
                 )
-                .animation(.easeOut(duration: 0.25), value: viewModel.status)
-                .animation(.easeOut(duration: 0.25), value: viewModel.contentType)
+                // B7: spring gives a livelier "pop" than easeOut(0.25) without
+                // overshooting enough to retrigger the W2 height-throttle.
+                .animation(.spring(response: 0.38, dampingFraction: 0.78), value: viewModel.status)
+                .animation(.spring(response: 0.38, dampingFraction: 0.78), value: viewModel.contentType)
 
             Spacer(minLength: 0)
         }
