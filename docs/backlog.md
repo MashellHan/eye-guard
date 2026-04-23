@@ -19,13 +19,6 @@
 
 ## P1 — 用户体验破坏
 
-### B1. Break overlay 白底文字不可读（bugs.md #1）
-- WCAG AA < 4.5:1
-- `EyeGuard/Sources/Notifications/BreakOverlayView.swift`
-- 修复方向：降低背景透明度 / scrim / 文字描边
-- 验收：白底/深底/彩色壁纸三种背景文字都清晰
-- I1 完成后 tester 的 `overlay-tier2-micro` / `overlay-tier3-mandatory` 自动覆盖
-
 ### B2. Break 结束语音重复播报 2 次（bugs.md #2）
 - 订阅没去重 / SwiftUI view 重建导致重复触发
 - 加幂等保护或正确取消订阅
@@ -85,3 +78,7 @@
   - 完成于 2026-04-23，commit `2f2874a`，test report `.agent_workspace/tests/20260423-1730-exercise-button/report.json`
   - 修复：抽出共享 `ExercisePresenter` 接管全屏 exercise window；EyeGuardApp.init 注册一次 `.startExercisesFromBreak` observer（Notch 模式不再无响应）；BreakOverlayView Tier 2 按钮改 post notification（不再塞进 320pt 浮窗）
   - reviewer & tester 全 PASS，0 critical 0 warning
+- **B1** Break overlay 白底文字不可读（task `20260423-1810-overlay-contrast`，2026-04-23）
+  - 完成于 2026-04-23，commit `54c33c0`，test report `.agent_workspace/tests/20260423-1810-overlay-contrast/report.json`
+  - 修复：Tier 2 加 black scrim (0.35) + 强制 white text，healthScore chip 背景换 .black.opacity(0.25)；Tier 3 不动
+  - reviewer PASS (1 warn: icon 还是 .blue), tester PASS (UI 截图因 infra SKIPPED, code review 已确认)
