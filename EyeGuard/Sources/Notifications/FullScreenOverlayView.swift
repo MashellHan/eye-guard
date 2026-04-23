@@ -34,6 +34,10 @@ struct FullScreenOverlayView: View {
     let onSkipped: @Sendable () -> Void
     let onPostponed: @Sendable () -> Void
     let onStartExercises: (@Sendable () -> Void)?
+    /// Whether this instance owns audio + completion callbacks.
+    /// In multi-monitor setups only the primary screen's view should speak and fire `onBreakTaken`;
+    /// secondary screens render the same countdown silently and dismiss when primary triggers.
+    var isPrimary: Bool = true
 
     @State private var remainingSeconds: Int = 0
     @State private var totalDuration: Int = 0
@@ -41,6 +45,9 @@ struct FullScreenOverlayView: View {
     @State private var appeared: Bool = false
     @State private var currentTip: String = eyeCareTips.randomElement() ?? eyeCareTips[0]
     @State private var shakeTrigger: Bool = false
+    /// Guard against duplicate completion when timer dispatches multiple <=0 ticks.
+    /// Mirrors the same pattern in `BreakOverlayView` (Tier 2).
+    @State private var hasCompleted: Bool = false
 
     private var progress: Double {
         guard totalDuration > 0 else { return 1.0 }
@@ -262,15 +269,25 @@ struct FullScreenOverlayView: View {
                     withAnimation {
                         remainingSeconds -= 1
                     }
-                    // Voice countdown for last 5 seconds (v3.2)
-                    if remainingSeconds <= 5 && remainingSeconds > 0 {
+                    // Voice countdown for last 5 seconds (v3.2).
+                    // Only primary screen speaks — otherwise N monitors → N speech overlaps.
+                    if isPrimary && remainingSeconds <= 5 && remainingSeconds > 0 {
                         SoundManager.shared.speakCountdown(remainingSeconds)
                     }
                 }
                 if remainingSeconds <= 0 {
-                    SoundManager.shared.speakBreakComplete()
-                    stopTimer()
-                    onBreakTaken()
+                    // Gate completion side-effects on primary + first-fire.
+                    // Without this guard, double monitors caused 2x "休息结束" speech (B2).
+                    if isPrimary && !hasCompleted {
+                        hasCompleted = true
+                        SoundManager.shared.speakBreakComplete()
+                        stopTimer()
+                        onBreakTaken()
+                    } else {
+                        // Secondary screens just stop their local timer; primary's
+                        // onBreakTaken → dismissFullScreen will tear down all windows.
+                        stopTimer()
+                    }
                 }
             }
         }

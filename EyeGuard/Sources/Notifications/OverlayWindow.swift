@@ -138,8 +138,15 @@ final class OverlayWindowController: NSObject {
             return
         }
 
+        // Identify the primary screen for audio + completion ownership.
+        // Prefer NSScreen.main (focused screen) for stable identity across replug;
+        // fall back to first enumerated screen if main is missing from the list.
+        let mainScreen = NSScreen.main
+        let primaryScreen: NSScreen = screens.first(where: { $0 == mainScreen }) ?? screens[0]
+
         for (index, screen) in screens.enumerated() {
-            let contentView = FullScreenOverlayView(
+            let isPrimary = (screen == primaryScreen)
+            var contentView = FullScreenOverlayView(
                 breakType: breakType,
                 healthScore: healthScore,
                 dismissPolicy: dismissPolicy,
@@ -173,6 +180,7 @@ final class OverlayWindowController: NSObject {
                     }
                 }
             )
+            contentView.isPrimary = isPrimary
 
             let hostingView = NSHostingView(rootView: contentView)
 
@@ -207,7 +215,7 @@ final class OverlayWindowController: NSObject {
             fullScreenWindows.append(fullScreenWindow)
 
             Log.notification.info(
-                "Full-screen overlay shown on screen \(index + 1) of \(screens.count)"
+                "Full-screen overlay shown on screen \(index + 1) of \(screens.count) (primary: \(isPrimary))"
             )
         }
 
