@@ -27,16 +27,6 @@
 - 修复方向：用 Instruments time profile 找 hot path；考虑 menubar 倒计时改成 widget refresh + 1s timer 用 DispatchSourceTimer
 - 验收：`/perf-check` 跑出 mean < 3% / max < 10%（去除启动尾）
 
-### B6. Break overlay 弹出后倒计时 ~3s 就自动退出（用户 2026-04-23 报告）
-- 现象：break 提醒弹窗刚出来，倒计时只走了 3 秒就自己退出
-- 怀疑链路：
-  - `FullScreenOverlayView` 或 `BreakOverlayView` 的 `startCountdownTimer` 起始值不对（用了错的 duration / 已耗时间被算在内）
-  - `BreakScheduler.takeBreakNow` 立刻 `endBreak()`（计时与 overlay 解耦错位）
-  - 新加的 `hasCompleted` 守卫某种 race 误触（B2 的修改？）— **优先验证：B2 commit `0cee483` 之前是否也有此 bug**
-  - `onBreakTaken` 被某个 dismiss / Notch flow 提前触发
-- 验收：弹窗出现后倒计时跑满（micro 20s / macro 5min / mandatory 完整 duration）才 dismiss；提前退出不应发生
-- 优先级：P0（核心 break 流程被破坏）
-
 ---
 
 ## P2 — 技术债（来自 review warning）
@@ -88,6 +78,10 @@
   - 完成于 2026-04-23，commit `54c33c0`，test report `.agent_workspace/tests/20260423-1810-overlay-contrast/report.json`
   - 修复：Tier 2 加 black scrim (0.35) + 强制 white text，healthScore chip 背景换 .black.opacity(0.25)；Tier 3 不动
   - reviewer PASS (1 warn: icon 还是 .blue), tester PASS (UI 截图因 infra SKIPPED, code review 已确认)
+- **B6** Break overlay 弹出后倒计时 ~3s 就自动退出（task `20260423-1945-overlay-3s-dismiss`，2026-04-23）
+  - 完成于 2026-04-23，commit `e8ea9a6`，test report `.agent_workspace/tests/20260423-1945-overlay-3s-dismiss/report.json`
+  - 修复：FullScreenOverlayView/BreakOverlayView 的 `startCountdownTimer` 首行 `timer?.invalidate(); timer = nil` 防止 NSHostingView 重复 onAppear 叠加 N 个 Timer（N×1Hz → 20s 在 ~3s 跑完）；FullScreenOverlayView 加 onAppear re-entry guard；加 per-instance UUID 诊断日志
+  - reviewer & tester 全 PASS（screenshot 实拍 4s 后 mandatory 倒计时还在 14:57，证明 1Hz 真实速率），UI baseline 4 张因 screencapture 窗口定位 infra flake 计为 SKIPPED_INFRA
 - **B2** Break 结束语音重复播报 2 次（task `20260423-1900-tts-dup`，2026-04-23）
   - 完成于 2026-04-23，commit `0cee483`，test report `.agent_workspace/tests/20260423-1900-tts-dup/report.json`
   - 修复：FullScreenOverlayView 加 `isPrimary` 标志 + `hasCompleted` 守卫；OverlayWindow 按 NSScreen.main 选 primary，secondary 屏不发声不触发 onBreakTaken
