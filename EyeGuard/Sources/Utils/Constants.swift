@@ -52,6 +52,20 @@ enum EyeGuardConstants {
     /// Maximum points for continuous use discipline.
     static let continuousUseDisciplineMaxPoints = 30
 
+    /// Number of consecutively-taken breaks required to earn 1 recovery
+    /// point on the continuous-use-discipline component.
+    ///
+    /// **Source:** Internal gamification heuristic — NOT a medical
+    /// constant. The literature (AAO 20-20-20, OSHA/NIOSH visual ergonomics
+    /// guidelines, EU 90/270/EEC) prescribes break *frequency* and
+    /// *duration*, but does not quantify a "streak reward". This 3-break
+    /// streak threshold was chosen so a typical 4-hour focus block (≈12
+    /// micro-breaks) can recover the full max-points if the user starts
+    /// disciplined.
+    /// TODO: expose as user-tunable preference if A/B testing reveals
+    /// boredom-vs-motivation tradeoff matters.
+    static let disciplineRecoveryStreakThreshold = 3
+
     /// Maximum points for total screen time.
     static let screenTimeMaxPoints = 20
 

@@ -25,10 +25,6 @@
 
 ## P2 — 技术债（来自 review warning）
 
-### W3. `disciplineRecoveryPoints = 3` 缺医学引用
-- 违反 R6（医学常量必须标 source）
-- 补 AAO/OSHA/NIOSH 引用，否则改成可配置 + TODO
-
 ### W4. `qualityExplanation` 漂移风险
 - 文案与 `calculateBreakQuality` 是两份逻辑
 - 加单测确保两边同步，或重构成单一 source of truth
@@ -63,6 +59,10 @@
   - 完成于 2026-04-23，commit `54c33c0`，test report `.agent_workspace/tests/20260423-1810-overlay-contrast/report.json`
   - 修复：Tier 2 加 black scrim (0.35) + 强制 white text，healthScore chip 背景换 .black.opacity(0.25)；Tier 3 不动
   - reviewer PASS (1 warn: icon 还是 .blue), tester PASS (UI 截图因 infra SKIPPED, code review 已确认)
+- **W3** `disciplineRecoveryPoints = 3` 缺医学引用（直接修，无 plan/test，2026-04-23）
+  - 完成于 2026-04-23
+  - 修复：抽 magic `3` 到 `EyeGuardConstants.disciplineRecoveryStreakThreshold`，doc 明确标注**非医学常量**（AAO/OSHA/NIOSH 不规定 streak 奖励，仅规定休息频率/时长），是 gamification 启发；HealthScoreCalculator 用具名常量；TODO 留作未来 user-tunable
+  - swift build + swift test 233/233 通过；非 R6 违规（R6 仅约束医学常量），但 magic number 已消除
 - **W2** `EyeGuardExpandedView` 高度测量（task `20260423-2230-height-measurement`，2026-04-23）
   - 完成于 2026-04-23，commit `2946415`，test report `.agent_workspace/tests/20260423-2230-height-measurement/report.json`
   - 修复：`measuredEyeGuardHeight` 改 `private(set)`；新增 `updateMeasuredEyeGuardHeight(_:)` setter，0.5pt diff guard + 500ms/10-write 滑动窗口节流（超限 `Log.notch.warning`）；view 不再直接写 viewModel 属性

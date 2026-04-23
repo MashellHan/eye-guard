@@ -223,8 +223,12 @@ struct HealthScoreCalculator: Sendable {
     }
 
     /// Counts the trailing streak of consecutively-taken breaks and
-    /// awards 1 recovery point per 3 in the streak. Returns 0 if no
-    /// streak (most recent break was skipped/postponed).
+    /// awards 1 recovery point per `disciplineRecoveryStreakThreshold`
+    /// (= 3) in the streak. Returns 0 if no streak (most recent break
+    /// was skipped/postponed).
+    ///
+    /// The streak threshold is a gamification heuristic, not a medical
+    /// constant — see `EyeGuardConstants.disciplineRecoveryStreakThreshold`.
     private func disciplineRecoveryPoints(events: [BreakEvent]) -> Int {
         var streak = 0
         for event in events.reversed() {
@@ -234,7 +238,7 @@ struct HealthScoreCalculator: Sendable {
                 break
             }
         }
-        return streak / 3
+        return streak / EyeGuardConstants.disciplineRecoveryStreakThreshold
     }
 
     /// Current trailing streak of consecutively-taken breaks (for UI display).
