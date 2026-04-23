@@ -30,7 +30,7 @@
    - 输出结构化 `report.json`，含 critical issues 和 `suggested_files`
    - **FAIL → 自动触发 dev 修复循环**：lead 把 critical issues 拼成修复 plan → dev 修 → reviewer review → tester 重跑（最多 2 轮）
 4. **COMMIT**（自动）：tester pass 后按 Conventional Commits 拆分 commit
-5. **PUSH**：必须用户显式确认才 push
+5. **PUSH**（自动）：commit 完直接 push（不再问用户）
 
 ### 通信约定
 - 三个 agent **不直接对话**，全部通过 `.agent_workspace/` 文件交换
@@ -61,11 +61,18 @@
 - type: `feat` / `fix` / `docs` / `refactor` / `test` / `chore` / `perf`
 - scope: 模块名（`menubar` / `mascot` / `notch` / `scheduling` / `report` 等）
 - body 引用 plan + review 路径
-- **push 前必须问用户确认**
+- commit + push 全自动，不再问用户
 
 ## 医学/科学依据
 - 任何提醒/break 时间逻辑改动必须标注 source（AAO / OSHA / EU 90/270/EEC / NIOSH）
 - 不要凭直觉改医学相关的常量
+
+## Git push
+- Remote: `https://github.com/MashellHan/eye-guard.git`（账号 **MashellHan**，不是 menha_microsoft）
+- 本机 `gh` 同时登录了两个账号，默认 active 可能是 `menha_microsoft` → push 会 403
+- 切账号一条命令：`gh auth switch --user MashellHan`
+- 切完直接 `git push`，无需改 remote / 清 keychain（gh credential helper 会用当前 active token）
+- **push 不需要用户确认** — tester pass + commit 完成后直接 push（目标：高度自动化 harness）
 
 ## 常用命令
 ```bash

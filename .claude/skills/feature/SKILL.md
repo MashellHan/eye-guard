@@ -74,9 +74,10 @@ git diff --name-only HEAD
 6. tester pass → COMMIT
 7. **test 循环最多 2 轮**（首次 + 1 次修复重测）。第 3 次还 FAIL → 停止，把所有报告给用户
 
-## 4. COMMIT 阶段（自动）⭐ 新增
+## 4. COMMIT + PUSH 阶段（全自动）⭐
 
-> 用户约定：tester pass 后**自动 commit**，但 push 仍需用户确认。
+> 用户约定：tester pass 后**自动 commit + 自动 push**，不再问用户（目标：高度自动化 harness）。
+> 前提：当前 `gh auth` active 账号是 `MashellHan`。如果 push 403，先 `gh auth switch --user MashellHan` 再重试。
 
 ### 4a. 拆分 commit
 按 Conventional Commits + 按改动性质拆：
@@ -100,18 +101,17 @@ Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
 ```
 
 > ⚠️ **永远不要** `git add .` 或 `git add -A`。明确列出本次任务相关的文件。
-> ⚠️ **永远不要** 自动 push。push 必须用户显式确认。
+> ✅ commit 后立即 `git push origin main`。push 失败先尝试 `gh auth switch --user MashellHan` 再重试一次，仍失败才停下问用户。
 
 ### 4c. 输出
 ```
-✅ Task <task_id> 完成
+✅ Task <task_id> 完成（已 push）
 
 Plan:    .agent_workspace/plans/<task_id>.md
 Review:  .agent_workspace/reviews/<task_id>-r<n>.md (verdict=PASS)
 Test:    .agent_workspace/tests/<task_id>/report.md (verdict=PASS)
 Commits: <hash1>, <hash2>
-
-下一步：要 push 到 origin/main 吗？(yes/no)
+Pushed:  origin/main
 ```
 
 ## 升级规则
