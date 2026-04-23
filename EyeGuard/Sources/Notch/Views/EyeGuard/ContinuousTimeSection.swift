@@ -18,7 +18,7 @@ struct ContinuousTimeSection: View {
                     .font(.system(size: 12))
                 Text("Continuous Use")
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.65))
+                    .foregroundStyle(AppColors.notchSecondaryText)
             }
 
             HStack(alignment: .firstTextBaseline, spacing: 6) {
@@ -33,7 +33,7 @@ struct ContinuousTimeSection: View {
                 }
                 Text("/ 20:00")
                     .font(.system(size: 13))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(AppColors.notchTertiaryText)
             }
 
             GeometryReader { proxy in

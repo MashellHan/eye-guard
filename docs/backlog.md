@@ -33,17 +33,19 @@
   - panel 内容比当前丰富但不超出 notch 美学（可加 breakdown 简版 / today stats 极简版）
   - 设计选型在 plan 阶段先输出 mock-up 方案再实现
 
-### B8. Break overlay 浅色背景下文字混淆（用户 2026-04-23 报告）
-- 现象：break 提醒页面（看截图左上角 Apu 模式的 Continuous Use / Health Score / Next Break / Take a Break Now panel）在浅色背景下文字仍看不清
-- 注意：B1 已修过 Tier 2 BreakOverlayView 的对比度，B1 加了 ultraThinMaterial + black scrim 0.35 + white text；这次问题可能在：
-  - Apu mascot 模式的 break panel（不是 Tier 2 也不是 Tier 3，是 mascot 自带的悬浮 panel）
-  - 或者 Tier 2 在某些 wallpaper / blur material 下 scrim 仍不够
-- 优先级：P1
-- 修复方向：
-  - 先识别截图中的 panel 实体：在 `EyeGuard/Sources/Mascot/` 下找 "Continuous Use / Health Score / Next Break" 的 panel view
-  - WCAG AA 4.5:1 contrast 是底线
-  - 考虑提高 scrim opacity 到 0.5+，或换更深的 material（.thick → 0.7 black gradient）
-  - 验收：在白色 / 浅灰 / 浅蓝桌面壁纸 3 种环境下截图对比度合格
+### B8. Break overlay 浅色背景下文字混淆（用户 2026-04-23 报告）— ✅ 已修
+- 完成于 2026-04-23（直接修，无 plan/test）
+- 现象：notch 展开 panel（"Continuous Use / Health Score / Take a Break Now"）字体太淡看不清
+- 根因：`AppColors.notchPrimaryText/Secondary/Tertiary/Hint/BarTrack/HoverTint` 全部用 white opacity 0.4-0.85，对比度边缘；ContinuousTimeSection / NextBreakSection / EyeGuardCollapsedContent 还有 inline `.white.opacity(...)` 硬编码绕过常量
+- 修复：
+  - notchPrimaryText 0.85 → 1.0（pure white）
+  - notchSecondaryText 0.7 → 0.85
+  - notchTertiaryText 0.5 → 0.7
+  - notchHintText 0.4 → 0.6
+  - notchBarTrack 0.10 → 0.15
+  - notchHoverTint 0.08 → 0.12
+  - 三个 view 内 inline opacity 改用常量
+- 详见 commit（待 push）
 
 ---
 

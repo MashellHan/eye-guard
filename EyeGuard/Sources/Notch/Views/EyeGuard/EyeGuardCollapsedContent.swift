@@ -19,7 +19,7 @@ struct EyeGuardCollapsedContent: View {
                     .font(.system(size: 10))
                 Text(bridge.continuousTimeFormatted)
                     .font(.system(size: 11, weight: .medium, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.9))
+                    .foregroundStyle(AppColors.notchPrimaryText)
             }
             .padding(.leading, 8)
 
@@ -27,7 +27,7 @@ struct EyeGuardCollapsedContent: View {
 
             // Right wing — eye icon
             Image(systemName: bridge.isInBreak ? "eye.slash" : "eye")
-                .foregroundStyle(.white.opacity(0.75))
+                .foregroundStyle(AppColors.notchSecondaryText)
                 .font(.system(size: 11))
                 .padding(.trailing, 8)
         }
