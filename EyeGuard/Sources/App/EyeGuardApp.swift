@@ -48,6 +48,20 @@ struct EyeGuardApp: App {
         c.start()
         coordinator = c
         Log.app.info("AppModeCoordinator started (mode=\(ModeManager.shared.currentMode.rawValue)).")
+
+        // DEBUG_UI_STATE hook (no-op unless the env var is set).
+        // Gate at the call site so the production launch path doesn't even
+        // allocate a Task when the var is unset (W1 fix).
+        if DebugTrigger.isRequested {
+            Task { @MainActor in
+                // Brief delay to let the mode coordinator finish its initial
+                // activate so the mascot/notch window is in place before we
+                // drive it. (Renderers themselves poll, so this is just a
+                // courtesy head-start, not a correctness dependency.)
+                try? await Task.sleep(for: .milliseconds(500))
+                DebugTrigger.activateIfRequested(scheduler: scheduler)
+            }
+        }
     }
 }
 

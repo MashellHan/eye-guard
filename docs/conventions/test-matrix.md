@@ -75,3 +75,30 @@
 - 任何 UI 截图的"点击/悬停"等触发动作，依赖 **`EyeGuard/Sources/App/DebugTrigger.swift`** 提供的命令行 / 环境变量入口（见该文件文档）
 - 性能采样在 baseline UI 启动后，等 3 秒进入稳态，然后每秒采样 10 次取均值
 - 阈值修改请在本文件改，不要散落到 tester 的 SOP
+
+### DebugTrigger 当前支持的 `DEBUG_UI_STATE` 状态
+
+启动方式：`DEBUG_UI_STATE=<state> open EyeGuard.app`。激活后 scheduler 自动暂停，需重启才能恢复正常调度。
+
+**Tier A（baseline + bug 重现，已实现）**
+- `menubar-popover`
+- `mascot-idle`
+- `overlay-tier2-micro`、`overlay-tier2-macro`
+- `overlay-tier3-mandatory`
+
+**Tier B（覆盖率扩展，已实现）**
+- `menubar-popover-mascot-mode`、`menubar-popover-notch-mode`
+- `mascot-concerned`、`mascot-alerting`、`mascot-resting`、`mascot-celebrating`
+- `notch-collapsed`、`notch-expanded`、`notch-pop-banner`
+- `dashboard-today`
+- `report-window`
+- `prefs-general`
+
+**Tier B 部分支持（仅父窗口，子 tab 路由 TBD，backlog `I1-tier-C`）**
+- `dashboard-history`、`dashboard-breakdown` — DebugTrigger 显式 log error 并 return；tester 标 `skipped, reason=debug_trigger_unsupported`
+- `prefs-reminder-modes`、`prefs-sounds` — 同上
+
+**Tier C（仅入口，子帧待 backlog `I1-tier-C`）**
+- `exercise-focus-shifting`、`exercise-figure-8`、`exercise-circle`、`exercise-distance`、`exercise-palming`
+
+未列出的 state（含上述部分支持的 state）→ tester 标 `skipped`, `reason=debug_trigger_unsupported`。

@@ -249,4 +249,17 @@ final class NotchViewModel {
             self.notchClose()
         }
     }
+
+    /// Cancel any in-flight boot animation auto-close so an external caller
+    /// (currently only `DebugTrigger`) can drive the notch deterministically
+    /// without racing the boot timer re-opening it.
+    func cancelBootAnimation() {
+        bootTask?.cancel()
+        bootTask = nil
+        if openReason == .boot {
+            // Reset the open reason so any subsequent state checks don't
+            // mistake a manual open for boot.
+            openReason = .unknown
+        }
+    }
 }

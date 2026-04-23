@@ -8,7 +8,18 @@ import SwiftUI
 ///
 /// State synchronization logic extracted to `MascotStateSync` in v2.1.
 struct MascotContainerView: View {
-    @State private var viewModel = MascotViewModel()
+    /// View model driving all rendered mascot state.
+    ///
+    /// Accepted from the outside so callers (notably `MascotWindowController`)
+    /// can hold the same instance the view renders. Previously this was a
+    /// `@State private var viewModel = MascotViewModel()`, which silently
+    /// created a SECOND view model — `MascotWindowController.viewModel` and
+    /// the rendered VM were different instances, so external `transition(to:)`
+    /// calls (DebugTrigger, pre-alert observers) had no visible effect.
+    /// Bug surfaced via test report I1 (iter1): all mascot states rendered
+    /// identical pixels because the visible VM was being driven only by
+    /// `MascotStateSync`, never by external commands.
+    @State var viewModel: MascotViewModel
 
     /// External binding to the BreakScheduler for state synchronization.
     let scheduler: BreakScheduler

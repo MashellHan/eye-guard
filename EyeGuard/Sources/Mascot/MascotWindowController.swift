@@ -87,6 +87,7 @@ final class MascotWindowController {
         self.viewModel = vm
 
         let containerView = MascotContainerView(
+            viewModel: vm,
             scheduler: scheduler,
             onTap: { [weak self] in
                 self?.handleMascotTap()

@@ -63,6 +63,20 @@ final class NotchModule {
         log.info("NotchModule activated on \(eligible.count) screen(s), bridge=\(self.bridge != nil)")
     }
 
+    /// View model for the notch on the main screen, exposed for `DebugTrigger`.
+    ///
+    /// Only for `DebugTrigger`; do not call from production code paths.
+    /// Filters to the controller whose window lives on `NSScreen.main` so
+    /// multi-monitor setups behave deterministically. Returns nil unless the
+    /// module is active and a matching controller exists.
+    var mainScreenViewModelForDebug: NotchViewModel? {
+        // Prefer the main-screen controller; fall back to the first available
+        // (e.g. if NSScreen.main hasn't latched yet during early launch).
+        let mainScreen = NSScreen.main
+        let match = controllers.first { $0.window?.screen == mainScreen }
+        return match?.viewModel ?? controllers.first?.viewModel
+    }
+
     func deactivate() {
         guard isActive else { return }
         flowAdapter?.stop()

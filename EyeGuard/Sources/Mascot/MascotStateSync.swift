@@ -16,8 +16,22 @@ enum MascotStateSync {
     ///
     /// Runs every 2 seconds, checking scheduler state and updating
     /// the mascot view model accordingly.
+    ///
+    /// When `DEBUG_UI_STATE` is set, the entire sync loop is skipped:
+    /// the loop's continuous re-evaluation of health-score / break-counter
+    /// state would clobber the state DebugTrigger forces, which is exactly
+    /// the bug surfaced as I1 in the iter1 test report (5 mascot states
+    /// rendered identical pixels — `transition(to: .celebrating)` worked
+    /// for one tick, then this loop reset to `.concerned` based on the
+    /// 33/100 health score and replayed the "跳过休息了…" speech bubble).
     @MainActor
     static func start(viewModel: MascotViewModel, scheduler: BreakScheduler) {
+        if DebugTrigger.isRequested {
+            Log.mascot.warning(
+                "MascotStateSync: skipped — DEBUG_UI_STATE active, leaving state to DebugTrigger."
+            )
+            return
+        }
         Task { @MainActor in
             // Initial greeting
             viewModel.showMessage("Hi! 我是阿普 👋")
