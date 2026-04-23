@@ -11,11 +11,12 @@ import CoreGraphics
 
 extension NSScreen {
     /// Size of the notch on this screen, pixel-perfect from macOS APIs.
-    /// Falls back to a typical MacBook notch size on non-notch displays
-    /// so the panel still has a valid drag/hit rect.
+    /// On non-notched displays, falls back to the real menu-bar height
+    /// (`frame.maxY − visibleFrame.maxY`) so the collapsed island sits
+    /// flush with the status bar instead of overhanging.
     var notchSize: CGSize {
         guard safeAreaInsets.top > 0 else {
-            return CGSize(width: 224, height: 38)
+            return CGSize(width: 224, height: menuBarHeight)
         }
 
         let notchHeight = safeAreaInsets.top
@@ -30,6 +31,16 @@ extension NSScreen {
         // +4 matches boring.notch's measurement for visual alignment.
         let notchWidth = fullWidth - leftPadding - rightPadding + 4
         return CGSize(width: notchWidth, height: notchHeight)
+    }
+
+    /// Real menu-bar thickness for this screen, derived from the gap
+    /// between `frame.maxY` and `visibleFrame.maxY`. Falls back to
+    /// `NSStatusBar.system.thickness` if that gap is zero (e.g. menu
+    /// bar set to auto-hide on a secondary display).
+    var menuBarHeight: CGFloat {
+        let gap = frame.maxY - visibleFrame.maxY
+        if gap > 0 { return gap }
+        return NSStatusBar.system.thickness
     }
 
     /// Whether this is the built-in display (typically the MacBook screen).

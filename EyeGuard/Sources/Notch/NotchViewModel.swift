@@ -65,11 +65,18 @@ final class NotchViewModel {
 
     // MARK: - Derived
 
-    /// Panel size when opened — varies by contentType.
+    /// Measured intrinsic height of the eyeGuard expanded content.
+    /// Reported via `MeasuredHeightPreferenceKey` from the SwiftUI tree.
+    /// Falls back to a sensible default until first measurement arrives.
+    var measuredEyeGuardHeight: CGFloat = 0
+
+    /// Panel size when opened — width is fixed, height adapts to content
+    /// for the eyeGuard panel so newly added rows don't get clipped.
     var openedSize: CGSize {
         switch contentType {
         case .eyeGuard:
-            return CGSize(width: 400, height: 280)
+            let height = measuredEyeGuardHeight > 0 ? measuredEyeGuardHeight : 280
+            return CGSize(width: 400, height: height)
         case .placeholder:
             return CGSize(width: 400, height: 200)
         }

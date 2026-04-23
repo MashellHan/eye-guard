@@ -81,6 +81,12 @@ final class EyeGuardDataBridge {
         scheduler.currentHealthScore
     }
 
+    /// Detailed breakdown of today's health score, including per-component
+    /// explanations. `nil` until the scheduler has computed at least once.
+    var healthScoreBreakdown: HealthScoreBreakdown? {
+        scheduler.currentBreakdown
+    }
+
     /// Whether a break is currently in progress.
     var isInBreak: Bool {
         scheduler.isBreakInProgress

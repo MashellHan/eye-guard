@@ -31,6 +31,8 @@ struct BreakOverlayView: View {
     @State private var timer: Timer?
     @State private var appeared: Bool = false
     @State private var shakeTrigger: Bool = false
+    @State private var hasCompleted: Bool = false
+    @State private var lastSpokenCountdown: Int = -1
 
     // MARK: - Computed
 
@@ -311,17 +313,21 @@ struct BreakOverlayView: View {
     private func startCountdownTimer() {
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
             Task { @MainActor in
+                guard !hasCompleted else { return }
                 if countdown > 0 {
                     withAnimation {
                         countdown -= 1
                     }
                     // Voice countdown for last 5 seconds (v3.2)
-                    if countdown <= 5 && countdown > 0 {
+                    if countdown <= 5 && countdown > 0 && countdown != lastSpokenCountdown {
+                        lastSpokenCountdown = countdown
                         SoundManager.shared.speakCountdown(countdown)
                     }
                 }
 
-                if countdown <= 0 {
+                if countdown <= 0 && !hasCompleted {
+                    hasCompleted = true
+                    stopTimer()
                     SoundManager.shared.speakBreakComplete()
                     completeBreak()
                 }

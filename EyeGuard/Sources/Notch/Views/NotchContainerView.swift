@@ -68,7 +68,7 @@ struct NotchContainerView: View {
         switch (viewModel.status, viewModel.contentType) {
         case (.opened, .eyeGuard):
             if let bridge {
-                EyeGuardExpandedView(bridge: bridge)
+                EyeGuardExpandedView(bridge: bridge, viewModel: viewModel)
             } else {
                 PlaceholderExpanded { viewModel.notchClose() }
             }

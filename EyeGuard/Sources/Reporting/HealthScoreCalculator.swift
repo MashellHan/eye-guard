@@ -65,7 +65,7 @@ struct HealthScoreCalculator: Sendable {
         exerciseSessionsToday: Int = 0
     ) -> HealthScore {
         let compliance = calculateBreakCompliance(breakEvents)
-        let discipline = calculateContinuousUseDiscipline(longestContinuousSession)
+        let discipline = calculateContinuousUseDiscipline(longestContinuousSession, events: breakEvents)
         let screenTime = calculateScreenTimeScore(totalScreenTime)
         let quality = calculateBreakQuality(breakEvents, exerciseSessions: exerciseSessionsToday)
 
@@ -100,9 +100,9 @@ struct HealthScoreCalculator: Sendable {
         )
 
         let complianceExplanation = complianceExplanation(breakEvents)
-        let disciplineExplanation = disciplineExplanation(longestContinuousSession)
+        let disciplineExplanation = disciplineExplanation(longestContinuousSession, events: breakEvents)
         let screenTimeExplanation = screenTimeExplanation(totalScreenTime)
-        let qualityExplanation = qualityExplanation(breakEvents)
+        let qualityExplanation = qualityExplanation(breakEvents, exerciseSessions: exerciseSessionsToday)
 
         let components = [
             ScoreComponent(
@@ -194,7 +194,17 @@ struct HealthScoreCalculator: Sendable {
 
     /// Continuous use discipline: penalizes long unbroken stretches.
     /// Full score = never exceeding the mandatory break interval.
-    private func calculateContinuousUseDiscipline(_ longestSession: TimeInterval) -> Int {
+    ///
+    /// Recovery: every 3 consecutive successfully-taken breaks at the tail
+    /// of the day's history awards +1 recovery point. Skipping a break
+    /// resets the streak. Total is capped at the component's max.
+    private func calculateContinuousUseDiscipline(_ longestSession: TimeInterval, events: [BreakEvent]) -> Int {
+        let baseScore = baseDisciplineScore(longestSession)
+        let recovery = disciplineRecoveryPoints(events: events)
+        return min(EyeGuardConstants.continuousUseDisciplineMaxPoints, baseScore + recovery)
+    }
+
+    private func baseDisciplineScore(_ longestSession: TimeInterval) -> Int {
         let maxAllowed = EyeGuardConstants.mandatoryBreakInterval
         let maxPoints = Double(EyeGuardConstants.continuousUseDisciplineMaxPoints)
 
@@ -210,6 +220,30 @@ struct HealthScoreCalculator: Sendable {
             // Exceeded mandatory interval
             return 0
         }
+    }
+
+    /// Counts the trailing streak of consecutively-taken breaks and
+    /// awards 1 recovery point per 3 in the streak. Returns 0 if no
+    /// streak (most recent break was skipped/postponed).
+    private func disciplineRecoveryPoints(events: [BreakEvent]) -> Int {
+        var streak = 0
+        for event in events.reversed() {
+            if event.wasTaken {
+                streak += 1
+            } else {
+                break
+            }
+        }
+        return streak / 3
+    }
+
+    /// Current trailing streak of consecutively-taken breaks (for UI display).
+    private func currentTakenStreak(events: [BreakEvent]) -> Int {
+        var streak = 0
+        for event in events.reversed() {
+            if event.wasTaken { streak += 1 } else { break }
+        }
+        return streak
     }
 
     /// Screen time score: penalizes exceeding recommended daily max (BUG-004 fix).
@@ -273,23 +307,46 @@ struct HealthScoreCalculator: Sendable {
 
     private func complianceExplanation(_ events: [BreakEvent]) -> String {
         guard !events.isEmpty else {
-            return "No breaks scheduled yet — keep it up!"
+            return "今天还没有安排休息。\n如何拿满:按计划完成休息提醒就行。"
         }
         let taken = events.filter(\.wasTaken).count
         let total = events.count
         let percent = Int(Double(taken) / Double(total) * 100)
-        return "\(taken)/\(total) breaks taken (\(percent)%)"
+        let missed = total - taken
+        if missed == 0 {
+            return "完成了 \(taken)/\(total) 次休息(100%)。\n保持下去就是满分。"
+        }
+        return "完成了 \(taken)/\(total) 次休息(\(percent)%),错过 \(missed) 次。\n如何改善:错过的休息无法撤销,但最近 10 次按 2 倍权重计入,所以接下来不再跳过,这一项会较快回升。明日重新计算。"
     }
 
-    private func disciplineExplanation(_ longestSession: TimeInterval) -> String {
+    private func disciplineExplanation(_ longestSession: TimeInterval, events: [BreakEvent]) -> String {
         let minutes = Int(longestSession / 60)
+        let microMin = Int(EyeGuardConstants.microBreakInterval / 60)
+        let mandatoryMin = Int(EyeGuardConstants.mandatoryBreakInterval / 60)
+        let base = baseDisciplineScore(longestSession)
+        let streak = currentTakenStreak(events: events)
+        let recovery = streak / 3
+        let untilNextRecovery = streak == 0 ? 3 : (3 - streak % 3)
+
+        let header: String
         if longestSession <= EyeGuardConstants.microBreakInterval {
-            return "Great! Longest session: \(minutes)min (under 20min)"
+            header = "今天最长一次连续用眼 \(minutes) 分钟,没超过 \(microMin) 分钟,基础分 \(base)/\(EyeGuardConstants.continuousUseDisciplineMaxPoints)。"
         } else if longestSession <= EyeGuardConstants.mandatoryBreakInterval {
-            return "Longest session: \(minutes)min — try shorter stretches"
+            header = "今天最长一次连续用眼 \(minutes) 分钟,超过了 \(microMin) 分钟门槛,基础分 \(base)/\(EyeGuardConstants.continuousUseDisciplineMaxPoints)。"
         } else {
-            return "Longest session: \(minutes)min — exceeded 2hr limit!"
+            header = "今天最长一次连续用眼 \(minutes) 分钟,超过了 \(mandatoryMin) 分钟硬性上限,基础分 0。"
         }
+
+        let recoveryLine: String
+        if base >= EyeGuardConstants.continuousUseDisciplineMaxPoints {
+            recoveryLine = "已是满分,保持下去就好。"
+        } else if streak == 0 {
+            recoveryLine = "恢复机制:连续 3 次按时完成休息可 +1 分。当前连续完成 0 次(上一次被跳过/推迟,streak 已清零),从下一次开始累计。"
+        } else {
+            recoveryLine = "恢复机制:连续 3 次按时完成休息可 +1 分。当前已连续完成 \(streak) 次,获得 +\(recovery) 恢复分;再坚持 \(untilNextRecovery) 次可再 +1。跳过任意一次会清零 streak。"
+        }
+
+        return header + "\n" + recoveryLine
     }
 
     private func screenTimeExplanation(_ totalTime: TimeInterval) -> String {
@@ -297,26 +354,50 @@ struct HealthScoreCalculator: Sendable {
         let minutes = Int((totalTime.truncatingRemainder(dividingBy: 3600)) / 60)
         let recommended = Int(EyeGuardConstants.recommendedMaxScreenTime / 3600)
         if totalTime <= EyeGuardConstants.recommendedMaxScreenTime * 0.5 {
-            return "Screen time: \(hours)h \(minutes)m — well under \(recommended)h limit"
+            return "今天屏幕时间 \(hours)h \(minutes)m,远低于推荐上限 \(recommended)h。\n保持下去就是满分。"
         } else if totalTime <= EyeGuardConstants.recommendedMaxScreenTime {
-            return "Screen time: \(hours)h \(minutes)m — approaching \(recommended)h limit"
+            return "今天屏幕时间 \(hours)h \(minutes)m,接近推荐上限 \(recommended)h,得分按比例衰减。\n这一项今天只会下降不会回升:已累计的时间不会清零。\n避免变更糟:今天减少屏幕时间,明日重新计算。"
         } else {
-            return "Screen time: \(hours)h \(minutes)m — over \(recommended)h limit!"
+            return "今天屏幕时间 \(hours)h \(minutes)m,超过推荐上限 \(recommended)h。\n这一项今天已锁定,无法恢复。\n建议:今天剩下时间多远眺/休息,明日注意控制总时长。"
         }
     }
 
-    private func qualityExplanation(_ events: [BreakEvent]) -> String {
+    private func qualityExplanation(_ events: [BreakEvent], exerciseSessions: Int = 0) -> String {
+        let baseMax = 6
+        let exerciseBonus = 4
         let takenBreaks = events.filter(\.wasTaken)
-        guard !takenBreaks.isEmpty else {
-            return "No breaks taken yet to measure quality"
+        let didExercise = exerciseSessions > 0
+
+        // Base portion (休息时长是否做满) — 取所有已完成休息的平均,过去做短了的休息没法回退
+        let baseScore: Int
+        let baseLine: String
+        if takenBreaks.isEmpty {
+            baseScore = baseMax
+            baseLine = "基础分 \(baseMax)/\(baseMax):还没完成休息,默认按满分计。"
+        } else {
+            var totalQuality = 0.0
+            for event in takenBreaks {
+                totalQuality += min(event.actualDuration / event.type.duration, 1.0)
+            }
+            let avg = totalQuality / Double(takenBreaks.count)
+            baseScore = Int(avg * Double(baseMax))
+            let avgPercent = Int(avg * 100)
+            if baseScore >= baseMax {
+                baseLine = "基础分 \(baseScore)/\(baseMax):休息时长平均 \(avgPercent)%,已拿满。"
+            } else {
+                baseLine = "基础分 \(baseScore)/\(baseMax):休息时长平均只有 \(avgPercent)%,过去提前关掉的休息无法补回。\n→ 接下来:倒计时走完再回去工作,这一项的均值会逐步上升。"
+            }
         }
-        var totalQuality = 0.0
-        for event in takenBreaks {
-            let quality = min(event.actualDuration / event.type.duration, 1.0)
-            totalQuality += quality
+
+        // Bonus portion (是否做眼保健操) — 这部分今天就能补回来
+        let bonusLine: String
+        if didExercise {
+            bonusLine = "眼保健操奖励 +\(exerciseBonus)/+\(exerciseBonus):今天已完成 \(exerciseSessions) 次,已拿到。"
+        } else {
+            bonusLine = "眼保健操奖励 +0/+\(exerciseBonus):今天还没做。\n→ 今天就能补:从托盘菜单的「眼保健操」入口完成 1 次,这 4 分立刻补回。"
         }
-        let avgPercent = Int(totalQuality / Double(takenBreaks.count) * 100)
-        return "Average break quality: \(avgPercent)%"
+
+        return "Quality = 基础分(最多 \(baseMax)) + 眼保健操奖励(0 或 +\(exerciseBonus))\n\n" + baseLine + "\n\n" + bonusLine
     }
 
     // MARK: - Summary Text
