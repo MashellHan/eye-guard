@@ -25,11 +25,6 @@
 
 ## P2 — 技术债（来自 review warning）
 
-### W2. `EyeGuardExpandedView` 高度测量
-- 测量循环没有上界，可能死循环
-- `private(set)` 违规
-- 加 max iteration + 修可见性
-
 ### W3. `disciplineRecoveryPoints = 3` 缺医学引用
 - 违反 R6（医学常量必须标 source）
 - 补 AAO/OSHA/NIOSH 引用，否则改成可配置 + TODO
@@ -68,6 +63,9 @@
   - 完成于 2026-04-23，commit `54c33c0`，test report `.agent_workspace/tests/20260423-1810-overlay-contrast/report.json`
   - 修复：Tier 2 加 black scrim (0.35) + 强制 white text，healthScore chip 背景换 .black.opacity(0.25)；Tier 3 不动
   - reviewer PASS (1 warn: icon 还是 .blue), tester PASS (UI 截图因 infra SKIPPED, code review 已确认)
+- **W2** `EyeGuardExpandedView` 高度测量（task `20260423-2230-height-measurement`，2026-04-23）
+  - 完成于 2026-04-23，commit `2946415`，test report `.agent_workspace/tests/20260423-2230-height-measurement/report.json`
+  - 修复：`measuredEyeGuardHeight` 改 `private(set)`；新增 `updateMeasuredEyeGuardHeight(_:)` setter，0.5pt diff guard + 500ms/10-write 滑动窗口节流（超限 `Log.notch.warning`）；view 不再直接写 viewModel 属性
 - **W1** DRY breakdown 视图重复（task `20260423-2130-breakdown-dry`，2026-04-23）
   - 完成于 2026-04-23，commit `eedf647`，test report `.agent_workspace/tests/20260423-2130-breakdown-dry/report.json`
   - 修复：抽 `EyeGuard/Sources/UI/Shared/BreakdownRowView.swift`，配 `BreakdownTheme` enum (.menubar/.notch) 注入字体/颜色/宽度差异；MenuBarView + HealthScoreSection 调用方改用共享组件，删旧 helper + state；R1 不破（共享 view 只读 ScoreComponent）
