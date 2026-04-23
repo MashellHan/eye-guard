@@ -19,33 +19,7 @@
 
 ## P1 — 用户体验破坏
 
-### B7. Notch island hover 弹出动画 + 内容单调（用户 2026-04-23 报告）
-- 现象：
-  1. hover 上 island 后 panel 弹出"过快"，无过渡动画（缺 fade/scale-in / spring）
-  2. panel 内容比较单调，可以参考 menubar popover 的丰富信息层次（健康分 breakdown / today stats / AI insight 等），但不能照搬，避免 notch 紧凑布局崩坏
-- 优先级：P1（UX 破坏，但不影响功能）
-- 修复方向：
-  - 设计 expert pass：PM 视角决定 notch 该展示什么子集（不是 menubar 的全部），designer 视角调动画曲线（spring / .easeOut / matchedGeometryEffect）和留白
-  - 现 view 入口：`EyeGuard/Sources/Notch/Views/EyeGuard/EyeGuardExpandedView.swift`、`NotchView.swift` / `NotchViewModel.swift`
-  - 注意 W2 刚改的 height-measurement throttle，动画期间 height 会连续变 → 节流窗口可能被打满（需要适配）
-- 验收：
-  - hover 进入有 200-300ms 过渡（不是瞬间出现）
-  - panel 内容比当前丰富但不超出 notch 美学（可加 breakdown 简版 / today stats 极简版）
-  - 设计选型在 plan 阶段先输出 mock-up 方案再实现
-
-### B8. Break overlay 浅色背景下文字混淆（用户 2026-04-23 报告）— ✅ 已修
-- 完成于 2026-04-23（直接修，无 plan/test）
-- 现象：notch 展开 panel（"Continuous Use / Health Score / Take a Break Now"）字体太淡看不清
-- 根因：`AppColors.notchPrimaryText/Secondary/Tertiary/Hint/BarTrack/HoverTint` 全部用 white opacity 0.4-0.85，对比度边缘；ContinuousTimeSection / NextBreakSection / EyeGuardCollapsedContent 还有 inline `.white.opacity(...)` 硬编码绕过常量
-- 修复：
-  - notchPrimaryText 0.85 → 1.0（pure white）
-  - notchSecondaryText 0.7 → 0.85
-  - notchTertiaryText 0.5 → 0.7
-  - notchHintText 0.4 → 0.6
-  - notchBarTrack 0.10 → 0.15
-  - notchHoverTint 0.08 → 0.12
-  - 三个 view 内 inline opacity 改用常量
-- 详见 commit（待 push）
+（已完成，见底部 ## 已完成）
 
 ---
 
@@ -107,6 +81,18 @@
   - 修复：(1) Mascot 鼠标追踪 10Hz Task.sleep poll → global NSEvent mouse-moved 事件监听（peek-mode 面板大半时间在屏外，event monitor > NSTrackingArea）；(2) Mascot bubble monitor 2Hz poll → `showBubble` didSet 回调；(3) MenuBar + Notch 倒计时 Text 套 `TimelineView(.periodic by: 1.0)`，把每秒 invalidation 隔离在 Text 节点内
   - 结果：30s 稳态 mean 3.01% → **2.16%**（target <3%），last-10s mean 3.45% → 1.57%（-55%），>3% 样本 13/30 → 7/30
   - 留 2 个 W 级 follow-up（mouse monitor 未 throttle、bubble didSet 初值同步）— tester 标 nice-to-have
+- **B7** Notch hover 动画 + 内容单调（task `20260424-0030-notch-animation-content`，2026-04-23）
+  - 完成于 2026-04-23，commit `39ff3e1`，test report `.agent_workspace/tests/20260424-0030-notch-animation-content/report.json`
+  - 修复：
+    1. `NotchContainerView` 动画 `easeOut(0.25)` → `spring(response: 0.38, dampingFraction: 0.78)`
+    2. `EyeGuardExpandedView` 给每个 child section 加 per-row `.transition`（scale-from-top / move-from-top），由 `viewModel.status == .opened` gate 触发 SwiftUI insertion phase；不加 `.delay()` stagger（避免 W2 height-throttle 被打满）
+    3. 新建 `CompactStatsStrip`（Done / Skip / Screen 3 列，~28pt），插入 NextBreakSection 与 BreakNowButton 之间
+    4. `EyeGuardDataBridge` 新增 `breaksTakenToday` / `breaksSkippedToday` / `screenTimeFormattedShort` 三个 derived getter（与 MenuBar Today's Stats 同源 → 0 漂移）
+  - 不加：display-mode 切换 / Preferences / Quit / Dashboard / AI Insight（保持 notch 一瞥即懂）
+  - tester 实测 0 height-throttle 警告，spring 动画在 W2 budget 内
+- **B8** Notch panel 字体对比度不足（直接修，无 plan/test，2026-04-23）
+  - 完成于 2026-04-23，commit `3b7ed5c`
+  - 修复：`AppColors.notch*` 6 项全面提亮（primary 0.85→1.0, secondary 0.7→0.85, tertiary 0.5→0.7, hint 0.4→0.6, barTrack 0.10→0.15, hoverTint 0.08→0.12）；ContinuousTimeSection/NextBreakSection/EyeGuardCollapsedContent inline opacity 改用常量
 - **B6** Break overlay 弹出后倒计时 ~3s 就自动退出（task `20260423-1945-overlay-3s-dismiss`，2026-04-23）
   - 完成于 2026-04-23，commit `e8ea9a6`，test report `.agent_workspace/tests/20260423-1945-overlay-3s-dismiss/report.json`
   - 修复：FullScreenOverlayView/BreakOverlayView 的 `startCountdownTimer` 首行 `timer?.invalidate(); timer = nil` 防止 NSHostingView 重复 onAppear 叠加 N 个 Timer（N×1Hz → 20s 在 ~3s 跑完）；FullScreenOverlayView 加 onAppear re-entry guard；加 per-instance UUID 诊断日志
