@@ -48,6 +48,10 @@ struct FullScreenOverlayView: View {
     /// Guard against duplicate completion when timer dispatches multiple <=0 ticks.
     /// Mirrors the same pattern in `BreakOverlayView` (Tier 2).
     @State private var hasCompleted: Bool = false
+    /// Set when `.screenDidLock` fires while this overlay is on screen (B10).
+    /// Causes the timer loop to stop and dismisses the window in lockstep with
+    /// the scheduler's `cancelActiveBreak()`.
+    @State private var dismissedByScreenLock: Bool = false
     /// Stable identifier for this view instance — surfaces in logs so we can
     /// correlate `onAppear` re-fires with rogue Timer ticks (B6 diagnosis).
     @State private var instanceID: UUID = UUID()
@@ -213,6 +217,17 @@ struct FullScreenOverlayView: View {
         .onAppear {
             let duration = Int(breakType.duration)
             Log.notification.info("FullScreenOverlay appeared id=\(instanceID.uuidString) breakType=\(breakType.displayName) duration=\(duration)s isPrimary=\(isPrimary)")
+            // B10: if screen locked before SwiftUI mounted us, bail immediately
+            // so the per-window Timer never starts (macOS does not suspend
+            // user-space Timers during lock screen).
+            if BreakScheduler.isScreenCurrentlyLocked() {
+                Log.notification.info("FullScreenOverlay onAppear aborted — screen already locked id=\(instanceID.uuidString)")
+                dismissedByScreenLock = true
+                if isPrimary {
+                    onSkipped()
+                }
+                return
+            }
             // B6: NSHostingView can re-fire `.onAppear` during a layout pass
             // or when SwiftUI rebuilds a parent subtree. Without this guard
             // we'd reset `remainingSeconds` and (worse) call
@@ -235,6 +250,20 @@ struct FullScreenOverlayView: View {
         .onDisappear {
             Log.notification.info("FullScreenOverlay disappeared: \(breakType.displayName), remaining=\(remainingSeconds)s")
             stopTimer()
+        }
+        // B10: dismiss on screen lock so the overlay vanishes when the user
+        // walks away (the scheduler also cancels the active break + stops TTS).
+        .onReceive(NotificationCenter.default.publisher(for: .screenDidLock)) { _ in
+            guard !dismissedByScreenLock else { return }
+            Log.notification.info("FullScreenOverlay dismiss on .screenDidLock id=\(instanceID.uuidString) isPrimary=\(isPrimary)")
+            dismissedByScreenLock = true
+            stopTimer()
+            // Only the primary view fires the user-facing callback; secondary
+            // screens just tear down their local Timer and let the controller
+            // dismiss every window in unison.
+            if isPrimary {
+                onSkipped()
+            }
         }
     }
 

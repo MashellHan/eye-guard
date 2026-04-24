@@ -24,6 +24,12 @@ struct BreakOverlayView: View {
     let onSkipped: @Sendable () -> Void
     let onPostponed: @Sendable () -> Void
     let onDismiss: @MainActor () -> Void
+    /// Whether this instance owns audio + completion side-effects (B9).
+    /// Tier 2 is single-window today, but mandatory escalations briefly run
+    /// Tier 2 + Tier 3 in parallel during the 0.3 s dismiss fade — without
+    /// this gate both tiers fire `speakCountdown` / `speakBreakComplete`,
+    /// producing double TTS. Mirrors the same flag on `FullScreenOverlayView`.
+    var isPrimary: Bool = true
 
     @State private var countdown: Int = 0
     @State private var isBreaking: Bool = false
@@ -32,6 +38,9 @@ struct BreakOverlayView: View {
     @State private var shakeTrigger: Bool = false
     @State private var hasCompleted: Bool = false
     @State private var lastSpokenCountdown: Int = -1
+    /// Set when `.screenDidLock` fires while this overlay is on screen (B10).
+    /// Causes the timer loop to bail out and triggers `onDismiss`.
+    @State private var dismissedByScreenLock: Bool = false
     /// Stable identifier for this view instance — used in B6 diagnostic
     /// logging to detect repeated `onAppear` / Timer scheduling.
     @State private var instanceID: UUID = UUID()
@@ -104,7 +113,16 @@ struct BreakOverlayView: View {
             shakeTrigger = true
         }
         .onAppear {
-            Log.notification.info("BreakOverlay appeared id=\(instanceID.uuidString) breakType=\(breakType.displayName) duration=\(breakDurationSeconds)s policy=\(String(describing: dismissPolicy))")
+            Log.notification.info("BreakOverlay appeared id=\(instanceID.uuidString) breakType=\(breakType.displayName) duration=\(breakDurationSeconds)s policy=\(String(describing: dismissPolicy)) isPrimary=\(isPrimary)")
+            // B10: if the screen locked between this overlay being scheduled
+            // and SwiftUI mounting it, dismiss immediately so we don't leave
+            // a Timer running while the user is away.
+            if BreakScheduler.isScreenCurrentlyLocked() {
+                Log.notification.info("BreakOverlay onAppear aborted — screen already locked id=\(instanceID.uuidString)")
+                dismissedByScreenLock = true
+                onDismiss()
+                return
+            }
             withAnimation(.spring(duration: 0.4)) {
                 appeared = true
             }
@@ -116,6 +134,16 @@ struct BreakOverlayView: View {
         .onDisappear {
             Log.notification.info("BreakOverlay disappeared: \(breakType.displayName), countdown=\(countdown)s")
             stopTimer()
+        }
+        // B10: react to screen lock anywhere in the lifetime — not just at
+        // onAppear. NotificationCenter posts on the main queue so this stays
+        // MainActor-safe.
+        .onReceive(NotificationCenter.default.publisher(for: .screenDidLock)) { _ in
+            guard !dismissedByScreenLock else { return }
+            Log.notification.info("BreakOverlay dismiss on .screenDidLock id=\(instanceID.uuidString)")
+            dismissedByScreenLock = true
+            stopTimer()
+            onDismiss()
         }
     }
 
@@ -337,18 +365,26 @@ struct BreakOverlayView: View {
                     withAnimation {
                         countdown -= 1
                     }
-                    // Voice countdown for last 5 seconds (v3.2)
-                    if countdown <= 5 && countdown > 0 && countdown != lastSpokenCountdown {
+                    // Voice countdown for last 5 seconds (v3.2).
+                    // B9: only the primary instance speaks — silences the
+                    // duplicate utterance during Tier 2 → Tier 3 escalation
+                    // overlap.
+                    if isPrimary && countdown <= 5 && countdown > 0 && countdown != lastSpokenCountdown {
                         lastSpokenCountdown = countdown
                         SoundManager.shared.speakCountdown(countdown)
                     }
                 }
 
                 if countdown <= 0 && !hasCompleted {
-                    Log.notification.info("BreakOverlay countdown reached 0 id=\(instanceID.uuidString)")
+                    Log.notification.info("BreakOverlay countdown reached 0 id=\(instanceID.uuidString) isPrimary=\(isPrimary)")
                     hasCompleted = true
                     stopTimer()
-                    SoundManager.shared.speakBreakComplete()
+                    // B9: same primary gate as the countdown branch — without
+                    // it Tier 2 + Tier 3 both fire "休息结束" when their
+                    // timers cross zero on the same tick.
+                    if isPrimary {
+                        SoundManager.shared.speakBreakComplete()
+                    }
                     completeBreak()
                 }
             }

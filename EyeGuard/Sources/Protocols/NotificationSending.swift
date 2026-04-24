@@ -38,6 +38,13 @@ protocol NotificationSending {
     /// Dismisses the current notification (user took the break).
     func acknowledgeBreak()
 
+    /// Cancels any active notification + escalation chain *without* invoking
+    /// the user-supplied taken/skipped/postponed callbacks (B10).
+    /// Used by `BreakScheduler.cancelActiveBreak()` when the screen locks
+    /// mid-break: we want the overlays gone and the escalation Task torn
+    /// down, but we must not record a break event for a non-event.
+    func cancelActive()
+
     /// Snoozes the current notification for a short period.
     ///
     /// - Parameters:
@@ -52,6 +59,10 @@ protocol NotificationSending {
 // MARK: - Default Exercise Parameters
 
 extension NotificationSending {
+    /// Default no-op so existing mock conformances don't have to add this
+    /// method just to satisfy the protocol (B10).
+    func cancelActive() {}
+
     /// Convenience overload without exercise parameters (backward compatibility).
     func notify(
         breakType: BreakType,

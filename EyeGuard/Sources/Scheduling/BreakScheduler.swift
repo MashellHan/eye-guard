@@ -108,7 +108,21 @@ final class BreakScheduler {
     /// DistributedNotificationCenter for immediate response (BUG-007/BUG-008).
     /// Used to gate elapsed accumulation — more reliable than idle polling
     /// since it doesn't depend on CGEventTap accessibility permissions.
-    private var isScreenLocked: Bool = false
+    private(set) var isScreenLocked: Bool = false
+
+    /// Static mirror of the most recent `isScreenLocked` value, written by
+    /// every `BreakScheduler` instance whenever the lock state changes.
+    /// Exposed so view-layer code (e.g. `BreakOverlayView.onAppear`) can ask
+    /// "is the screen locked right now?" without taking a dependency on the
+    /// scheduler instance — keeps R1 (views don't import scheduler-internal
+    /// state) intact while still giving overlays a fast bail-out path (B10).
+    nonisolated(unsafe) private static var _isScreenCurrentlyLocked: Bool = false
+
+    /// Returns the current screen-lock state. Safe to call from any actor —
+    /// reads a single Bool snapshot maintained by `registerScreenLockObserver`.
+    static func isScreenCurrentlyLocked() -> Bool {
+        _isScreenCurrentlyLocked
+    }
 
     /// Per-break-type elapsed time for independent tracking (H5/BUG-001).
     /// Treat as read-only externally; mutated only by `@testable import` tests.
@@ -198,11 +212,20 @@ final class BreakScheduler {
             Task { @MainActor in
                 guard let self else { return }
                 self.isScreenLocked = true
+                Self._isScreenCurrentlyLocked = true
                 if !self.wasIdle {
                     self.wasIdle = true
                     self.handleIdleDetected()
                 }
-                Log.scheduler.notice("Screen locked — elapsed accumulation paused (BUG-008).")
+                // B10: cancel any in-flight break + silence TTS so we don't
+                // leave overlays running with audio while the user is away.
+                // Use `cancelActiveBreak()` (not `endBreak`) so the break
+                // is treated as interrupted, not "completed" — preserves
+                // discipline streak / health-score correctness.
+                self.cancelActiveBreak()
+                self.soundPlayer.stopSpeaking()
+                NotificationCenter.default.post(name: .screenDidLock, object: nil)
+                Log.scheduler.notice("Screen locked — elapsed accumulation paused, active break cancelled (B10).")
             }
         }
 
@@ -214,11 +237,18 @@ final class BreakScheduler {
             Task { @MainActor in
                 guard let self else { return }
                 self.isScreenLocked = false
+                Self._isScreenCurrentlyLocked = false
                 if self.wasIdle {
                     self.wasIdle = false
                     self.handleActivityResumed()
                 }
-                Log.scheduler.notice("Screen unlocked — elapsed accumulation resumed (BUG-008).")
+                // B10: lock duration must not count toward continuous use —
+                // restart the session clock so a 1-hour AFK doesn't slingshot
+                // the user from "fresh" to "stressed/overdue" on resume.
+                self.sessionStartTime = .now
+                self.currentSessionDuration = 0
+                NotificationCenter.default.post(name: .screenDidUnlock, object: nil)
+                Log.scheduler.notice("Screen unlocked — session reset, elapsed accumulation resumed (B10).")
             }
         }
     }
@@ -350,6 +380,25 @@ final class BreakScheduler {
 
         // Recalculate score immediately so menu bar updates right away
         recalculateHealthScore()
+    }
+
+    /// Cancels the in-flight break without recording it as taken or skipped (B10).
+    ///
+    /// Used when an external event (screen lock, system sleep) interrupts the
+    /// user mid-break. Crucially **does not** call `recordBreak(...)`, so the
+    /// discipline streak / daily counters / health-score breakdown stay clean —
+    /// using `endBreak(quality: 0)` here would have polluted those stats.
+    /// Also clears any active notification UI so the overlay doesn't outlive
+    /// the lock event.
+    func cancelActiveBreak() {
+        guard isBreakInProgress || notificationSender.isNotificationActive else { return }
+        Log.scheduler.info("Cancelling active break (B10): isBreakInProgress=\(self.isBreakInProgress) notificationActive=\(self.notificationSender.isNotificationActive)")
+        isBreakInProgress = false
+        activeBreakType = nil
+        soundPlayer.stopAmbient()
+        // Tear down any visible/queued notification so the overlay window
+        // and escalation Tasks don't outlive the cancellation.
+        notificationSender.cancelActive()
     }
 
     /// Records that the user skipped a scheduled break.

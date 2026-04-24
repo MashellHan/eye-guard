@@ -144,4 +144,13 @@ extension Notification.Name {
 
     /// Posted when pre-alert is cancelled (idle, postpone, etc.).
     static let preAlertCancelled = Notification.Name("EyeGuard.preAlertCancelled")
+
+    /// Posted when the screen locks (B10). BreakScheduler also cancels any
+    /// active break and stops TTS; overlays observe this to dismiss themselves
+    /// so per-window Timers stop ticking while the user is away.
+    static let screenDidLock = Notification.Name("EyeGuard.screenDidLock")
+
+    /// Posted when the screen unlocks (B10). BreakScheduler resets session
+    /// tracking so the continuous-use counter doesn't jump by the lock duration.
+    static let screenDidUnlock = Notification.Name("EyeGuard.screenDidUnlock")
 }

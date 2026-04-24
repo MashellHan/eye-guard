@@ -178,6 +178,21 @@ final class NotificationManager: NotificationSending {
         isNotificationActive = false
     }
 
+    /// Cancels the active notification + escalation chain without invoking
+    /// any user-supplied callback (B10). Used when the screen locks mid-break.
+    func cancelActive() {
+        guard isNotificationActive else { return }
+        Log.notification.info("Cancelling active notification (B10).")
+        cancelEscalation()
+        snoozeTask?.cancel()
+        snoozeTask = nil
+        dismissAllOverlays()
+        clearCallbacks()
+        activeBreakType = nil
+        activeBehavior = nil
+        isNotificationActive = false
+    }
+
     /// Postpones the current break by the configured delay (v2.4).
     ///
     /// - Parameter breakType: The break type being postponed.
