@@ -3,7 +3,7 @@
 > 合并 `docs/bugs.md` + 已知技术债。按优先级排，从上往下做。
 > 修的时候用 `/feature <描述>` 走完整流程。
 
-更新时间：2026-04-23（B7/B8 由用户报告 P1 重新激活）
+更新时间：2026-04-24（B9/B10 已完成）
 
 ---
 
@@ -37,6 +37,11 @@
 
 ## 已完成
 
+- **B9 + B10** Break TTS 仍重复 + 息屏不停（task `20260424-0130-tts-screenlock`，2026-04-24）
+  - 完成于 2026-04-24，test report `.agent_workspace/tests/20260424-0130-tts-screenlock/report.json`
+  - B9 修复：BreakOverlayView 加 `isPrimary` + `hasCompleted` 守卫（mirror B2 的 Tier 3 模式），speakCountdown 与完成 speak 全 gate
+  - B10 修复：新增 `BreakScheduler.cancelActiveBreak()`（不调 recordBreak，不污染 discipline streak / 当日 stats / quality avg）；增强 registerScreenLockObserver — 锁屏时 cancelActiveBreak + soundPlayer.stopSpeaking + post `.screenDidLock`；解锁时 reset sessionStartTime + currentSessionDuration；两个 overlay 监听 `.screenDidLock` 自动 dismiss + invalidate timer，onAppear 通过新静态 `BreakScheduler.isScreenCurrentlyLocked()` early-return（R1 不破：view 不注入 scheduler）
+  - reviewer PASS (0 critical, 2 warning：nonisolated(unsafe) 可改 @MainActor / 缺 cancelActiveBreak 单测)；tester PASS (233/233 unit, 5/5 UI baseline 无 regress, 0 critical 2 warning：I1 idle CPU 5.48%（已知 B5 follow-up）/ I2 tier3 overlay CPU 54.8% — 留作后续 backlog）
 - popover 透明度修复（背景换 windowBackgroundColor）
 - HealthScore 可解释 breakdown + click-to-open popover
 - 多 agent harness（dev / reviewer / tester + /feature skill）
