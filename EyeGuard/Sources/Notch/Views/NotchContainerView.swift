@@ -24,10 +24,13 @@ struct NotchContainerView: View {
                     NotchShape(cornerRadius: 14)
                         .fill(Color.black)
                 )
-                // B7: spring gives a livelier "pop" than easeOut(0.25) without
-                // overshooting enough to retrigger the W2 height-throttle.
-                .animation(.spring(response: 0.38, dampingFraction: 0.78), value: viewModel.status)
-                .animation(.spring(response: 0.38, dampingFraction: 0.78), value: viewModel.contentType)
+                // B7 → B11 polish: softer/longer spring with a touch of
+                // bounce so the panel "breathes" open instead of snapping.
+                // Lower stiffness + slightly under-damped feel matches the
+                // Dynamic-Island reference. Staying inside W2's height
+                // throttle (10 writes/500ms) — measured 4–6 settle frames.
+                .animation(.spring(response: 0.5, dampingFraction: 0.74, blendDuration: 0.2), value: viewModel.status)
+                .animation(.spring(response: 0.5, dampingFraction: 0.74, blendDuration: 0.2), value: viewModel.contentType)
 
             Spacer(minLength: 0)
         }

@@ -20,6 +20,18 @@ struct EyeGuardExpandedView: View {
     @Bindable var bridge: EyeGuardDataBridge
     var viewModel: NotchViewModel?
 
+    /// Shared, gentle insert/remove transition for every row in the panel.
+    /// Combines a soft fade with a small downward slide + barely-perceptible
+    /// scale-up — the slide softens the otherwise-rigid `.move(edge: .top)`
+    /// pop, while the 3% scale removes the "stamping in" feeling without
+    /// triggering W2 height-throttle (no per-row .delay()).
+    static let rowTransition: AnyTransition = .asymmetric(
+        insertion: .opacity
+            .combined(with: .offset(y: -6))
+            .combined(with: .scale(scale: 0.985, anchor: .top)),
+        removal: .opacity.combined(with: .offset(y: -4))
+    )
+
     var body: some View {
         // B11: outer spacing 14→10 + padding 16→14 to absorb the 3 new
         // sections (QuickActionsRow ~26pt, AIInsightRow ~30pt, NotchFooterRow
@@ -34,35 +46,35 @@ struct EyeGuardExpandedView: View {
             // 10-writes / 500ms budget.
             if viewModel?.status == .opened {
                 ContinuousTimeSection(bridge: bridge)
-                    .transition(.opacity.combined(with: .scale(scale: 0.94, anchor: .top)))
+                    .transition(Self.rowTransition)
 
                 Divider()
                     .background(Color.white.opacity(0.12))
                     .transition(.opacity)
 
                 HealthScoreSection(bridge: bridge)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .transition(Self.rowTransition)
                 NextBreakSection(bridge: bridge)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .transition(Self.rowTransition)
                 CompactStatsStrip(bridge: bridge)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .transition(Self.rowTransition)
 
                 BreakNowButton(bridge: bridge)
                     .padding(.top, 4)
-                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                    .transition(Self.rowTransition)
 
                 // B11: Exercise + Tip secondary actions sit directly under
                 // the primary CTA — same insert/transition pattern, no
                 // `.delay()` (would burn W2 height-throttle budget).
                 QuickActionsRow(bridge: bridge)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .transition(Self.rowTransition)
 
                 Divider()
                     .background(Color.white.opacity(0.12))
                     .transition(.opacity)
 
                 AIInsightRow(bridge: bridge)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .transition(Self.rowTransition)
 
                 Divider()
                     .background(Color.white.opacity(0.08))
