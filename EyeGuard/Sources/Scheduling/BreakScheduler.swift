@@ -359,7 +359,12 @@ final class BreakScheduler {
             },
             onSkipped: { [weak self] in
                 Task { @MainActor in
-                    self?.skipBreak(breakType)
+                    // Manual breaks are user-initiated, so dismissing the
+                    // overlay should NOT count against today's Skipped tally
+                    // (a misclick / changed-mind shouldn't penalise discipline).
+                    // Only auto-scheduled breaks call `skipBreak` here; manual
+                    // requests just tear down without recording the event.
+                    self?.notificationSender.cancelActive()
                 }
             },
             onPostponed: { [weak self] delay in
