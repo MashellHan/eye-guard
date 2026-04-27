@@ -19,6 +19,7 @@ final class NotchModule {
     private var controllers: [NotchWindowController] = []
     private var bridge: EyeGuardDataBridge?
     private var flowAdapter: NotchBreakFlowAdapter?
+    private var tipObserver: NSObjectProtocol?
     private let log = Logger(subsystem: "com.eyeguard.app", category: "Notch")
 
     private init() {}
@@ -59,6 +60,31 @@ final class NotchModule {
             flowAdapter = adapter
         }
 
+        // In notch mode the mascot isn't running, so the
+        // `.showEyeTipRequested` notification (posted by the bridge's
+        // Tip quick-action) had no observer — clicks looked dead.
+        // Surface the tip via a `.info` pop banner on the main-screen
+        // notch view-model.
+        if let firstVM = controllers.first?.viewModel {
+            tipObserver = NotificationCenter.default.addObserver(
+                forName: .showEyeTipRequested,
+                object: nil,
+                queue: .main
+            ) { [weak firstVM] note in
+                guard let firstVM else { return }
+                let tipId = note.userInfo?["tipId"] as? Int
+                let tip = TipDatabase.tips.first(where: { $0.id == tipId })
+                    ?? TipDatabase.randomTip()
+                Task { @MainActor in
+                    firstVM.pop(
+                        kind: .info,
+                        message: tip.titleChinese,
+                        duration: 4.5
+                    )
+                }
+            }
+        }
+
         isActive = true
         log.info("NotchModule activated on \(eligible.count) screen(s), bridge=\(self.bridge != nil)")
     }
@@ -81,6 +107,10 @@ final class NotchModule {
         guard isActive else { return }
         flowAdapter?.stop()
         flowAdapter = nil
+        if let tipObserver {
+            NotificationCenter.default.removeObserver(tipObserver)
+        }
+        tipObserver = nil
         for controller in controllers {
             controller.window?.orderOut(nil)
             controller.window?.close()
