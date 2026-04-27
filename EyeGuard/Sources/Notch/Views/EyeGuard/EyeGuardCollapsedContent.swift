@@ -12,14 +12,22 @@ struct EyeGuardCollapsedContent: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            // Left wing — color tier indicator
+            // Left wing — countdown to next break with a label so the
+            // user knows what the timer is for. Color dot keeps the
+            // continuous-use tier signal (green/yellow/orange/red/blue).
             HStack(spacing: 4) {
                 Image(systemName: bridge.tier.symbolName)
                     .foregroundStyle(bridge.tier.color)
                     .font(.system(size: 10))
-                Text(bridge.continuousTimeFormatted)
+                Text(countdownText)
                     .font(.system(size: 11, weight: .medium, design: .monospaced))
                     .foregroundStyle(AppColors.notchPrimaryText)
+                    .monospacedDigit()
+                Text(countdownLabel)
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(AppColors.notchTertiaryText)
+                    .textCase(.uppercase)
+                    .tracking(0.4)
             }
             .padding(.leading, 8)
 
@@ -33,9 +41,27 @@ struct EyeGuardCollapsedContent: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(
-            "Continuous use \(bridge.continuousTimeFormatted), \(a11yTierLabel)"
-        )
+        .accessibilityLabel(a11yLabel)
+    }
+
+    /// MM:SS shown in the wing — countdown to the next break (or "rest"
+    /// time elapsed when a break is in progress).
+    private var countdownText: String {
+        bridge.isInBreak
+            ? bridge.continuousTimeFormatted
+            : bridge.nextBreakInFormatted
+    }
+
+    /// Tiny suffix label that explains what the countdown means.
+    private var countdownLabel: String {
+        bridge.isInBreak ? "rest" : "→ break"
+    }
+
+    private var a11yLabel: String {
+        if bridge.isInBreak {
+            return "Resting, \(bridge.continuousTimeFormatted) elapsed"
+        }
+        return "Next break in \(bridge.nextBreakInFormatted), \(a11yTierLabel)"
     }
 
     private var a11yTierLabel: String {
