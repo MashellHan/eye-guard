@@ -43,7 +43,7 @@ final class DashboardWindowController {
         let hostingView = NSHostingView(rootView: dashboardView)
 
         let dashboardWindow = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 840, height: 740),
+            contentRect: NSRect(x: 0, y: 0, width: 1180, height: 880),
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
             backing: .buffered,
             defer: false
@@ -51,7 +51,7 @@ final class DashboardWindowController {
 
         dashboardWindow.title = "EyeGuard Dashboard"
         dashboardWindow.contentView = hostingView
-        dashboardWindow.contentMinSize = NSSize(width: 500, height: 400)
+        dashboardWindow.contentMinSize = NSSize(width: 720, height: 540)
         dashboardWindow.center()
         dashboardWindow.isReleasedWhenClosed = false
 
