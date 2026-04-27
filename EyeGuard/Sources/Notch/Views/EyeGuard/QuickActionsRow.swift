@@ -35,7 +35,7 @@ struct QuickActionsRow: View {
                 icon: "lightbulb",
                 label: "Tip"
             ) {
-                bridge.showRandomTip()
+                bridge.showRandomTip(inline: true)
             }
         }
     }

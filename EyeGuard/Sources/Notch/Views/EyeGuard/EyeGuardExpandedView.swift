@@ -35,6 +35,12 @@ struct EyeGuardExpandedView: View {
         Group {
             if viewModel?.status == .opened {
                 VStack(alignment: .leading, spacing: 10) {
+                    if let tip = bridge.inlineTip {
+                        InlineTipBanner(tip: tip) {
+                            bridge.dismissInlineTip()
+                        }
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
                     ContinuousTimeSection(bridge: bridge)
                     Divider()
                         .background(Color.white.opacity(0.12))
@@ -51,6 +57,7 @@ struct EyeGuardExpandedView: View {
                         .background(Color.white.opacity(0.08))
                     NotchFooterRow(bridge: bridge)
                 }
+                .animation(.easeInOut(duration: 0.22), value: bridge.inlineTip?.id)
                 .transition(.opacity)
             } else {
                 // Fallback when this view is rendered outside an .opened

@@ -64,6 +64,16 @@ final class EyeGuardDataBridge {
 
     private let scheduler: BreakScheduler
 
+    // MARK: - Inline Tip Banner (shown inside the expanded panel)
+    //
+    // When the user taps the Tip quick-action while the notch is
+    // expanded, we surface the tip as an inline banner pinned above
+    // "Continuous Use" instead of collapsing the panel and popping a
+    // notch banner. Holds the most recently picked tip + an auto-clear
+    // task. Only meaningful while `inlineTip != nil`.
+    var inlineTip: EyeHealthTip?
+    private var inlineTipDismissTask: Task<Void, Never>?
+
     // MARK: - Derived Outputs
 
     /// Continuous time since last break, in seconds.
@@ -222,16 +232,45 @@ final class EyeGuardDataBridge {
         )
     }
 
-    /// Surfaces a random `TipDatabase` tip via the existing speech-bubble
-    /// notification — same payload shape as `MenuBarView.showRandomTip()`
-    /// so mascot / notch presenters can't drift on the userInfo contract.
-    func showRandomTip() {
+    /// Surfaces a random `TipDatabase` tip.
+    ///
+    /// Behaviour depends on whether the notch panel is currently expanded:
+    /// - **Expanded** (caller passes `inline: true`): stash the tip on
+    ///   `inlineTip` so `EyeGuardExpandedView` renders it as a pinned
+    ///   banner above "Continuous Use". Auto-clears after 8s. Keeps the
+    ///   panel open so the user can read without losing their place.
+    /// - **Collapsed** (default): post the legacy
+    ///   `.showEyeTipRequested` notification — observed by mascot
+    ///   (speech bubble) or `NotchModule` (info pop banner).
+    ///
+    /// Same `TipDatabase.randomTip()` source as `MenuBarView.showRandomTip()`
+    /// so all surfaces stay in lockstep.
+    func showRandomTip(inline: Bool = false) {
         let tip = TipDatabase.randomTip()
-        NotificationCenter.default.post(
-            name: .showEyeTipRequested,
-            object: nil,
-            userInfo: ["tipId": tip.id]
-        )
+        if inline {
+            inlineTip = tip
+            inlineTipDismissTask?.cancel()
+            inlineTipDismissTask = Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .seconds(8))
+                guard let self, !Task.isCancelled else { return }
+                if self.inlineTip?.id == tip.id {
+                    self.inlineTip = nil
+                }
+            }
+        } else {
+            NotificationCenter.default.post(
+                name: .showEyeTipRequested,
+                object: nil,
+                userInfo: ["tipId": tip.id]
+            )
+        }
+    }
+
+    /// Manually clear the inline tip banner (close button on the banner).
+    func dismissInlineTip() {
+        inlineTipDismissTask?.cancel()
+        inlineTipDismissTask = nil
+        inlineTip = nil
     }
 
     /// Builds today's daily report and pops up `ReportWindowController`.
