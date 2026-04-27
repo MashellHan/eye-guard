@@ -3,7 +3,7 @@
 > 合并 `docs/bugs.md` + 已知技术债。按优先级排，从上往下做。
 > 修的时候用 `/feature <描述>` 走完整流程。
 
-更新时间：2026-04-27（B11 已完成）
+更新时间：2026-04-27（B12 已完成）
 
 ---
 
@@ -36,6 +36,14 @@
 ---
 
 ## 已完成
+
+- **B12** Notch 展开/收起动画两阶段化（参照灵动岛）（task `20260427-1646-notch-island-animation`，2026-04-27）
+  - 完成于 2026-04-27，commit `9882527`，test report `.agent_workspace/tests/20260427-1646-notch-island-animation/report.md`
+  - 排查：window 高度固定 400pt，所有形变在 SwiftUI 内 → 排除 NSWindow setFrame 跳变。根因是容器 spring + per-row content transitions 同时起跑导致割裂
+  - Phase A 容器 morph：`interpolatingSpring(mass:1, stiffness:200, damping:22)` ζ≈0.78 ~3% overshoot；NotchShape 加 `animatableData` 让 cornerRadius 14↔18 跟随 spring 插值；call-site audit 确认 NotchShape 仅 NotchContainerView 一处构造
+  - Phase B 内容 fade：删除 `rowTransition` static + 所有 per-row `.transition(...)`；整个 `.opened` VStack 包成单个 `.transition(.opacity)` + outer `.easeOut(0.22).delay(opened ? 0.13 : 0)` —— 进入延 130ms 等容器 spring 弹完，退出立即 fade-out 防 ghost frame
+  - tester PASS：W2 height-throttle 0 warning（关键验收项）；UI 截图肉眼确认 cornerRadius 14→18 morph；233/233 unit；perf 全 OK
+  - reviewer 1 warning：`.opened` 与 `else` 分支 12 children VStack 重复（plan 明确 out-of-scope，留作 B12.5 follow-up 抽 `@ViewBuilder`）
 
 - **B11** Notch island 内容丰富化（task `20260427-1617-notch-rich-content`，2026-04-27）
   - 完成于 2026-04-27，commit `92b742b`，test report `.agent_workspace/tests/20260427-1617-notch-rich-content/report.md`
