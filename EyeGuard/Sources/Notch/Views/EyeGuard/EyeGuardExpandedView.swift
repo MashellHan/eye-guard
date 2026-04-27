@@ -21,7 +21,10 @@ struct EyeGuardExpandedView: View {
     var viewModel: NotchViewModel?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        // B11: outer spacing 14→10 + padding 16→14 to absorb the 3 new
+        // sections (QuickActionsRow ~26pt, AIInsightRow ~30pt, NotchFooterRow
+        // ~32pt) without busting the ~420pt panel-height budget.
+        VStack(alignment: .leading, spacing: 10) {
             // B7: gate every child on `.opened` so SwiftUI sees each row as
             // an insert and runs its `.transition`. Without the `if`, the
             // whole VStack is constructed before the parent's spring kicks
@@ -47,11 +50,32 @@ struct EyeGuardExpandedView: View {
                 BreakNowButton(bridge: bridge)
                     .padding(.top, 4)
                     .transition(.opacity.combined(with: .scale(scale: 0.95)))
+
+                // B11: Exercise + Tip secondary actions sit directly under
+                // the primary CTA — same insert/transition pattern, no
+                // `.delay()` (would burn W2 height-throttle budget).
+                QuickActionsRow(bridge: bridge)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+
+                Divider()
+                    .background(Color.white.opacity(0.12))
+                    .transition(.opacity)
+
+                AIInsightRow(bridge: bridge)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+
+                Divider()
+                    .background(Color.white.opacity(0.08))
+                    .transition(.opacity)
+
+                NotchFooterRow(bridge: bridge)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             } else {
                 // Fallback when this view is rendered outside an .opened
                 // context (e.g. the placeholder bridge path in
                 // NotchContainerView during contentType juggling). Mirrors
-                // the original VStack so we don't regress non-hover paths.
+                // the .opened branch (without transitions) so non-hover
+                // paths don't regress to a stale layout.
                 ContinuousTimeSection(bridge: bridge)
                 Divider()
                     .background(Color.white.opacity(0.12))
@@ -60,9 +84,16 @@ struct EyeGuardExpandedView: View {
                 CompactStatsStrip(bridge: bridge)
                 BreakNowButton(bridge: bridge)
                     .padding(.top, 4)
+                QuickActionsRow(bridge: bridge)
+                Divider()
+                    .background(Color.white.opacity(0.12))
+                AIInsightRow(bridge: bridge)
+                Divider()
+                    .background(Color.white.opacity(0.08))
+                NotchFooterRow(bridge: bridge)
             }
         }
-        .padding(16)
+        .padding(14)
         .frame(maxWidth: .infinity, alignment: .top)
         .background(
             GeometryReader { geo in

@@ -152,6 +152,53 @@ final class EyeGuardDataBridge {
         TimeFormatting.formatDuration(scheduler.totalScreenTimeToday)
     }
 
+    /// Number of eye-exercise sessions logged today (B11). Mirrors
+    /// `MenuBarView.statsSection` so the Notch's 4-column strip stays in
+    /// lockstep with the menubar popover.
+    var exerciseSessionsToday: Int {
+        scheduler.exerciseSessionsToday
+    }
+
+    /// Daily exercise target derived from screen time tier (B11). See
+    /// `BreakScheduler.recommendedExerciseSessions` for the source-of-truth
+    /// formula — kept here as a thin pass-through so notch views never reach
+    /// into the scheduler.
+    var recommendedExerciseSessions: Int {
+        scheduler.recommendedExerciseSessions
+    }
+
+    /// One-line AI insight for the notch's compact AIInsightRow (B11).
+    /// Computed each access — `InsightGenerator` is a pure function so the
+    /// cost is negligible and we get fresh text on every redraw.
+    ///
+    /// Compliance formula intentionally identical to
+    /// `MenuBarView.insightAndReportSection` (line 310-313) so both surfaces
+    /// agree on the narrative. Diverging would be a B11 acceptance fail.
+    var currentInsight: String {
+        let total = scheduler.breaksTakenToday + scheduler.breaksSkippedToday
+        let compliance = total > 0
+            ? Double(scheduler.breaksTakenToday) / Double(total)
+            : 1.0
+        return InsightGenerator().generateMenuBarInsight(
+            healthScore: scheduler.currentHealthScore,
+            screenTime: scheduler.totalScreenTimeToday,
+            breakCompliance: compliance
+        )
+    }
+
+    /// Underlying scheduler reference — escape hatch for window controllers
+    /// that genuinely need a `BreakScheduler` argument
+    /// (`DashboardWindowController.shared.showDashboard(scheduler:)`).
+    ///
+    /// **R1 contract**: Notch views MUST NOT use this property to read
+    /// scheduler state directly — go through the derived getters above so
+    /// the bridge stays the single boundary between Notch and business
+    /// logic. Reviewer should reject any `bridge.underlyingScheduler.foo`
+    /// access that isn't a `WindowController` constructor argument.
+    var underlyingScheduler: BreakScheduler {
+        scheduler
+    }
+
     // MARK: - Actions
 
     /// Immediately request a manual break.
@@ -163,6 +210,62 @@ final class EyeGuardDataBridge {
     /// and the button immediately disabled itself via `isInBreak`.
     func triggerBreakNow() {
         scheduler.requestManualBreak()
+    }
+
+    /// Posts the same notification the menubar's "Exercise" quick action
+    /// uses (`Constants.swift:131`). Centralised here so notch views never
+    /// import `NotificationCenter` / `Notification.Name`.
+    func triggerExercise() {
+        NotificationCenter.default.post(
+            name: .startExercisesFromBreak,
+            object: nil
+        )
+    }
+
+    /// Surfaces a random `TipDatabase` tip via the existing speech-bubble
+    /// notification — same payload shape as `MenuBarView.showRandomTip()`
+    /// so mascot / notch presenters can't drift on the userInfo contract.
+    func showRandomTip() {
+        let tip = TipDatabase.randomTip()
+        NotificationCenter.default.post(
+            name: .showEyeTipRequested,
+            object: nil,
+            userInfo: ["tipId": tip.id]
+        )
+    }
+
+    /// Builds today's daily report and pops up `ReportWindowController`.
+    ///
+    /// Body intentionally mirrors `MenuBarView.generateReport()` (line
+    /// 392-419): same `ReportDataProvider` snapshot → same
+    /// `DailyReportGenerator` invocation → same fall-back to in-memory
+    /// markdown when the on-disk file isn't there yet. Kept as an `async`
+    /// MainActor method so the call site is a simple `await`.
+    func generateReport() async {
+        let data = ReportDataProvider.shared.currentData()
+        let generator = DailyReportGenerator()
+        let report = await generator.generate(
+            sessions: data.sessions,
+            breakEvents: data.breakEvents,
+            totalScreenTime: data.totalScreenTime,
+            longestContinuousSession: data.longestContinuousSession
+        )
+
+        let fileURL = EyeGuardConstants.reportsDirectory
+            .appendingPathComponent("\(report.dateString).md")
+        let markdown = (try? String(contentsOf: fileURL, encoding: .utf8))
+            ?? generator.generateMarkdownContent(
+                sessions: data.sessions,
+                breakEvents: data.breakEvents,
+                totalScreenTime: data.totalScreenTime,
+                longestContinuousSession: data.longestContinuousSession
+            )
+
+        ReportWindowController.shared.showReport(
+            markdown: markdown,
+            fileURL: fileURL,
+            title: "EyeGuard Report — \(report.dateString)"
+        )
     }
 
     // MARK: - Init
