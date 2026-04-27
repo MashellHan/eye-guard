@@ -24,18 +24,19 @@ struct NotchContainerView: View {
                     NotchShape(cornerRadius: currentCornerRadius)
                         .fill(Color.black)
                 )
-                // B12: Two-phase Dynamic-Island morph — phase A is the
-                // container shape (frame + cornerRadius) driven by an
-                // interpolatingSpring (mass:1, stiffness:200, damping:22 →
-                // ζ≈0.78, ~3% overshoot) so the pill "breathes" open with
-                // a clean elastic settle. Content fade is handled inside
-                // EyeGuardExpandedView (phase B, delayed ~130ms). Same
-                // spring drives status + contentType to keep both phases
-                // visually coherent. Stays inside W2 height-throttle
-                // (10 writes/500ms) — overshoot adds at most 1–2 settle
-                // frames over the previous spring.
-                .animation(.interpolatingSpring(mass: 1.0, stiffness: 200, damping: 22), value: viewModel.status)
-                .animation(.interpolatingSpring(mass: 1.0, stiffness: 200, damping: 22), value: viewModel.contentType)
+                // B12 follow-up: clip to NotchShape so any content (text,
+                // images) cannot paint outside the morphing pill while the
+                // container spring is still in motion. Without this clip,
+                // text rows render at their intrinsic width and visibly
+                // overflow the rounded edge during the open animation.
+                .clipShape(NotchShape(cornerRadius: currentCornerRadius))
+                // B12 follow-up: dropped overshoot (damping 22 → 28, ζ≈0.99)
+                // so the container settles cleanly without the bounce that
+                // was making content "shrink back" mid-fade. Pure
+                // critically-damped spring still feels organic but is rock
+                // stable — no oscillation, no resize wobble.
+                .animation(.interpolatingSpring(mass: 1.0, stiffness: 200, damping: 28), value: viewModel.status)
+                .animation(.interpolatingSpring(mass: 1.0, stiffness: 200, damping: 28), value: viewModel.contentType)
 
             Spacer(minLength: 0)
         }
