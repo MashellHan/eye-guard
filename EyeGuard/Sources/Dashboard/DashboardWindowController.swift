@@ -27,6 +27,11 @@ final class DashboardWindowController {
 
     // MARK: - Public API
 
+    /// Default content size for the dashboard window.
+    /// Picked to comfortably fit the multi-section dashboard without
+    /// horizontal scrolling on a 1440×900 screen.
+    private static let defaultContentSize = NSSize(width: 1280, height: 920)
+
     /// Shows the dashboard window, creating it if needed.
     ///
     /// - Parameter scheduler: The BreakScheduler to display data from.
@@ -43,7 +48,7 @@ final class DashboardWindowController {
         let hostingView = NSHostingView(rootView: dashboardView)
 
         let dashboardWindow = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 1180, height: 880),
+            contentRect: NSRect(origin: .zero, size: Self.defaultContentSize),
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
             backing: .buffered,
             defer: false
@@ -51,7 +56,14 @@ final class DashboardWindowController {
 
         dashboardWindow.title = "EyeGuard Dashboard"
         dashboardWindow.contentView = hostingView
-        dashboardWindow.contentMinSize = NSSize(width: 720, height: 540)
+        dashboardWindow.contentMinSize = NSSize(width: 800, height: 600)
+        // Skip macOS state-restoration so the window always opens at the
+        // intended default size instead of whatever the user last left it
+        // at — previously the restored frame masked our default bump.
+        dashboardWindow.isRestorable = false
+        // Force the content size after creation in case AppKit tried to
+        // restore an older frame from the window-state cache.
+        dashboardWindow.setContentSize(Self.defaultContentSize)
         dashboardWindow.center()
         dashboardWindow.isReleasedWhenClosed = false
 
