@@ -76,6 +76,16 @@ final class NotchModule {
                 let tip = TipDatabase.tips.first(where: { $0.id == tipId })
                     ?? TipDatabase.randomTip()
                 Task { @MainActor in
+                    // If the panel is currently expanded (user clicked
+                    // Tip from QuickActionsRow inside the .opened view),
+                    // close it first — `pop()` early-returns while
+                    // `.opened` so without this the click looks dead.
+                    // A small delay lets the close animation start
+                    // before the popping state takes over.
+                    if firstVM.status == .opened {
+                        firstVM.notchClose()
+                        try? await Task.sleep(for: .milliseconds(180))
+                    }
                     firstVM.pop(
                         kind: .info,
                         message: tip.titleChinese,
