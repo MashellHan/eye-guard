@@ -99,12 +99,15 @@ struct FullScreenOverlayView: View {
 
     var body: some View {
         ZStack {
-            // Semi-transparent background
-            Color.black.opacity(0.65)
+            // B1 follow-up: blur must render BELOW the dark scrim. ZStack
+            // stacks bottom→top, so VisualEffectBlur first, then a heavy
+            // black scrim on top guarantees dark substrate even on a white
+            // wallpaper. Previous order let `.fullScreenUI` material wash
+            // the scrim back to near-transparent → white text on white bg.
+            VisualEffectBlur()
                 .ignoresSafeArea()
 
-            // Blur effect
-            VisualEffectBlur()
+            Color.black.opacity(0.85)
                 .ignoresSafeArea()
 
             // Center content

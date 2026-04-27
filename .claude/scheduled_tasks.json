@@ -1,0 +1,12 @@
+{
+  "tasks": [
+    {
+      "id": "acaa703b",
+      "cron": "4-59/10 * * * *",
+      "prompt": "静默运行 `pew sync`（Bash 工具），只在失败时报告。成功不要回复，避免打断对话。",
+      "createdAt": 1776937709775,
+      "lastFiredAt": 1777277081397,
+      "recurring": true
+    }
+  ]
+}

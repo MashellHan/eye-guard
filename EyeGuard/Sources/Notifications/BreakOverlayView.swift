@@ -87,15 +87,13 @@ struct BreakOverlayView: View {
         }
         .padding(24)
         .frame(width: 320, height: 280)
-        // B1: light wallpapers made `.ultraThinMaterial` nearly transparent,
-        // dropping text contrast below WCAG AA. Stack a translucent dark scrim
-        // on top of the material so we always have a darker substrate for
-        // white text, while preserving the frosted-glass aesthetic.
+        // B1 follow-up: prior fix used opacity 0.35 on top of ultraThinMaterial,
+        // which still let bright wallpapers bleed through and white-on-white
+        // text. Drop the material entirely — solid dark fill gives WCAG AA
+        // contrast on every background.
         .background {
-            ZStack {
-                Rectangle().fill(.ultraThinMaterial)
-                Color.black.opacity(0.35)
-            }
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(white: 0.12).opacity(0.92))
         }
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(
