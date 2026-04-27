@@ -3,7 +3,7 @@
 > 合并 `docs/bugs.md` + 已知技术债。按优先级排，从上往下做。
 > 修的时候用 `/feature <描述>` 走完整流程。
 
-更新时间：2026-04-24（B9/B10 已完成）
+更新时间：2026-04-27（B11 已完成）
 
 ---
 
@@ -36,6 +36,12 @@
 ---
 
 ## 已完成
+
+- **B11** Notch island 内容丰富化（task `20260427-1617-notch-rich-content`，2026-04-27）
+  - 完成于 2026-04-27，commit `92b742b`，test report `.agent_workspace/tests/20260427-1617-notch-rich-content/report.md`
+  - 新增：QuickActionsRow（Exercise + Tip ghost 按钮）、AIInsightRow（brain icon + insight 单行 + Report doc icon）、NotchFooterRow（Dashboard / Settings / Quit）；CompactStatsStrip 3 → 4 列（加 Exercises N/M）
+  - Bridge 加 4 个 derived getter + 3 个 action + generateReport()；underlyingScheduler 仅供 Dashboard window controller 用，doc 注释禁止 view 直读 state（R1 守住）
+  - 总高 ~360pt（实测）≪ 420pt 上限；W2 height-throttle 0 warning；reviewer PASS (0 critical, 2 warning hover affordance / report 抽 presenter 留作 follow-up)；tester PASS (233/233 unit, 5/5 UI, 0 critical, perf 全 OK)
 
 - **B9 + B10** Break TTS 仍重复 + 息屏不停（task `20260424-0130-tts-screenlock`，2026-04-24）
   - 完成于 2026-04-24，test report `.agent_workspace/tests/20260424-0130-tts-screenlock/report.json`
