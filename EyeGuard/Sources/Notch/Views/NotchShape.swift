@@ -11,14 +11,22 @@ import SwiftUI
 /// the screen bezel), bottom edges are rounded. The corner radius is
 /// proportional to the shape height.
 struct NotchShape: Shape {
-    var cornerRadius: CGFloat?
+    var cornerRadius: CGFloat = 14
 
-    init(cornerRadius: CGFloat? = nil) {
+    /// Expose `cornerRadius` to SwiftUI's animation system so spring/ease
+    /// drivers can interpolate the radius continuously (B12). Without this
+    /// the shape re-paints with a stepped radius and the morph looks janky.
+    var animatableData: CGFloat {
+        get { cornerRadius }
+        set { cornerRadius = newValue }
+    }
+
+    init(cornerRadius: CGFloat = 14) {
         self.cornerRadius = cornerRadius
     }
 
     func path(in rect: CGRect) -> Path {
-        let radius = cornerRadius ?? min(rect.height, 14)
+        let radius = cornerRadius
         var path = Path()
 
         path.move(to: CGPoint(x: rect.minX, y: rect.minY))

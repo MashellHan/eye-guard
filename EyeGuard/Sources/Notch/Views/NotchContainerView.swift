@@ -21,16 +21,21 @@ struct NotchContainerView: View {
                     height: currentHeight
                 )
                 .background(
-                    NotchShape(cornerRadius: 14)
+                    NotchShape(cornerRadius: currentCornerRadius)
                         .fill(Color.black)
                 )
-                // B7 → B11 polish: softer/longer spring with a touch of
-                // bounce so the panel "breathes" open instead of snapping.
-                // Lower stiffness + slightly under-damped feel matches the
-                // Dynamic-Island reference. Staying inside W2's height
-                // throttle (10 writes/500ms) — measured 4–6 settle frames.
-                .animation(.spring(response: 0.5, dampingFraction: 0.74, blendDuration: 0.2), value: viewModel.status)
-                .animation(.spring(response: 0.5, dampingFraction: 0.74, blendDuration: 0.2), value: viewModel.contentType)
+                // B12: Two-phase Dynamic-Island morph — phase A is the
+                // container shape (frame + cornerRadius) driven by an
+                // interpolatingSpring (mass:1, stiffness:200, damping:22 →
+                // ζ≈0.78, ~3% overshoot) so the pill "breathes" open with
+                // a clean elastic settle. Content fade is handled inside
+                // EyeGuardExpandedView (phase B, delayed ~130ms). Same
+                // spring drives status + contentType to keep both phases
+                // visually coherent. Stays inside W2 height-throttle
+                // (10 writes/500ms) — overshoot adds at most 1–2 settle
+                // frames over the previous spring.
+                .animation(.interpolatingSpring(mass: 1.0, stiffness: 200, damping: 22), value: viewModel.status)
+                .animation(.interpolatingSpring(mass: 1.0, stiffness: 200, damping: 22), value: viewModel.contentType)
 
             Spacer(minLength: 0)
         }
@@ -52,6 +57,19 @@ struct NotchContainerView: View {
         case .closed:
             return viewModel.geometry.deviceNotchRect.width
                 + viewModel.currentExpansionWidth
+        }
+    }
+
+    /// B12: cornerRadius participates in the container morph — opened
+    /// state widens to 18pt for a softer, more "liquid" feel; closed and
+    /// popping keep the 14pt radius that lines up with the screen bezel.
+    /// Interpolated by `NotchShape.animatableData` under the same spring.
+    private var currentCornerRadius: CGFloat {
+        switch viewModel.status {
+        case .opened:
+            return 18
+        case .popping, .closed:
+            return 14
         }
     }
 
